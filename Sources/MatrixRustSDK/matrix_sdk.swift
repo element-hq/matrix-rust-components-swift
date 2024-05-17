@@ -707,6 +707,91 @@ extension BackupDownloadStrategy: Equatable, Hashable {}
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * Current state of a [`Paginator`].
+ */
+
+public enum PaginatorState {
+    
+    /**
+     * The initial state of the paginator.
+     */
+    case initial
+    /**
+     * The paginator is fetching the target initial event.
+     */
+    case fetchingTargetEvent
+    /**
+     * The target initial event could be found, zero or more paginations have
+     * happened since then, and the paginator is at rest now.
+     */
+    case idle
+    /**
+     * The paginator is… paginating one direction or another.
+     */
+    case paginating
+}
+
+
+public struct FfiConverterTypePaginatorState: FfiConverterRustBuffer {
+    typealias SwiftType = PaginatorState
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PaginatorState {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .initial
+        
+        case 2: return .fetchingTargetEvent
+        
+        case 3: return .idle
+        
+        case 4: return .paginating
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: PaginatorState, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .initial:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .fetchingTargetEvent:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .idle:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .paginating:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypePaginatorState_lift(_ buf: RustBuffer) throws -> PaginatorState {
+    return try FfiConverterTypePaginatorState.lift(buf)
+}
+
+public func FfiConverterTypePaginatorState_lower(_ value: PaginatorState) -> RustBuffer {
+    return FfiConverterTypePaginatorState.lower(value)
+}
+
+
+
+extension PaginatorState: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * The role of a member in a room.
  */
 

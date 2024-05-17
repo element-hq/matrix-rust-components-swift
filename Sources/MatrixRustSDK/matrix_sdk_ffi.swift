@@ -852,9 +852,18 @@ public protocol ClientProtocol : AnyObject {
     func getRecentlyVisitedRooms() async throws  -> [String]
     
     /**
-     * Get the preview of a room, to interact with it.
+     * Given a room alias, get the preview of a room, to interact with it.
      */
-    func getRoomPreview(roomIdOrAlias: String) async throws  -> RoomPreview
+    func getRoomPreviewFromRoomAlias(roomAlias: String) async throws  -> RoomPreview
+    
+    /**
+     * Given a room id, get the preview of a room, to interact with it.
+     *
+     * The list of `via_servers` must be a list of servers that know
+     * about the room and can resolve it, and that may appear as a `via`
+     * parameter in e.g. a permalink URL. This list can be empty.
+     */
+    func getRoomPreviewFromRoomId(roomId: String, viaServers: [String]) async throws  -> RoomPreview
     
     func getSessionVerificationController() async throws  -> SessionVerificationController
     
@@ -1234,15 +1243,39 @@ open func getRecentlyVisitedRooms()async throws  -> [String] {
 }
     
     /**
-     * Get the preview of a room, to interact with it.
+     * Given a room alias, get the preview of a room, to interact with it.
      */
-open func getRoomPreview(roomIdOrAlias: String)async throws  -> RoomPreview {
+open func getRoomPreviewFromRoomAlias(roomAlias: String)async throws  -> RoomPreview {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_get_room_preview(
+                uniffi_matrix_sdk_ffi_fn_method_client_get_room_preview_from_room_alias(
                     self.uniffiClonePointer(),
-                    FfiConverterString.lower(roomIdOrAlias)
+                    FfiConverterString.lower(roomAlias)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeRoomPreview.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Given a room id, get the preview of a room, to interact with it.
+     *
+     * The list of `via_servers` must be a list of servers that know
+     * about the room and can resolve it, and that may appear as a `via`
+     * parameter in e.g. a permalink URL. This list can be empty.
+     */
+open func getRoomPreviewFromRoomId(roomId: String, viaServers: [String])async throws  -> RoomPreview {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_get_room_preview_from_room_id(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(roomId),FfiConverterSequenceString.lower(viaServers)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
@@ -2068,7 +2101,19 @@ public protocol EncryptionProtocol : AnyObject {
     
     func backupStateListener(listener: BackupStateListener)  -> TaskHandle
     
+    /**
+     * Get the public curve25519 key of our own device in base64. This is
+     * usually what is called the identity key of the device.
+     */
+    func curve25519Key() async  -> String?
+    
     func disableRecovery() async throws 
+    
+    /**
+     * Get the public ed25519 key of our own device. This is usually what is
+     * called the fingerprint of the device.
+     */
+    func ed25519Key() async  -> String?
     
     func enableBackups() async throws 
     
@@ -2184,6 +2229,28 @@ open func backupStateListener(listener: BackupStateListener) -> TaskHandle {
 })
 }
     
+    /**
+     * Get the public curve25519 key of our own device in base64. This is
+     * usually what is called the identity key of the device.
+     */
+open func curve25519Key()async  -> String? {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_curve25519_key(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionString.lift,
+            errorHandler: nil
+            
+        )
+}
+    
 open func disableRecovery()async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -2198,6 +2265,28 @@ open func disableRecovery()async throws  {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeRecoveryError.lift
+        )
+}
+    
+    /**
+     * Get the public ed25519 key of our own device. This is usually what is
+     * called the fingerprint of the device.
+     */
+open func ed25519Key()async  -> String? {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_ed25519_key(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionString.lift,
+            errorHandler: nil
+            
         )
 }
     
@@ -16524,70 +16613,6 @@ extension OtherState: Equatable, Hashable {}
 
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
-
-public enum PaginationOptions {
-    
-    case simpleRequest(eventLimit: UInt16, waitForToken: Bool
-    )
-    case untilNumItems(eventLimit: UInt16, items: UInt16, waitForToken: Bool
-    )
-}
-
-
-public struct FfiConverterTypePaginationOptions: FfiConverterRustBuffer {
-    typealias SwiftType = PaginationOptions
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PaginationOptions {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .simpleRequest(eventLimit: try FfiConverterUInt16.read(from: &buf), waitForToken: try FfiConverterBool.read(from: &buf)
-        )
-        
-        case 2: return .untilNumItems(eventLimit: try FfiConverterUInt16.read(from: &buf), items: try FfiConverterUInt16.read(from: &buf), waitForToken: try FfiConverterBool.read(from: &buf)
-        )
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: PaginationOptions, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case let .simpleRequest(eventLimit,waitForToken):
-            writeInt(&buf, Int32(1))
-            FfiConverterUInt16.write(eventLimit, into: &buf)
-            FfiConverterBool.write(waitForToken, into: &buf)
-            
-        
-        case let .untilNumItems(eventLimit,items,waitForToken):
-            writeInt(&buf, Int32(2))
-            FfiConverterUInt16.write(eventLimit, into: &buf)
-            FfiConverterUInt16.write(items, into: &buf)
-            FfiConverterBool.write(waitForToken, into: &buf)
-            
-        }
-    }
-}
-
-
-public func FfiConverterTypePaginationOptions_lift(_ buf: RustBuffer) throws -> PaginationOptions {
-    return try FfiConverterTypePaginationOptions.lift(buf)
-}
-
-public func FfiConverterTypePaginationOptions_lower(_ value: PaginationOptions) -> RustBuffer {
-    return FfiConverterTypePaginationOptions.lower(value)
-}
-
-
-
-extension PaginationOptions: Equatable, Hashable {}
-
-
-
 
 public enum ParseError {
 
@@ -19272,7 +19297,7 @@ public enum TimelineItemContentKind {
     case callInvite
     case unableToDecrypt(msg: EncryptedMessage
     )
-    case roomMembership(userId: String, change: MembershipChange?
+    case roomMembership(userId: String, userDisplayName: String?, change: MembershipChange?
     )
     case profileChange(displayName: String?, prevDisplayName: String?, avatarUrl: String?, prevAvatarUrl: String?
     )
@@ -19307,7 +19332,7 @@ public struct FfiConverterTypeTimelineItemContentKind: FfiConverterRustBuffer {
         case 6: return .unableToDecrypt(msg: try FfiConverterTypeEncryptedMessage.read(from: &buf)
         )
         
-        case 7: return .roomMembership(userId: try FfiConverterString.read(from: &buf), change: try FfiConverterOptionTypeMembershipChange.read(from: &buf)
+        case 7: return .roomMembership(userId: try FfiConverterString.read(from: &buf), userDisplayName: try FfiConverterOptionString.read(from: &buf), change: try FfiConverterOptionTypeMembershipChange.read(from: &buf)
         )
         
         case 8: return .profileChange(displayName: try FfiConverterOptionString.read(from: &buf), prevDisplayName: try FfiConverterOptionString.read(from: &buf), avatarUrl: try FfiConverterOptionString.read(from: &buf), prevAvatarUrl: try FfiConverterOptionString.read(from: &buf)
@@ -19365,9 +19390,10 @@ public struct FfiConverterTypeTimelineItemContentKind: FfiConverterRustBuffer {
             FfiConverterTypeEncryptedMessage.write(msg, into: &buf)
             
         
-        case let .roomMembership(userId,change):
+        case let .roomMembership(userId,userDisplayName,change):
             writeInt(&buf, Int32(7))
             FfiConverterString.write(userId, into: &buf)
+            FfiConverterOptionString.write(userDisplayName, into: &buf)
             FfiConverterOptionTypeMembershipChange.write(change, into: &buf)
             
         
@@ -20273,7 +20299,7 @@ extension FfiConverterCallbackInterfaceNotificationSettingsDelegate : FfiConvert
 
 public protocol PaginationStatusListener : AnyObject {
     
-    func onUpdate(status: PaginationStatus) 
+    func onUpdate(status: PaginatorState) 
     
 }
 
@@ -20297,7 +20323,7 @@ fileprivate struct UniffiCallbackInterfacePaginationStatusListener {
                     throw UniffiInternalError.unexpectedStaleHandle
                 }
                 return uniffiObj.onUpdate(
-                     status: try FfiConverterTypePaginationStatus_lift(status)
+                     status: try FfiConverterTypePaginatorState_lift(status)
                 )
             }
 
@@ -23842,7 +23868,10 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recently_visited_rooms() != 22399) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_room_preview() != 15212) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_room_preview_from_room_alias() != 10849) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_room_preview_from_room_id() != 6925) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_session_verification_controller() != 55934) {
@@ -23992,7 +24021,13 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_backup_state_listener() != 14246) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_curve25519_key() != 58425) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_disable_recovery() != 18699) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_ed25519_key() != 11864) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_backups() != 55446) {
@@ -24736,7 +24771,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettingsdelegate_settings_did_change() != 51708) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_paginationstatuslistener_on_update() != 21763) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_paginationstatuslistener_on_update() != 58051) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_progresswatcher_transmission_progress() != 41133) {
