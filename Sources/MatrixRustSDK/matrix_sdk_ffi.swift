@@ -7798,7 +7798,7 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16], caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
     
-    func subscribeToBackPaginationStatus(listener: PaginationStatusListener) throws  -> TaskHandle
+    func subscribeToBackPaginationStatus(listener: PaginationStatusListener) async throws  -> TaskHandle
     
     func toggleReaction(eventId: String, key: String) async throws 
     
@@ -8213,12 +8213,21 @@ open func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16]
 })
 }
     
-open func subscribeToBackPaginationStatus(listener: PaginationStatusListener)throws  -> TaskHandle {
-    return try  FfiConverterTypeTaskHandle.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
-    uniffi_matrix_sdk_ffi_fn_method_timeline_subscribe_to_back_pagination_status(self.uniffiClonePointer(),
-        FfiConverterCallbackInterfacePaginationStatusListener.lower(listener),$0
-    )
-})
+open func subscribeToBackPaginationStatus(listener: PaginationStatusListener)async throws  -> TaskHandle {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_subscribe_to_back_pagination_status(
+                    self.uniffiClonePointer(),
+                    FfiConverterCallbackInterfacePaginationStatusListener.lower(listener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeTaskHandle.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func toggleReaction(eventId: String, key: String)async throws  {
@@ -12498,12 +12507,14 @@ public func FfiConverterTypeRoomPreview_lower(_ value: RoomPreview) -> RustBuffe
 public struct RoomSubscription {
     public var requiredState: [RequiredState]?
     public var timelineLimit: UInt32?
+    public var includeHeroes: Bool?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(requiredState: [RequiredState]?, timelineLimit: UInt32?) {
+    public init(requiredState: [RequiredState]?, timelineLimit: UInt32?, includeHeroes: Bool?) {
         self.requiredState = requiredState
         self.timelineLimit = timelineLimit
+        self.includeHeroes = includeHeroes
     }
 }
 
@@ -12517,12 +12528,16 @@ extension RoomSubscription: Equatable, Hashable {
         if lhs.timelineLimit != rhs.timelineLimit {
             return false
         }
+        if lhs.includeHeroes != rhs.includeHeroes {
+            return false
+        }
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(requiredState)
         hasher.combine(timelineLimit)
+        hasher.combine(includeHeroes)
     }
 }
 
@@ -12532,13 +12547,15 @@ public struct FfiConverterTypeRoomSubscription: FfiConverterRustBuffer {
         return
             try RoomSubscription(
                 requiredState: FfiConverterOptionSequenceTypeRequiredState.read(from: &buf), 
-                timelineLimit: FfiConverterOptionUInt32.read(from: &buf)
+                timelineLimit: FfiConverterOptionUInt32.read(from: &buf), 
+                includeHeroes: FfiConverterOptionBool.read(from: &buf)
         )
     }
 
     public static func write(_ value: RoomSubscription, into buf: inout [UInt8]) {
         FfiConverterOptionSequenceTypeRequiredState.write(value.requiredState, into: &buf)
         FfiConverterOptionUInt32.write(value.timelineLimit, into: &buf)
+        FfiConverterOptionBool.write(value.includeHeroes, into: &buf)
     }
 }
 
@@ -20496,7 +20513,7 @@ extension FfiConverterCallbackInterfaceNotificationSettingsDelegate : FfiConvert
 
 public protocol PaginationStatusListener : AnyObject {
     
-    func onUpdate(status: PaginatorState) 
+    func onUpdate(status: LiveBackPaginationStatus) 
     
 }
 
@@ -20520,7 +20537,7 @@ fileprivate struct UniffiCallbackInterfacePaginationStatusListener {
                     throw UniffiInternalError.unexpectedStaleHandle
                 }
                 return uniffiObj.onUpdate(
-                     status: try FfiConverterTypePaginatorState_lift(status)
+                     status: try FfiConverterTypeLiveBackPaginationStatus_lift(status)
                 )
             }
 
@@ -23762,9 +23779,10 @@ public func generateWebviewUrl(widgetSettings: WidgetSettings, room: Room, props
  * but should only be done as temporal workarounds until this function is
  * adjusted
  */
-public func getElementCallRequiredPermissions() -> WidgetCapabilities {
+public func getElementCallRequiredPermissions(ownUserId: String) -> WidgetCapabilities {
     return try!  FfiConverterTypeWidgetCapabilities.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_func_get_element_call_required_permissions($0
+    uniffi_matrix_sdk_ffi_fn_func_get_element_call_required_permissions(
+        FfiConverterString.lower(ownUserId),$0
     )
 })
 }
@@ -23942,7 +23960,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_func_generate_webview_url() != 6844) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_func_get_element_call_required_permissions() != 30886) {
+    if (uniffi_matrix_sdk_ffi_checksum_func_get_element_call_required_permissions() != 51419) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_log_event() != 62286) {
@@ -24848,7 +24866,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_voice_message() != 49989) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_back_pagination_status() != 32222) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_back_pagination_status() != 46161) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_toggle_reaction() != 10294) {
@@ -24974,7 +24992,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettingsdelegate_settings_did_change() != 51708) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_paginationstatuslistener_on_update() != 58051) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_paginationstatuslistener_on_update() != 29884) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_progresswatcher_transmission_progress() != 41133) {
