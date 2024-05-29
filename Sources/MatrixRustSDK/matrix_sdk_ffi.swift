@@ -15361,6 +15361,7 @@ public enum HumanQrLoginError {
     case InvalidQrCode
     case SlidingSyncNotAvailable
     case OidcMetadataInvalid
+    case OtherDeviceNotSignedIn
 }
 
 
@@ -15383,6 +15384,7 @@ public struct FfiConverterTypeHumanQrLoginError: FfiConverterRustBuffer {
         case 7: return .InvalidQrCode
         case 8: return .SlidingSyncNotAvailable
         case 9: return .OidcMetadataInvalid
+        case 10: return .OtherDeviceNotSignedIn
 
          default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -15429,6 +15431,10 @@ public struct FfiConverterTypeHumanQrLoginError: FfiConverterRustBuffer {
         
         case .OidcMetadataInvalid:
             writeInt(&buf, Int32(9))
+        
+        
+        case .OtherDeviceNotSignedIn:
+            writeInt(&buf, Int32(10))
         
         }
     }
