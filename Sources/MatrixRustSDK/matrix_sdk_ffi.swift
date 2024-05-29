@@ -1789,6 +1789,22 @@ public protocol ClientBuilderProtocol : AnyObject {
     
     func build() async throws  -> Client
     
+    /**
+     * Finish the building of the client and attempt to log in using the
+     * provided [`QrCodeData`].
+     *
+     * This method will build the client and immediately attempt to log the
+     * client in using the provided [`QrCodeData`] using the login
+     * mechanism described in [MSC4108]. As such this methods requires OIDC
+     * support as well as sliding sync support.
+     *
+     * The usage of the progress_listener is required to transfer the
+     * [`CheckCode`] to the existing client.
+     *
+     * [MSC4108]: https://github.com/matrix-org/matrix-spec-proposals/pull/4108
+     */
+    func buildWithQrCode(qrCodeData: QrCodeData, oidcConfiguration: OidcConfiguration, progressListener: QrLoginProgressListener) async throws  -> Client
+    
     func disableAutomaticTokenRefresh()  -> ClientBuilder
     
     func disableSslVerification()  -> ClientBuilder
@@ -1928,6 +1944,37 @@ open func build()async throws  -> Client {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
             liftFunc: FfiConverterTypeClient.lift,
             errorHandler: FfiConverterTypeClientBuildError.lift
+        )
+}
+    
+    /**
+     * Finish the building of the client and attempt to log in using the
+     * provided [`QrCodeData`].
+     *
+     * This method will build the client and immediately attempt to log the
+     * client in using the provided [`QrCodeData`] using the login
+     * mechanism described in [MSC4108]. As such this methods requires OIDC
+     * support as well as sliding sync support.
+     *
+     * The usage of the progress_listener is required to transfer the
+     * [`CheckCode`] to the existing client.
+     *
+     * [MSC4108]: https://github.com/matrix-org/matrix-spec-proposals/pull/4108
+     */
+open func buildWithQrCode(qrCodeData: QrCodeData, oidcConfiguration: OidcConfiguration, progressListener: QrLoginProgressListener)async throws  -> Client {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_clientbuilder_build_with_qr_code(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeQrCodeData.lower(qrCodeData),FfiConverterTypeOidcConfiguration.lower(oidcConfiguration),FfiConverterCallbackInterfaceQrLoginProgressListener.lower(progressListener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeClient.lift,
+            errorHandler: FfiConverterTypeHumanQrLoginError.lift
         )
 }
     
@@ -4163,6 +4210,124 @@ public func FfiConverterTypeOidcAuthenticationData_lift(_ pointer: UnsafeMutable
 
 public func FfiConverterTypeOidcAuthenticationData_lower(_ value: OidcAuthenticationData) -> UnsafeMutableRawPointer {
     return FfiConverterTypeOidcAuthenticationData.lower(value)
+}
+
+
+
+
+/**
+ * Data for the QR code login mechanism.
+ *
+ * The [`QrCodeData`] can be serialized and encoded as a QR code or it can be
+ * decoded from a QR code.
+ */
+public protocol QrCodeDataProtocol : AnyObject {
+    
+}
+
+/**
+ * Data for the QR code login mechanism.
+ *
+ * The [`QrCodeData`] can be serialized and encoded as a QR code or it can be
+ * decoded from a QR code.
+ */
+open class QrCodeData:
+    QrCodeDataProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_qrcodedata(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_qrcodedata(pointer, $0) }
+    }
+
+    
+    /**
+     * Attempt to decode a slice of bytes into a [`QrCodeData`] object.
+     *
+     * The slice of bytes would generally be returned by a QR code decoder.
+     */
+public static func fromBytes(bytes: Data)throws  -> QrCodeData {
+    return try  FfiConverterTypeQrCodeData.lift(try rustCallWithError(FfiConverterTypeQrCodeDecodeError.lift) {
+    uniffi_matrix_sdk_ffi_fn_constructor_qrcodedata_from_bytes(
+        FfiConverterData.lower(bytes),$0
+    )
+})
+}
+    
+
+    
+
+}
+
+public struct FfiConverterTypeQrCodeData: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = QrCodeData
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> QrCodeData {
+        return QrCodeData(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: QrCodeData) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> QrCodeData {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: QrCodeData, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeQrCodeData_lift(_ pointer: UnsafeMutableRawPointer) throws -> QrCodeData {
+    return try FfiConverterTypeQrCodeData.lift(pointer)
+}
+
+public func FfiConverterTypeQrCodeData_lower(_ value: QrCodeData) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeQrCodeData.lower(value)
 }
 
 
@@ -15182,6 +15347,98 @@ extension FocusEventError: Equatable, Hashable {}
 
 extension FocusEventError: Error { }
 
+
+public enum HumanQrLoginError {
+
+    
+    
+    case LinkingNotSupported
+    case Cancelled
+    case Expired
+    case ConnectionInsecure
+    case Declined
+    case Unknown
+    case InvalidQrCode
+    case SlidingSyncNotAvailable
+    case OidcMetadataInvalid
+}
+
+
+public struct FfiConverterTypeHumanQrLoginError: FfiConverterRustBuffer {
+    typealias SwiftType = HumanQrLoginError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HumanQrLoginError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .LinkingNotSupported
+        case 2: return .Cancelled
+        case 3: return .Expired
+        case 4: return .ConnectionInsecure
+        case 5: return .Declined
+        case 6: return .Unknown
+        case 7: return .InvalidQrCode
+        case 8: return .SlidingSyncNotAvailable
+        case 9: return .OidcMetadataInvalid
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: HumanQrLoginError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        
+        case .LinkingNotSupported:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .Cancelled:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .Expired:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .ConnectionInsecure:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .Declined:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .Unknown:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .InvalidQrCode:
+            writeInt(&buf, Int32(7))
+        
+        
+        case .SlidingSyncNotAvailable:
+            writeInt(&buf, Int32(8))
+        
+        
+        case .OidcMetadataInvalid:
+            writeInt(&buf, Int32(9))
+        
+        }
+    }
+}
+
+
+extension HumanQrLoginError: Equatable, Hashable {}
+
+extension HumanQrLoginError: Error { }
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
@@ -17197,6 +17454,158 @@ public func FfiConverterTypePusherKind_lower(_ value: PusherKind) -> RustBuffer 
 
 
 extension PusherKind: Equatable, Hashable {}
+
+
+
+
+/**
+ * Error type for the decoding of the [`QrCodeData`].
+ */
+public enum QrCodeDecodeError {
+
+    
+    
+    case Crypto(message: String)
+    
+}
+
+
+public struct FfiConverterTypeQrCodeDecodeError: FfiConverterRustBuffer {
+    typealias SwiftType = QrCodeDecodeError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> QrCodeDecodeError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .Crypto(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: QrCodeDecodeError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        case .Crypto(_ /* message is ignored*/):
+            writeInt(&buf, Int32(1))
+
+        
+        }
+    }
+}
+
+
+extension QrCodeDecodeError: Equatable, Hashable {}
+
+extension QrCodeDecodeError: Error { }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Enum describing the progress of the QR-code login.
+ */
+
+public enum QrLoginProgress {
+    
+    /**
+     * The login process is starting.
+     */
+    case starting
+    /**
+     * We established a secure channel with the other device.
+     */
+    case establishingSecureChannel(
+        /**
+         * The check code that the device should display so the other device
+         * can confirm that the channel is secure as well.
+         */checkCode: UInt8, 
+        /**
+         * The string representation of the check code, will be guaranteed to
+         * be 2 characters long, preserving the leading zero if the
+         * first digit is a zero.
+         */checkCodeString: String
+    )
+    /**
+     * We are waiting for the login and for the OIDC provider to give us an
+     * access token.
+     */
+    case waitingForToken(userCode: String
+    )
+    /**
+     * The login has successfully finished.
+     */
+    case done
+}
+
+
+public struct FfiConverterTypeQrLoginProgress: FfiConverterRustBuffer {
+    typealias SwiftType = QrLoginProgress
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> QrLoginProgress {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .starting
+        
+        case 2: return .establishingSecureChannel(checkCode: try FfiConverterUInt8.read(from: &buf), checkCodeString: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .waitingForToken(userCode: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 4: return .done
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: QrLoginProgress, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .starting:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .establishingSecureChannel(checkCode,checkCodeString):
+            writeInt(&buf, Int32(2))
+            FfiConverterUInt8.write(checkCode, into: &buf)
+            FfiConverterString.write(checkCodeString, into: &buf)
+            
+        
+        case let .waitingForToken(userCode):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(userCode, into: &buf)
+            
+        
+        case .done:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeQrLoginProgress_lift(_ buf: RustBuffer) throws -> QrLoginProgress {
+    return try FfiConverterTypeQrLoginProgress.lift(buf)
+}
+
+public func FfiConverterTypeQrLoginProgress_lower(_ value: QrLoginProgress) -> RustBuffer {
+    return FfiConverterTypeQrLoginProgress.lower(value)
+}
+
+
+
+extension QrLoginProgress: Equatable, Hashable {}
 
 
 
@@ -20650,6 +21059,87 @@ fileprivate struct FfiConverterCallbackInterfaceProgressWatcher {
 
 extension FfiConverterCallbackInterfaceProgressWatcher : FfiConverter {
     typealias SwiftType = ProgressWatcher
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
+public protocol QrLoginProgressListener : AnyObject {
+    
+    func onUpdate(state: QrLoginProgress) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceQrLoginProgressListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceQrLoginProgressListener = UniffiVTableCallbackInterfaceQrLoginProgressListener(
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            state: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceQrLoginProgressListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     state: try FfiConverterTypeQrLoginProgress.lift(state)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceQrLoginProgressListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface QrLoginProgressListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitQrLoginProgressListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_qrloginprogresslistener(&UniffiCallbackInterfaceQrLoginProgressListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceQrLoginProgressListener {
+    fileprivate static var handleMap = UniffiHandleMap<QrLoginProgressListener>()
+}
+
+extension FfiConverterCallbackInterfaceQrLoginProgressListener : FfiConverter {
+    typealias SwiftType = QrLoginProgressListener
     typealias FfiType = UInt64
 
     public static func lift(_ handle: UInt64) throws -> SwiftType {
@@ -24188,6 +24678,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_build() != 56018) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_build_with_qr_code() != 51905) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_automatic_token_refresh() != 43839) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -24953,6 +25446,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_constructor_clientbuilder_new() != 27991) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_qrcodedata_from_bytes() != 32675) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_span_current() != 53698) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -24996,6 +25492,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_progresswatcher_transmission_progress() != 41133) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_qrloginprogresslistener_on_update() != 9758) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_recoverystatelistener_on_update() != 64575) {
@@ -25065,6 +25564,7 @@ private var initializationResult: InitializationResult {
     uniffiCallbackInitNotificationSettingsDelegate()
     uniffiCallbackInitPaginationStatusListener()
     uniffiCallbackInitProgressWatcher()
+    uniffiCallbackInitQrLoginProgressListener()
     uniffiCallbackInitRecoveryStateListener()
     uniffiCallbackInitRoomDirectorySearchEntriesListener()
     uniffiCallbackInitRoomInfoListener()
