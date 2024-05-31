@@ -16044,10 +16044,10 @@ public enum MessageLikeEventContent {
     
     case callAnswer
     case callInvite
-    case callHangup
-    case callCandidates
     case callNotify(notifyType: NotifyType
     )
+    case callHangup
+    case callCandidates
     case keyVerificationReady
     case keyVerificationStart
     case keyVerificationCancel
@@ -16078,12 +16078,12 @@ public struct FfiConverterTypeMessageLikeEventContent: FfiConverterRustBuffer {
         
         case 2: return .callInvite
         
-        case 3: return .callHangup
-        
-        case 4: return .callCandidates
-        
-        case 5: return .callNotify(notifyType: try FfiConverterTypeNotifyType.read(from: &buf)
+        case 3: return .callNotify(notifyType: try FfiConverterTypeNotifyType.read(from: &buf)
         )
+        
+        case 4: return .callHangup
+        
+        case 5: return .callCandidates
         
         case 6: return .keyVerificationReady
         
@@ -16130,18 +16130,18 @@ public struct FfiConverterTypeMessageLikeEventContent: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         
         
-        case .callHangup:
+        case let .callNotify(notifyType):
             writeInt(&buf, Int32(3))
+            FfiConverterTypeNotifyType.write(notifyType, into: &buf)
+            
         
-        
-        case .callCandidates:
+        case .callHangup:
             writeInt(&buf, Int32(4))
         
         
-        case let .callNotify(notifyType):
+        case .callCandidates:
             writeInt(&buf, Int32(5))
-            FfiConverterTypeNotifyType.write(notifyType, into: &buf)
-            
+        
         
         case .keyVerificationReady:
             writeInt(&buf, Int32(6))
@@ -16223,6 +16223,7 @@ public enum MessageLikeEventType {
     case callCandidates
     case callHangup
     case callInvite
+    case callNotify
     case keyVerificationAccept
     case keyVerificationCancel
     case keyVerificationDone
@@ -16259,41 +16260,43 @@ public struct FfiConverterTypeMessageLikeEventType: FfiConverterRustBuffer {
         
         case 4: return .callInvite
         
-        case 5: return .keyVerificationAccept
+        case 5: return .callNotify
         
-        case 6: return .keyVerificationCancel
+        case 6: return .keyVerificationAccept
         
-        case 7: return .keyVerificationDone
+        case 7: return .keyVerificationCancel
         
-        case 8: return .keyVerificationKey
+        case 8: return .keyVerificationDone
         
-        case 9: return .keyVerificationMac
+        case 9: return .keyVerificationKey
         
-        case 10: return .keyVerificationReady
+        case 10: return .keyVerificationMac
         
-        case 11: return .keyVerificationStart
+        case 11: return .keyVerificationReady
         
-        case 12: return .pollEnd
+        case 12: return .keyVerificationStart
         
-        case 13: return .pollResponse
+        case 13: return .pollEnd
         
-        case 14: return .pollStart
+        case 14: return .pollResponse
         
-        case 15: return .reaction
+        case 15: return .pollStart
         
-        case 16: return .roomEncrypted
+        case 16: return .reaction
         
-        case 17: return .roomMessage
+        case 17: return .roomEncrypted
         
-        case 18: return .roomRedaction
+        case 18: return .roomMessage
         
-        case 19: return .sticker
+        case 19: return .roomRedaction
         
-        case 20: return .unstablePollEnd
+        case 20: return .sticker
         
-        case 21: return .unstablePollResponse
+        case 21: return .unstablePollEnd
         
-        case 22: return .unstablePollStart
+        case 22: return .unstablePollResponse
+        
+        case 23: return .unstablePollStart
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -16319,76 +16322,80 @@ public struct FfiConverterTypeMessageLikeEventType: FfiConverterRustBuffer {
             writeInt(&buf, Int32(4))
         
         
-        case .keyVerificationAccept:
+        case .callNotify:
             writeInt(&buf, Int32(5))
         
         
-        case .keyVerificationCancel:
+        case .keyVerificationAccept:
             writeInt(&buf, Int32(6))
         
         
-        case .keyVerificationDone:
+        case .keyVerificationCancel:
             writeInt(&buf, Int32(7))
         
         
-        case .keyVerificationKey:
+        case .keyVerificationDone:
             writeInt(&buf, Int32(8))
         
         
-        case .keyVerificationMac:
+        case .keyVerificationKey:
             writeInt(&buf, Int32(9))
         
         
-        case .keyVerificationReady:
+        case .keyVerificationMac:
             writeInt(&buf, Int32(10))
         
         
-        case .keyVerificationStart:
+        case .keyVerificationReady:
             writeInt(&buf, Int32(11))
         
         
-        case .pollEnd:
+        case .keyVerificationStart:
             writeInt(&buf, Int32(12))
         
         
-        case .pollResponse:
+        case .pollEnd:
             writeInt(&buf, Int32(13))
         
         
-        case .pollStart:
+        case .pollResponse:
             writeInt(&buf, Int32(14))
         
         
-        case .reaction:
+        case .pollStart:
             writeInt(&buf, Int32(15))
         
         
-        case .roomEncrypted:
+        case .reaction:
             writeInt(&buf, Int32(16))
         
         
-        case .roomMessage:
+        case .roomEncrypted:
             writeInt(&buf, Int32(17))
         
         
-        case .roomRedaction:
+        case .roomMessage:
             writeInt(&buf, Int32(18))
         
         
-        case .sticker:
+        case .roomRedaction:
             writeInt(&buf, Int32(19))
         
         
-        case .unstablePollEnd:
+        case .sticker:
             writeInt(&buf, Int32(20))
         
         
-        case .unstablePollResponse:
+        case .unstablePollEnd:
             writeInt(&buf, Int32(21))
         
         
-        case .unstablePollStart:
+        case .unstablePollResponse:
             writeInt(&buf, Int32(22))
+        
+        
+        case .unstablePollStart:
+            writeInt(&buf, Int32(23))
         
         }
     }
@@ -19918,6 +19925,7 @@ public enum TimelineItemContentKind {
     case poll(question: String, kind: PollKind, maxSelections: UInt64, answers: [PollAnswer], votes: [String: [String]], endTime: UInt64?, hasBeenEdited: Bool
     )
     case callInvite
+    case callNotify
     case unableToDecrypt(msg: EncryptedMessage
     )
     case roomMembership(userId: String, userDisplayName: String?, change: MembershipChange?
@@ -19952,22 +19960,24 @@ public struct FfiConverterTypeTimelineItemContentKind: FfiConverterRustBuffer {
         
         case 5: return .callInvite
         
-        case 6: return .unableToDecrypt(msg: try FfiConverterTypeEncryptedMessage.read(from: &buf)
+        case 6: return .callNotify
+        
+        case 7: return .unableToDecrypt(msg: try FfiConverterTypeEncryptedMessage.read(from: &buf)
         )
         
-        case 7: return .roomMembership(userId: try FfiConverterString.read(from: &buf), userDisplayName: try FfiConverterOptionString.read(from: &buf), change: try FfiConverterOptionTypeMembershipChange.read(from: &buf)
+        case 8: return .roomMembership(userId: try FfiConverterString.read(from: &buf), userDisplayName: try FfiConverterOptionString.read(from: &buf), change: try FfiConverterOptionTypeMembershipChange.read(from: &buf)
         )
         
-        case 8: return .profileChange(displayName: try FfiConverterOptionString.read(from: &buf), prevDisplayName: try FfiConverterOptionString.read(from: &buf), avatarUrl: try FfiConverterOptionString.read(from: &buf), prevAvatarUrl: try FfiConverterOptionString.read(from: &buf)
+        case 9: return .profileChange(displayName: try FfiConverterOptionString.read(from: &buf), prevDisplayName: try FfiConverterOptionString.read(from: &buf), avatarUrl: try FfiConverterOptionString.read(from: &buf), prevAvatarUrl: try FfiConverterOptionString.read(from: &buf)
         )
         
-        case 9: return .state(stateKey: try FfiConverterString.read(from: &buf), content: try FfiConverterTypeOtherState.read(from: &buf)
+        case 10: return .state(stateKey: try FfiConverterString.read(from: &buf), content: try FfiConverterTypeOtherState.read(from: &buf)
         )
         
-        case 10: return .failedToParseMessageLike(eventType: try FfiConverterString.read(from: &buf), error: try FfiConverterString.read(from: &buf)
+        case 11: return .failedToParseMessageLike(eventType: try FfiConverterString.read(from: &buf), error: try FfiConverterString.read(from: &buf)
         )
         
-        case 11: return .failedToParseState(eventType: try FfiConverterString.read(from: &buf), stateKey: try FfiConverterString.read(from: &buf), error: try FfiConverterString.read(from: &buf)
+        case 12: return .failedToParseState(eventType: try FfiConverterString.read(from: &buf), stateKey: try FfiConverterString.read(from: &buf), error: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -20008,20 +20018,24 @@ public struct FfiConverterTypeTimelineItemContentKind: FfiConverterRustBuffer {
             writeInt(&buf, Int32(5))
         
         
-        case let .unableToDecrypt(msg):
+        case .callNotify:
             writeInt(&buf, Int32(6))
+        
+        
+        case let .unableToDecrypt(msg):
+            writeInt(&buf, Int32(7))
             FfiConverterTypeEncryptedMessage.write(msg, into: &buf)
             
         
         case let .roomMembership(userId,userDisplayName,change):
-            writeInt(&buf, Int32(7))
+            writeInt(&buf, Int32(8))
             FfiConverterString.write(userId, into: &buf)
             FfiConverterOptionString.write(userDisplayName, into: &buf)
             FfiConverterOptionTypeMembershipChange.write(change, into: &buf)
             
         
         case let .profileChange(displayName,prevDisplayName,avatarUrl,prevAvatarUrl):
-            writeInt(&buf, Int32(8))
+            writeInt(&buf, Int32(9))
             FfiConverterOptionString.write(displayName, into: &buf)
             FfiConverterOptionString.write(prevDisplayName, into: &buf)
             FfiConverterOptionString.write(avatarUrl, into: &buf)
@@ -20029,19 +20043,19 @@ public struct FfiConverterTypeTimelineItemContentKind: FfiConverterRustBuffer {
             
         
         case let .state(stateKey,content):
-            writeInt(&buf, Int32(9))
+            writeInt(&buf, Int32(10))
             FfiConverterString.write(stateKey, into: &buf)
             FfiConverterTypeOtherState.write(content, into: &buf)
             
         
         case let .failedToParseMessageLike(eventType,error):
-            writeInt(&buf, Int32(10))
+            writeInt(&buf, Int32(11))
             FfiConverterString.write(eventType, into: &buf)
             FfiConverterString.write(error, into: &buf)
             
         
         case let .failedToParseState(eventType,stateKey,error):
-            writeInt(&buf, Int32(11))
+            writeInt(&buf, Int32(12))
             FfiConverterString.write(eventType, into: &buf)
             FfiConverterString.write(stateKey, into: &buf)
             FfiConverterString.write(error, into: &buf)
