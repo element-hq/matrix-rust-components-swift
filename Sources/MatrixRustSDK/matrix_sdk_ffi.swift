@@ -766,12 +766,41 @@ open class AuthenticationService:
     }
     /**
      * Creates a new service to authenticate a user with.
+     *
+     * # Arguments
+     *
+     * * `session_path` - A path to the directory where the session data will
+     * be stored. A new directory **must** be given for each subsequent
+     * session as the database isn't designed to be shared.
+     *
+     * * `passphrase` - An optional passphrase to use to encrypt the session
+     * data.
+     *
+     * * `user_agent` - An optional user agent to use when making requests.
+     *
+     * * `additional_root_certificates` - Additional root certificates to trust
+     * when making requests when built with rustls.
+     *
+     * * `proxy` - An optional HTTP(S) proxy URL to use when making requests.
+     *
+     * * `oidc_configuration` - Configuration data about the app to use during
+     * OIDC authentication. This is required if OIDC authentication is to be
+     * used.
+     *
+     * * `custom_sliding_sync_proxy` - An optional sliding sync proxy URL that
+     * will override the proxy discovered from the homeserver's well-known.
+     *
+     * * `session_delegate` - A delegate that will handle token refresh etc.
+     * when the cross-process lock is configured.
+     *
+     * * `cross_process_refresh_lock_id` - A process ID to use for
+     * cross-process token refresh locks.
      */
-public convenience init(basePath: String, passphrase: String?, userAgent: String?, additionalRootCertificates: [Data], proxy: String?, oidcConfiguration: OidcConfiguration?, customSlidingSyncProxy: String?, sessionDelegate: ClientSessionDelegate?, crossProcessRefreshLockId: String?) {
+public convenience init(sessionPath: String, passphrase: String?, userAgent: String?, additionalRootCertificates: [Data], proxy: String?, oidcConfiguration: OidcConfiguration?, customSlidingSyncProxy: String?, sessionDelegate: ClientSessionDelegate?, crossProcessRefreshLockId: String?) {
     let pointer =
         try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_constructor_authenticationservice_new(
-        FfiConverterString.lower(basePath),
+        FfiConverterString.lower(sessionPath),
         FfiConverterOptionString.lower(passphrase),
         FfiConverterOptionString.lower(userAgent),
         FfiConverterSequenceData.lower(additionalRootCertificates),
@@ -1957,8 +1986,6 @@ public protocol ClientBuilderProtocol : AnyObject {
      */
     func backupDownloadStrategy(backupDownloadStrategy: BackupDownloadStrategy)  -> ClientBuilder
     
-    func basePath(path: String)  -> ClientBuilder
-    
     func build() async throws  -> Client
     
     /**
@@ -1994,6 +2021,15 @@ public protocol ClientBuilderProtocol : AnyObject {
     func serverNameOrHomeserverUrl(serverNameOrUrl: String)  -> ClientBuilder
     
     func serverVersions(versions: [String])  -> ClientBuilder
+    
+    /**
+     * Sets the path that the client will use to store its data once logged in.
+     * This path **must** be unique per session as the data stores aren't
+     * capable of handling multiple users.
+     *
+     * Leaving this unset tells the client to use an in-memory data store.
+     */
+    func sessionPath(path: String)  -> ClientBuilder
     
     func setSessionDelegate(sessionDelegate: ClientSessionDelegate)  -> ClientBuilder
     
@@ -2090,14 +2126,6 @@ open func backupDownloadStrategy(backupDownloadStrategy: BackupDownloadStrategy)
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_backup_download_strategy(self.uniffiClonePointer(),
         FfiConverterTypeBackupDownloadStrategy_lower(backupDownloadStrategy),$0
-    )
-})
-}
-    
-open func basePath(path: String) -> ClientBuilder {
-    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_base_path(self.uniffiClonePointer(),
-        FfiConverterString.lower(path),$0
     )
 })
 }
@@ -2217,6 +2245,21 @@ open func serverVersions(versions: [String]) -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_server_versions(self.uniffiClonePointer(),
         FfiConverterSequenceString.lower(versions),$0
+    )
+})
+}
+    
+    /**
+     * Sets the path that the client will use to store its data once logged in.
+     * This path **must** be unique per session as the data stores aren't
+     * capable of handling multiple users.
+     *
+     * Leaving this unset tells the client to use an in-memory data store.
+     */
+open func sessionPath(path: String) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_session_path(self.uniffiClonePointer(),
+        FfiConverterString.lower(path),$0
     )
 })
 }
@@ -11202,6 +11245,12 @@ public struct OidcConfiguration {
      * dynamic client registration.
      */
     public var staticRegistrations: [String: String]
+    /**
+     * A file path where any dynamic registrations should be stored.
+     *
+     * Suggested value: `{base_path}/oidc/registrations.json`
+     */
+    public var dynamicRegistrationsFile: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -11231,7 +11280,12 @@ public struct OidcConfiguration {
         /**
          * Pre-configured registrations for use with issuers that don't support
          * dynamic client registration.
-         */staticRegistrations: [String: String]) {
+         */staticRegistrations: [String: String], 
+        /**
+         * A file path where any dynamic registrations should be stored.
+         *
+         * Suggested value: `{base_path}/oidc/registrations.json`
+         */dynamicRegistrationsFile: String) {
         self.clientName = clientName
         self.redirectUri = redirectUri
         self.clientUri = clientUri
@@ -11240,6 +11294,7 @@ public struct OidcConfiguration {
         self.policyUri = policyUri
         self.contacts = contacts
         self.staticRegistrations = staticRegistrations
+        self.dynamicRegistrationsFile = dynamicRegistrationsFile
     }
 }
 
@@ -11271,6 +11326,9 @@ extension OidcConfiguration: Equatable, Hashable {
         if lhs.staticRegistrations != rhs.staticRegistrations {
             return false
         }
+        if lhs.dynamicRegistrationsFile != rhs.dynamicRegistrationsFile {
+            return false
+        }
         return true
     }
 
@@ -11283,6 +11341,7 @@ extension OidcConfiguration: Equatable, Hashable {
         hasher.combine(policyUri)
         hasher.combine(contacts)
         hasher.combine(staticRegistrations)
+        hasher.combine(dynamicRegistrationsFile)
     }
 }
 
@@ -11298,7 +11357,8 @@ public struct FfiConverterTypeOidcConfiguration: FfiConverterRustBuffer {
                 tosUri: FfiConverterOptionString.read(from: &buf), 
                 policyUri: FfiConverterOptionString.read(from: &buf), 
                 contacts: FfiConverterOptionSequenceString.read(from: &buf), 
-                staticRegistrations: FfiConverterDictionaryStringString.read(from: &buf)
+                staticRegistrations: FfiConverterDictionaryStringString.read(from: &buf), 
+                dynamicRegistrationsFile: FfiConverterString.read(from: &buf)
         )
     }
 
@@ -11311,6 +11371,7 @@ public struct FfiConverterTypeOidcConfiguration: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.policyUri, into: &buf)
         FfiConverterOptionSequenceString.write(value.contacts, into: &buf)
         FfiConverterDictionaryStringString.write(value.staticRegistrations, into: &buf)
+        FfiConverterString.write(value.dynamicRegistrationsFile, into: &buf)
     }
 }
 
@@ -14746,13 +14807,13 @@ public enum AuthenticationError {
     
     case SessionMissing(message: String)
     
-    case InvalidBasePath(message: String)
-    
     case OidcNotSupported(message: String)
     
     case OidcMetadataMissing(message: String)
     
     case OidcMetadataInvalid(message: String)
+    
+    case OidcRegistrationsPathInvalid(message: String)
     
     case OidcCallbackUrlInvalid(message: String)
     
@@ -14803,19 +14864,19 @@ public struct FfiConverterTypeAuthenticationError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 8: return .InvalidBasePath(
+        case 8: return .OidcNotSupported(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 9: return .OidcNotSupported(
+        case 9: return .OidcMetadataMissing(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 10: return .OidcMetadataMissing(
+        case 10: return .OidcMetadataInvalid(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 11: return .OidcMetadataInvalid(
+        case 11: return .OidcRegistrationsPathInvalid(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -14860,13 +14921,13 @@ public struct FfiConverterTypeAuthenticationError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(6))
         case .SessionMissing(_ /* message is ignored*/):
             writeInt(&buf, Int32(7))
-        case .InvalidBasePath(_ /* message is ignored*/):
-            writeInt(&buf, Int32(8))
         case .OidcNotSupported(_ /* message is ignored*/):
-            writeInt(&buf, Int32(9))
+            writeInt(&buf, Int32(8))
         case .OidcMetadataMissing(_ /* message is ignored*/):
-            writeInt(&buf, Int32(10))
+            writeInt(&buf, Int32(9))
         case .OidcMetadataInvalid(_ /* message is ignored*/):
+            writeInt(&buf, Int32(10))
+        case .OidcRegistrationsPathInvalid(_ /* message is ignored*/):
             writeInt(&buf, Int32(11))
         case .OidcCallbackUrlInvalid(_ /* message is ignored*/):
             writeInt(&buf, Int32(12))
@@ -25057,9 +25118,6 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_backup_download_strategy() != 11959) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_base_path() != 5092) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_build() != 56018) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25091,6 +25149,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_versions() != 15644) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_session_path() != 49266) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_set_session_delegate() != 8576) {
@@ -25825,7 +25886,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_constructor_mediasource_from_json() != 29216) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_constructor_authenticationservice_new() != 54979) {
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_authenticationservice_new() != 23411) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_clientbuilder_new() != 27991) {
