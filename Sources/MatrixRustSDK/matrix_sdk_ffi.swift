@@ -574,6 +574,139 @@ fileprivate struct FfiConverterDuration: FfiConverterRustBuffer {
 
 
 
+public protocol AbortSendHandleProtocol : AnyObject {
+    
+    /**
+     * Try to abort the sending of the current event.
+     *
+     * If this returns `true`, then the sending could be aborted, because the
+     * event hasn't been sent yet. Otherwise, if this returns `false`, the
+     * event had already been sent and could not be aborted.
+     *
+     * This has an effect only on the first call; subsequent calls will always
+     * return `false`.
+     */
+    func abort() async  -> Bool
+    
+}
+
+open class AbortSendHandle:
+    AbortSendHandleProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_abortsendhandle(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_abortsendhandle(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Try to abort the sending of the current event.
+     *
+     * If this returns `true`, then the sending could be aborted, because the
+     * event hasn't been sent yet. Otherwise, if this returns `false`, the
+     * event had already been sent and could not be aborted.
+     *
+     * This has an effect only on the first call; subsequent calls will always
+     * return `false`.
+     */
+open func abort()async  -> Bool {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_abortsendhandle_abort(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: nil
+            
+        )
+}
+    
+
+}
+
+public struct FfiConverterTypeAbortSendHandle: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = AbortSendHandle
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> AbortSendHandle {
+        return AbortSendHandle(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: AbortSendHandle) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AbortSendHandle {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: AbortSendHandle, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeAbortSendHandle_lift(_ pointer: UnsafeMutableRawPointer) throws -> AbortSendHandle {
+    return try FfiConverterTypeAbortSendHandle.lift(pointer)
+}
+
+public func FfiConverterTypeAbortSendHandle_lower(_ value: AbortSendHandle) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeAbortSendHandle.lower(value)
+}
+
+
+
+
 public protocol AuthenticationServiceProtocol : AnyObject {
     
     /**
@@ -835,6 +968,16 @@ public protocol ClientProtocol : AnyObject {
     
     func displayName() async throws  -> String
     
+    /**
+     * Enables or disables the sending queue, according to the given parameter.
+     *
+     * The sending queue automatically disables itself whenever sending an
+     * event with it failed (e.g., sending an event via the high-level Timeline
+     * object), so it's required to manually re-enable it as soon as
+     * connectivity is back on the device.
+     */
+    func enableSendingQueue(enable: Bool) 
+    
     func encryption()  -> Encryption
     
     func getDmRoom(userId: String) throws  -> Room?
@@ -928,7 +1071,7 @@ public protocol ClientProtocol : AnyObject {
     
     func searchUsers(searchTerm: String, limit: UInt64) async throws  -> SearchUsersResults
     
-    func session() async throws  -> Session
+    func session() throws  -> Session
     
     /**
      * Set the given account data content for the given event type.
@@ -947,6 +1090,15 @@ public protocol ClientProtocol : AnyObject {
     func setPusher(identifiers: PusherIdentifiers, kind: PusherKind, appDisplayName: String, deviceDisplayName: String, profileTag: String?, lang: String) async throws 
     
     func subscribeToIgnoredUsers(listener: IgnoredUsersListener)  -> TaskHandle
+    
+    /**
+     * Subscribe to the global enablement status of the sending queue, at the
+     * client-wide level.
+     *
+     * The given listener will be immediately called with the initial value of
+     * the enablement status.
+     */
+    func subscribeToSendingQueueStatus(listener: SendingQueueStatusListener)  -> TaskHandle
     
     func syncService()  -> SyncServiceBuilder
     
@@ -1133,6 +1285,21 @@ open func displayName()async throws  -> String {
             liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
+}
+    
+    /**
+     * Enables or disables the sending queue, according to the given parameter.
+     *
+     * The sending queue automatically disables itself whenever sending an
+     * event with it failed (e.g., sending an event via the high-level Timeline
+     * object), so it's required to manually re-enable it as soon as
+     * connectivity is back on the device.
+     */
+open func enableSendingQueue(enable: Bool) {try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_enable_sending_queue(self.uniffiClonePointer(),
+        FfiConverterBool.lower(enable),$0
+    )
+}
 }
     
 open func encryption() -> Encryption {
@@ -1544,21 +1711,11 @@ open func searchUsers(searchTerm: String, limit: UInt64)async throws  -> SearchU
         )
 }
     
-open func session()async throws  -> Session {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_session(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterTypeSession.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
+open func session()throws  -> Session {
+    return try  FfiConverterTypeSession.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_client_session(self.uniffiClonePointer(),$0
+    )
+})
 }
     
     /**
@@ -1632,6 +1789,21 @@ open func subscribeToIgnoredUsers(listener: IgnoredUsersListener) -> TaskHandle 
     return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_ignored_users(self.uniffiClonePointer(),
         FfiConverterCallbackInterfaceIgnoredUsersListener.lower(listener),$0
+    )
+})
+}
+    
+    /**
+     * Subscribe to the global enablement status of the sending queue, at the
+     * client-wide level.
+     *
+     * The given listener will be immediately called with the initial value of
+     * the enablement status.
+     */
+open func subscribeToSendingQueueStatus(listener: SendingQueueStatusListener) -> TaskHandle {
+    return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_sending_queue_status(self.uniffiClonePointer(),
+        FfiConverterCallbackInterfaceSendingQueueStatusListener.lower(listener),$0
     )
 })
 }
@@ -3197,6 +3369,8 @@ public protocol MessageProtocol : AnyObject {
     
     func body()  -> String
     
+    func content()  -> RoomMessageEventContentWithoutRelation
+    
     func inReplyTo()  -> InReplyToDetails?
     
     func isEdited()  -> Bool
@@ -3251,6 +3425,13 @@ open class Message:
 open func body() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_message_body(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func content() -> RoomMessageEventContentWithoutRelation {
+    return try!  FfiConverterTypeRoomMessageEventContentWithoutRelation.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_message_content(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -6212,10 +6393,11 @@ public protocol RoomListItemProtocol : AnyObject {
     func displayName()  -> String?
     
     /**
-     * Building a `Room`. If its internal timeline hasn't been initialized
-     * it'll fail.
+     * Build a full `Room` FFI object, filling its associated timeline.
+     *
+     * If its internal timeline hasn't been initialized, it'll fail.
      */
-    func fullRoom() async throws  -> Room
+    func fullRoom() throws  -> Room
     
     func id()  -> String
     
@@ -6316,24 +6498,15 @@ open func displayName() -> String? {
 }
     
     /**
-     * Building a `Room`. If its internal timeline hasn't been initialized
-     * it'll fail.
+     * Build a full `Room` FFI object, filling its associated timeline.
+     *
+     * If its internal timeline hasn't been initialized, it'll fail.
      */
-open func fullRoom()async throws  -> Room {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_roomlistitem_full_room(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeRoom.lift,
-            errorHandler: FfiConverterTypeRoomListError.lift
-        )
+open func fullRoom()throws  -> Room {
+    return try  FfiConverterTypeRoom.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_full_room(self.uniffiClonePointer(),$0
+    )
+})
 }
     
 open func id() -> String {
@@ -7895,9 +8068,7 @@ public protocol TimelineProtocol : AnyObject {
     
     func addListener(listener: TimelineListener) async  -> RoomTimelineListenerResult
     
-    func cancelSend(txnId: String) 
-    
-    func createPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind) throws 
+    func createPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind) async throws 
     
     func edit(newContent: RoomMessageEventContentWithoutRelation, editItem: EventTimelineItem) async throws 
     
@@ -7916,9 +8087,28 @@ public protocol TimelineProtocol : AnyObject {
      */
     func focusedPaginateForwards(numEvents: UInt16) async throws  -> Bool
     
+    /**
+     * Get the current timeline item for the given event ID, if any.
+     *
+     * Will return a remote event, *or* a local echo that has been sent but not
+     * yet replaced by a remote echo.
+     *
+     * It's preferable to store the timeline items in the model for your UI, if
+     * possible, instead of just storing IDs and coming back to the timeline
+     * object to look up items.
+     */
     func getEventTimelineItemByEventId(eventId: String) async throws  -> EventTimelineItem
     
-    func getTimelineEventContentByEventId(eventId: String) async throws  -> RoomMessageEventContentWithoutRelation
+    /**
+     * Get the current timeline item for the given transaction ID, if any.
+     *
+     * This will always return a local echo, if found.
+     *
+     * It's preferable to store the timeline items in the model for your UI, if
+     * possible, instead of just storing IDs and coming back to the timeline
+     * object to look up items.
+     */
+    func getEventTimelineItemByTransactionId(transactionId: String) async throws  -> EventTimelineItem
     
     func latestEvent() async  -> EventTimelineItem?
     
@@ -7939,11 +8129,30 @@ public protocol TimelineProtocol : AnyObject {
      */
     func paginateBackwards(numEvents: UInt16) async throws  -> Bool
     
+    /**
+     * Redacts an event from the timeline.
+     *
+     * Only works for events that exist as timeline items.
+     *
+     * If it was a local event, this will *try* to cancel it, if it was not
+     * being sent already. If the event was a remote event, then it will be
+     * redacted by sending a redaction request to the server.
+     *
+     * Returns whether the redaction did happen. It can only return false for
+     * local events that are being processed.
+     */
+    func redactEvent(item: EventTimelineItem, reason: String?) async throws  -> Bool
+    
     func retryDecryption(sessionIds: [String]) 
     
-    func retrySend(txnId: String) 
-    
-    func send(msg: RoomMessageEventContentWithoutRelation) 
+    /**
+     * Queues an event in the room's sending queue so it's processed for
+     * sending later.
+     *
+     * Returns an abort handle that allows to abort sending, if it hasn't
+     * happened yet.
+     */
+    func send(msg: RoomMessageEventContentWithoutRelation) async throws  -> AbortSendHandle
     
     func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
     
@@ -7951,9 +8160,9 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
     
-    func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?) 
+    func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?) async 
     
-    func sendPollResponse(pollStartId: String, answers: [String]) throws 
+    func sendPollResponse(pollStartId: String, answers: [String]) async throws 
     
     func sendReadReceipt(receiptType: ReceiptType, eventId: String) async throws 
     
@@ -8028,21 +8237,21 @@ open func addListener(listener: TimelineListener)async  -> RoomTimelineListenerR
         )
 }
     
-open func cancelSend(txnId: String) {try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timeline_cancel_send(self.uniffiClonePointer(),
-        FfiConverterString.lower(txnId),$0
-    )
-}
-}
-    
-open func createPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind)throws  {try rustCallWithError(FfiConverterTypeClientError.lift) {
-    uniffi_matrix_sdk_ffi_fn_method_timeline_create_poll(self.uniffiClonePointer(),
-        FfiConverterString.lower(question),
-        FfiConverterSequenceString.lower(answers),
-        FfiConverterUInt8.lower(maxSelections),
-        FfiConverterTypePollKind.lower(pollKind),$0
-    )
-}
+open func createPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_create_poll(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(question),FfiConverterSequenceString.lower(answers),FfiConverterUInt8.lower(maxSelections),FfiConverterTypePollKind.lower(pollKind)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func edit(newContent: RoomMessageEventContentWithoutRelation, editItem: EventTimelineItem)async throws  {
@@ -8144,6 +8353,16 @@ open func focusedPaginateForwards(numEvents: UInt16)async throws  -> Bool {
         )
 }
     
+    /**
+     * Get the current timeline item for the given event ID, if any.
+     *
+     * Will return a remote event, *or* a local echo that has been sent but not
+     * yet replaced by a remote echo.
+     *
+     * It's preferable to store the timeline items in the model for your UI, if
+     * possible, instead of just storing IDs and coming back to the timeline
+     * object to look up items.
+     */
 open func getEventTimelineItemByEventId(eventId: String)async throws  -> EventTimelineItem {
     return
         try  await uniffiRustCallAsync(
@@ -8161,19 +8380,28 @@ open func getEventTimelineItemByEventId(eventId: String)async throws  -> EventTi
         )
 }
     
-open func getTimelineEventContentByEventId(eventId: String)async throws  -> RoomMessageEventContentWithoutRelation {
+    /**
+     * Get the current timeline item for the given transaction ID, if any.
+     *
+     * This will always return a local echo, if found.
+     *
+     * It's preferable to store the timeline items in the model for your UI, if
+     * possible, instead of just storing IDs and coming back to the timeline
+     * object to look up items.
+     */
+open func getEventTimelineItemByTransactionId(transactionId: String)async throws  -> EventTimelineItem {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_timeline_get_timeline_event_content_by_event_id(
+                uniffi_matrix_sdk_ffi_fn_method_timeline_get_event_timeline_item_by_transaction_id(
                     self.uniffiClonePointer(),
-                    FfiConverterString.lower(eventId)
+                    FfiConverterString.lower(transactionId)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeRoomMessageEventContentWithoutRelation.lift,
+            liftFunc: FfiConverterTypeEventTimelineItem.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -8243,6 +8471,35 @@ open func paginateBackwards(numEvents: UInt16)async throws  -> Bool {
         )
 }
     
+    /**
+     * Redacts an event from the timeline.
+     *
+     * Only works for events that exist as timeline items.
+     *
+     * If it was a local event, this will *try* to cancel it, if it was not
+     * being sent already. If the event was a remote event, then it will be
+     * redacted by sending a redaction request to the server.
+     *
+     * Returns whether the redaction did happen. It can only return false for
+     * local events that are being processed.
+     */
+open func redactEvent(item: EventTimelineItem, reason: String?)async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_redact_event(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeEventTimelineItem.lower(item),FfiConverterOptionString.lower(reason)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
 open func retryDecryption(sessionIds: [String]) {try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_retry_decryption(self.uniffiClonePointer(),
         FfiConverterSequenceString.lower(sessionIds),$0
@@ -8250,18 +8507,28 @@ open func retryDecryption(sessionIds: [String]) {try! rustCall() {
 }
 }
     
-open func retrySend(txnId: String) {try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timeline_retry_send(self.uniffiClonePointer(),
-        FfiConverterString.lower(txnId),$0
-    )
-}
-}
-    
-open func send(msg: RoomMessageEventContentWithoutRelation) {try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timeline_send(self.uniffiClonePointer(),
-        FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(msg),$0
-    )
-}
+    /**
+     * Queues an event in the room's sending queue so it's processed for
+     * sending later.
+     *
+     * Returns an abort handle that allows to abort sending, if it hasn't
+     * happened yet.
+     */
+open func send(msg: RoomMessageEventContentWithoutRelation)async throws  -> AbortSendHandle {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_send(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(msg)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeAbortSendHandle.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
@@ -8299,23 +8566,39 @@ open func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, ca
 })
 }
     
-open func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?) {try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timeline_send_location(self.uniffiClonePointer(),
-        FfiConverterString.lower(body),
-        FfiConverterString.lower(geoUri),
-        FfiConverterOptionString.lower(description),
-        FfiConverterOptionUInt8.lower(zoomLevel),
-        FfiConverterOptionTypeAssetType.lower(assetType),$0
-    )
-}
+open func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?)async  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_send_location(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(body),FfiConverterString.lower(geoUri),FfiConverterOptionString.lower(description),FfiConverterOptionUInt8.lower(zoomLevel),FfiConverterOptionTypeAssetType.lower(assetType)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: nil
+            
+        )
 }
     
-open func sendPollResponse(pollStartId: String, answers: [String])throws  {try rustCallWithError(FfiConverterTypeClientError.lift) {
-    uniffi_matrix_sdk_ffi_fn_method_timeline_send_poll_response(self.uniffiClonePointer(),
-        FfiConverterString.lower(pollStartId),
-        FfiConverterSequenceString.lower(answers),$0
-    )
-}
+open func sendPollResponse(pollStartId: String, answers: [String])async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_send_poll_response(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(pollStartId),FfiConverterSequenceString.lower(answers)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func sendReadReceipt(receiptType: ReceiptType, eventId: String)async throws  {
@@ -15143,11 +15426,6 @@ public enum EventSendState {
     case sendingFailed(error: String
     )
     /**
-     * Sending has been cancelled because an earlier event in the
-     * message-sending queue failed.
-     */
-    case cancelled
-    /**
      * The local event has been sent successfully to the server.
      */
     case sent(eventId: String
@@ -15167,9 +15445,7 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
         case 2: return .sendingFailed(error: try FfiConverterString.read(from: &buf)
         )
         
-        case 3: return .cancelled
-        
-        case 4: return .sent(eventId: try FfiConverterString.read(from: &buf)
+        case 3: return .sent(eventId: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -15189,12 +15465,8 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
             FfiConverterString.write(error, into: &buf)
             
         
-        case .cancelled:
-            writeInt(&buf, Int32(3))
-        
-        
         case let .sent(eventId):
-            writeInt(&buf, Int32(4))
+            writeInt(&buf, Int32(3))
             FfiConverterString.write(eventId, into: &buf)
             
         }
@@ -19920,7 +20192,7 @@ public enum TimelineItemContentKind {
     
     case message
     case redactedMessage
-    case sticker(body: String, info: ImageInfo, url: String
+    case sticker(body: String, info: ImageInfo, source: MediaSource
     )
     case poll(question: String, kind: PollKind, maxSelections: UInt64, answers: [PollAnswer], votes: [String: [String]], endTime: UInt64?, hasBeenEdited: Bool
     )
@@ -19952,7 +20224,7 @@ public struct FfiConverterTypeTimelineItemContentKind: FfiConverterRustBuffer {
         
         case 2: return .redactedMessage
         
-        case 3: return .sticker(body: try FfiConverterString.read(from: &buf), info: try FfiConverterTypeImageInfo.read(from: &buf), url: try FfiConverterString.read(from: &buf)
+        case 3: return .sticker(body: try FfiConverterString.read(from: &buf), info: try FfiConverterTypeImageInfo.read(from: &buf), source: try FfiConverterTypeMediaSource.read(from: &buf)
         )
         
         case 4: return .poll(question: try FfiConverterString.read(from: &buf), kind: try FfiConverterTypePollKind.read(from: &buf), maxSelections: try FfiConverterUInt64.read(from: &buf), answers: try FfiConverterSequenceTypePollAnswer.read(from: &buf), votes: try FfiConverterDictionaryStringSequenceString.read(from: &buf), endTime: try FfiConverterOptionUInt64.read(from: &buf), hasBeenEdited: try FfiConverterBool.read(from: &buf)
@@ -19996,11 +20268,11 @@ public struct FfiConverterTypeTimelineItemContentKind: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         
         
-        case let .sticker(body,info,url):
+        case let .sticker(body,info,source):
             writeInt(&buf, Int32(3))
             FfiConverterString.write(body, into: &buf)
             FfiConverterTypeImageInfo.write(info, into: &buf)
-            FfiConverterString.write(url, into: &buf)
+            FfiConverterTypeMediaSource.write(source, into: &buf)
             
         
         case let .poll(question,kind,maxSelections,answers,votes,endTime,hasBeenEdited):
@@ -21721,6 +21993,96 @@ fileprivate struct FfiConverterCallbackInterfaceRoomListServiceSyncIndicatorList
 
 extension FfiConverterCallbackInterfaceRoomListServiceSyncIndicatorListener : FfiConverter {
     typealias SwiftType = RoomListServiceSyncIndicatorListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
+/**
+ * A listener to the global (client-wide) status of the sending queue.
+ */
+public protocol SendingQueueStatusListener : AnyObject {
+    
+    /**
+     * Called every time the sending queue has received a new status.
+     *
+     * This can be set automatically (in case of sending failure), or manually
+     * via an API call.
+     */
+    func onUpdate(newValue: Bool) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceSendingQueueStatusListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceSendingQueueStatusListener = UniffiVTableCallbackInterfaceSendingQueueStatusListener(
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            newValue: Int8,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSendingQueueStatusListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     newValue: try FfiConverterBool.lift(newValue)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceSendingQueueStatusListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface SendingQueueStatusListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitSendingQueueStatusListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_sendingqueuestatuslistener(&UniffiCallbackInterfaceSendingQueueStatusListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceSendingQueueStatusListener {
+    fileprivate static var handleMap = UniffiHandleMap<SendingQueueStatusListener>()
+}
+
+extension FfiConverterCallbackInterfaceSendingQueueStatusListener : FfiConverter {
+    typealias SwiftType = SendingQueueStatusListener
     typealias FfiType = UInt64
 
     public static func lift(_ handle: UInt64) throws -> SwiftType {
@@ -24524,6 +24886,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_roommessageeventcontentwithoutrelation_with_mentions() != 8867) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_abortsendhandle_abort() != 55658) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_authenticationservice_configure_homeserver() != 11225) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -24561,6 +24926,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_display_name() != 56259) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_sending_queue() != 21698) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_encryption() != 9657) {
@@ -24638,7 +25006,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_search_users() != 42927) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_session() != 55731) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_session() != 8085) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_account_data() != 18256) {
@@ -24654,6 +25022,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_ignored_users() != 23285) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_sending_queue_status() != 43691) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_sync_service() != 52812) {
@@ -24855,6 +25226,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_message_body() != 21198) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_message_content() != 57046) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_message_in_reply_to() != 16154) {
@@ -25178,7 +25552,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_display_name() != 8651) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_full_room() != 35618) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_full_room() != 41333) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_id() != 41176) {
@@ -25298,10 +25672,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_add_listener() != 58433) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_cancel_send() != 35492) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_create_poll() != 33830) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_create_poll() != 37925) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 45021) {
@@ -25322,10 +25693,10 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_focused_paginate_forwards() != 51003) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_event_id() != 36555) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_event_id() != 28091) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_timeline_event_content_by_event_id() != 31042) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_transaction_id() != 64706) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_latest_event() != 11115) {
@@ -25337,13 +25708,13 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_paginate_backwards() != 65175) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_redact_event() != 8574) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_retry_decryption() != 21112) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_retry_send() != 47520) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send() != 27762) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send() != 35299) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 47157) {
@@ -25355,10 +25726,10 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 30540) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_location() != 56484) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_location() != 47400) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_poll_response() != 34078) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_poll_response() != 59076) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_read_receipt() != 37532) {
@@ -25532,6 +25903,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservicesyncindicatorlistener_on_update() != 36937) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_sendingqueuestatuslistener_on_update() != 65345) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_accept_verification_request() != 22759) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25586,6 +25960,7 @@ private var initializationResult: InitializationResult {
     uniffiCallbackInitRoomListLoadingStateListener()
     uniffiCallbackInitRoomListServiceStateListener()
     uniffiCallbackInitRoomListServiceSyncIndicatorListener()
+    uniffiCallbackInitSendingQueueStatusListener()
     uniffiCallbackInitSessionVerificationControllerDelegate()
     uniffiCallbackInitSyncServiceStateObserver()
     uniffiCallbackInitTimelineListener()
