@@ -998,14 +998,15 @@ public protocol ClientProtocol : AnyObject {
     func displayName() async throws  -> String
     
     /**
-     * Enables or disables the sending queue, according to the given parameter.
+     * Enables or disables all the room send queues at once.
      *
-     * The sending queue automatically disables itself whenever sending an
-     * event with it failed (e.g., sending an event via the high-level Timeline
-     * object), so it's required to manually re-enable it as soon as
-     * connectivity is back on the device.
+     * When connectivity is lost on a device, it is recommended to disable the
+     * room sending queues.
+     *
+     * This can be controlled for individual rooms, using
+     * [`Room::enable_send_queue`].
      */
-    func enableSendingQueue(enable: Bool) 
+    func enableAllSendQueues(enable: Bool) 
     
     func encryption()  -> Encryption
     
@@ -1121,13 +1122,13 @@ public protocol ClientProtocol : AnyObject {
     func subscribeToIgnoredUsers(listener: IgnoredUsersListener)  -> TaskHandle
     
     /**
-     * Subscribe to the global enablement status of the sending queue, at the
+     * Subscribe to the global enablement status of the send queue, at the
      * client-wide level.
      *
      * The given listener will be immediately called with the initial value of
      * the enablement status.
      */
-    func subscribeToSendingQueueStatus(listener: SendingQueueStatusListener)  -> TaskHandle
+    func subscribeToSendQueueStatus(listener: SendQueueRoomErrorListener)  -> TaskHandle
     
     func syncService()  -> SyncServiceBuilder
     
@@ -1317,15 +1318,16 @@ open func displayName()async throws  -> String {
 }
     
     /**
-     * Enables or disables the sending queue, according to the given parameter.
+     * Enables or disables all the room send queues at once.
      *
-     * The sending queue automatically disables itself whenever sending an
-     * event with it failed (e.g., sending an event via the high-level Timeline
-     * object), so it's required to manually re-enable it as soon as
-     * connectivity is back on the device.
+     * When connectivity is lost on a device, it is recommended to disable the
+     * room sending queues.
+     *
+     * This can be controlled for individual rooms, using
+     * [`Room::enable_send_queue`].
      */
-open func enableSendingQueue(enable: Bool) {try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_client_enable_sending_queue(self.uniffiClonePointer(),
+open func enableAllSendQueues(enable: Bool) {try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_enable_all_send_queues(self.uniffiClonePointer(),
         FfiConverterBool.lower(enable),$0
     )
 }
@@ -1823,16 +1825,16 @@ open func subscribeToIgnoredUsers(listener: IgnoredUsersListener) -> TaskHandle 
 }
     
     /**
-     * Subscribe to the global enablement status of the sending queue, at the
+     * Subscribe to the global enablement status of the send queue, at the
      * client-wide level.
      *
      * The given listener will be immediately called with the initial value of
      * the enablement status.
      */
-open func subscribeToSendingQueueStatus(listener: SendingQueueStatusListener) -> TaskHandle {
+open func subscribeToSendQueueStatus(listener: SendQueueRoomErrorListener) -> TaskHandle {
     return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_sending_queue_status(self.uniffiClonePointer(),
-        FfiConverterCallbackInterfaceSendingQueueStatusListener.lower(listener),$0
+    uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_send_queue_status(self.uniffiClonePointer(),
+        FfiConverterCallbackInterfaceSendQueueRoomErrorListener.lower(listener),$0
     )
 })
 }
@@ -4615,7 +4617,12 @@ public protocol RoomProtocol : AnyObject {
      * compute a room name based on the room's nature (DM or not) and number of
      * members.
      */
-    func displayName() throws  -> String
+    func displayName()  -> String?
+    
+    /**
+     * Enable or disable the send queue for that particular room.
+     */
+    func enableSendQueue(enable: Bool) 
     
     func getPowerLevels() async throws  -> RoomPowerLevels
     
@@ -4651,6 +4658,12 @@ public protocol RoomProtocol : AnyObject {
     func isEncrypted() throws  -> Bool
     
     func isPublic()  -> Bool
+    
+    /**
+     * Returns whether the send queue for that particular room is enabled or
+     * not.
+     */
+    func isSendQueueEnabled()  -> Bool
     
     func isSpace()  -> Bool
     
@@ -5117,11 +5130,21 @@ open func discardRoomKey()async throws  {
      * compute a room name based on the room's nature (DM or not) and number of
      * members.
      */
-open func displayName()throws  -> String {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+open func displayName() -> String? {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_display_name(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+    /**
+     * Enable or disable the send queue for that particular room.
+     */
+open func enableSendQueue(enable: Bool) {try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_room_enable_send_queue(self.uniffiClonePointer(),
+        FfiConverterBool.lower(enable),$0
+    )
+}
 }
     
 open func getPowerLevels()async throws  -> RoomPowerLevels {
@@ -5246,6 +5269,17 @@ open func isEncrypted()throws  -> Bool {
 open func isPublic() -> Bool {
     return try!  FfiConverterBool.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_is_public(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Returns whether the send queue for that particular room is enabled or
+     * not.
+     */
+open func isSendQueueEnabled() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_room_is_send_queue_enabled(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -7853,7 +7887,7 @@ public protocol SyncServiceBuilderProtocol : AnyObject {
     
     func withCrossProcessLock(appIdentifier: String?)  -> SyncServiceBuilder
     
-    func withUtdHook(delegate: UnableToDecryptDelegate)  -> SyncServiceBuilder
+    func withUtdHook(delegate: UnableToDecryptDelegate) async  -> SyncServiceBuilder
     
 }
 
@@ -7923,12 +7957,22 @@ open func withCrossProcessLock(appIdentifier: String?) -> SyncServiceBuilder {
 })
 }
     
-open func withUtdHook(delegate: UnableToDecryptDelegate) -> SyncServiceBuilder {
-    return try!  FfiConverterTypeSyncServiceBuilder.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_utd_hook(self.uniffiClonePointer(),
-        FfiConverterCallbackInterfaceUnableToDecryptDelegate.lower(delegate),$0
-    )
-})
+open func withUtdHook(delegate: UnableToDecryptDelegate)async  -> SyncServiceBuilder {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_utd_hook(
+                    self.uniffiClonePointer(),
+                    FfiConverterCallbackInterfaceUnableToDecryptDelegate.lower(delegate)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeSyncServiceBuilder.lift,
+            errorHandler: nil
+            
+        )
 }
     
 
@@ -8189,7 +8233,7 @@ public protocol TimelineProtocol : AnyObject {
     func retryDecryption(sessionIds: [String]) 
     
     /**
-     * Queues an event in the room's sending queue so it's processed for
+     * Queues an event in the room's send queue so it's processed for
      * sending later.
      *
      * Returns an abort handle that allows to abort sending, if it hasn't
@@ -8551,7 +8595,7 @@ open func retryDecryption(sessionIds: [String]) {try! rustCall() {
 }
     
     /**
-     * Queues an event in the room's sending queue so it's processed for
+     * Queues an event in the room's send queue so it's processed for
      * sending later.
      *
      * Returns an abort handle that allows to abort sending, if it hasn't
@@ -22078,41 +22122,41 @@ extension FfiConverterCallbackInterfaceRoomListServiceSyncIndicatorListener : Ff
 
 
 /**
- * A listener to the global (client-wide) status of the sending queue.
+ * A listener to the global (client-wide) error reporter of the send queue.
  */
-public protocol SendingQueueStatusListener : AnyObject {
+public protocol SendQueueRoomErrorListener : AnyObject {
     
     /**
-     * Called every time the sending queue has received a new status.
-     *
-     * This can be set automatically (in case of sending failure), or manually
-     * via an API call.
+     * Called every time the send queue has ran into an error for a given room,
+     * which will disable the send queue for that particular room.
      */
-    func onUpdate(newValue: Bool) 
+    func onError(roomId: String, error: ClientError) 
     
 }
 
 
 
 // Put the implementation in a struct so we don't pollute the top-level namespace
-fileprivate struct UniffiCallbackInterfaceSendingQueueStatusListener {
+fileprivate struct UniffiCallbackInterfaceSendQueueRoomErrorListener {
 
     // Create the VTable using a series of closures.
     // Swift automatically converts these into C callback functions.
-    static var vtable: UniffiVTableCallbackInterfaceSendingQueueStatusListener = UniffiVTableCallbackInterfaceSendingQueueStatusListener(
-        onUpdate: { (
+    static var vtable: UniffiVTableCallbackInterfaceSendQueueRoomErrorListener = UniffiVTableCallbackInterfaceSendQueueRoomErrorListener(
+        onError: { (
             uniffiHandle: UInt64,
-            newValue: Int8,
+            roomId: RustBuffer,
+            error: RustBuffer,
             uniffiOutReturn: UnsafeMutableRawPointer,
             uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
         ) in
             let makeCall = {
                 () throws -> () in
-                guard let uniffiObj = try? FfiConverterCallbackInterfaceSendingQueueStatusListener.handleMap.get(handle: uniffiHandle) else {
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSendQueueRoomErrorListener.handleMap.get(handle: uniffiHandle) else {
                     throw UniffiInternalError.unexpectedStaleHandle
                 }
-                return uniffiObj.onUpdate(
-                     newValue: try FfiConverterBool.lift(newValue)
+                return uniffiObj.onError(
+                     roomId: try FfiConverterString.lift(roomId),
+                     error: try FfiConverterTypeClientError.lift(error)
                 )
             }
 
@@ -22125,25 +22169,25 @@ fileprivate struct UniffiCallbackInterfaceSendingQueueStatusListener {
             )
         },
         uniffiFree: { (uniffiHandle: UInt64) -> () in
-            let result = try? FfiConverterCallbackInterfaceSendingQueueStatusListener.handleMap.remove(handle: uniffiHandle)
+            let result = try? FfiConverterCallbackInterfaceSendQueueRoomErrorListener.handleMap.remove(handle: uniffiHandle)
             if result == nil {
-                print("Uniffi callback interface SendingQueueStatusListener: handle missing in uniffiFree")
+                print("Uniffi callback interface SendQueueRoomErrorListener: handle missing in uniffiFree")
             }
         }
     )
 }
 
-private func uniffiCallbackInitSendingQueueStatusListener() {
-    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_sendingqueuestatuslistener(&UniffiCallbackInterfaceSendingQueueStatusListener.vtable)
+private func uniffiCallbackInitSendQueueRoomErrorListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_sendqueueroomerrorlistener(&UniffiCallbackInterfaceSendQueueRoomErrorListener.vtable)
 }
 
 // FfiConverter protocol for callback interfaces
-fileprivate struct FfiConverterCallbackInterfaceSendingQueueStatusListener {
-    fileprivate static var handleMap = UniffiHandleMap<SendingQueueStatusListener>()
+fileprivate struct FfiConverterCallbackInterfaceSendQueueRoomErrorListener {
+    fileprivate static var handleMap = UniffiHandleMap<SendQueueRoomErrorListener>()
 }
 
-extension FfiConverterCallbackInterfaceSendingQueueStatusListener : FfiConverter {
-    typealias SwiftType = SendingQueueStatusListener
+extension FfiConverterCallbackInterfaceSendQueueRoomErrorListener : FfiConverter {
+    typealias SwiftType = SendQueueRoomErrorListener
     typealias FfiType = UInt64
 
     public static func lift(_ handle: UInt64) throws -> SwiftType {
@@ -24989,7 +25033,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_display_name() != 56259) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_sending_queue() != 21698) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_all_send_queues() != 24140) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_encryption() != 9657) {
@@ -25085,7 +25129,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_ignored_users() != 23285) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_sending_queue_status() != 43691) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_send_queue_status() != 57403) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_sync_service() != 52812) {
@@ -25418,7 +25462,10 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_discard_room_key() != 18081) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_display_name() != 30224) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_display_name() != 64194) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_enable_send_queue() != 23914) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_get_power_levels() != 54094) {
@@ -25449,6 +25496,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_is_public() != 7336) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_is_send_queue_enabled() != 36591) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_is_space() != 16919) {
@@ -25721,7 +25771,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_cross_process_lock() != 31599) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_utd_hook() != 61858) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_utd_hook() != 9029) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_taskhandle_cancel() != 9124) {
@@ -25775,7 +25825,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_retry_decryption() != 21112) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send() != 35299) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send() != 62420) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 47157) {
@@ -25964,7 +26014,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservicesyncindicatorlistener_on_update() != 36937) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sendingqueuestatuslistener_on_update() != 65345) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sendqueueroomerrorlistener_on_error() != 38224) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_accept_verification_request() != 22759) {
@@ -26021,7 +26071,7 @@ private var initializationResult: InitializationResult {
     uniffiCallbackInitRoomListLoadingStateListener()
     uniffiCallbackInitRoomListServiceStateListener()
     uniffiCallbackInitRoomListServiceSyncIndicatorListener()
-    uniffiCallbackInitSendingQueueStatusListener()
+    uniffiCallbackInitSendQueueRoomErrorListener()
     uniffiCallbackInitSessionVerificationControllerDelegate()
     uniffiCallbackInitSyncServiceStateObserver()
     uniffiCallbackInitTimelineListener()
