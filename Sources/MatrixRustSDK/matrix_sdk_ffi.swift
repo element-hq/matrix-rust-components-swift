@@ -4602,6 +4602,11 @@ public protocol RoomProtocol : AnyObject {
     func canonicalAlias()  -> String?
     
     /**
+     * Remove the `ComposerDraft` stored in the state store for this room.
+     */
+    func clearComposerDraft() async throws 
+    
+    /**
      * Forces the currently active room key, which is used to encrypt messages,
      * to be rotated.
      *
@@ -4688,6 +4693,11 @@ public protocol RoomProtocol : AnyObject {
     func leave() async throws 
     
     /**
+     * Retrieve the `ComposerDraft` stored in the state store for this room.
+     */
+    func loadComposerDraft() async throws  -> ComposerDraft?
+    
+    /**
      * Mark a room as read, by attaching a read receipt on the latest event.
      *
      * Note: this does NOT unset the unread flag; it's the caller's
@@ -4752,6 +4762,12 @@ public protocol RoomProtocol : AnyObject {
     func resetPowerLevels() async throws  -> RoomPowerLevels
     
     func roomInfo() async throws  -> RoomInfo
+    
+    /**
+     * Store the given `ComposerDraft` in the state store using the current
+     * room id, as identifier.
+     */
+    func saveComposerDraft(draft: ComposerDraft) async throws 
     
     /**
      * Send a call notification event in the current room.
@@ -5100,6 +5116,26 @@ open func canonicalAlias() -> String? {
 }
     
     /**
+     * Remove the `ComposerDraft` stored in the state store for this room.
+     */
+open func clearComposerDraft()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_clear_composer_draft(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
      * Forces the currently active room key, which is used to encrypt messages,
      * to be rotated.
      *
@@ -5362,6 +5398,26 @@ open func leave()async throws  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Retrieve the `ComposerDraft` stored in the state store for this room.
+     */
+open func loadComposerDraft()async throws  -> ComposerDraft? {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_load_composer_draft(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeComposerDraft.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -5638,6 +5694,27 @@ open func roomInfo()async throws  -> RoomInfo {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterTypeRoomInfo.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Store the given `ComposerDraft` in the state store using the current
+     * room id, as identifier.
+     */
+open func saveComposerDraft(draft: ComposerDraft)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_save_composer_draft(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeComposerDraft_lower(draft)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -8200,6 +8277,14 @@ public protocol TimelineProtocol : AnyObject {
     func latestEvent() async  -> EventTimelineItem?
     
     /**
+     * Load the reply details for the given event id.
+     *
+     * This will return an `InReplyToDetails` object that contains the details
+     * which will either be ready or an error.
+     */
+    func loadReplyDetails(eventIdStr: String) async throws  -> InReplyToDetails
+    
+    /**
      * Mark the room as read by trying to attach an *unthreaded* read receipt
      * to the latest room event.
      *
@@ -8508,6 +8593,29 @@ open func latestEvent()async  -> EventTimelineItem? {
             liftFunc: FfiConverterOptionTypeEventTimelineItem.lift,
             errorHandler: nil
             
+        )
+}
+    
+    /**
+     * Load the reply details for the given event id.
+     *
+     * This will return an `InReplyToDetails` object that contains the details
+     * which will either be ready or an error.
+     */
+open func loadReplyDetails(eventIdStr: String)async throws  -> InReplyToDetails {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_load_reply_details(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(eventIdStr)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeInReplyToDetails.lift,
+            errorHandler: FfiConverterTypeClientError.lift
         )
 }
     
@@ -24029,6 +24137,27 @@ fileprivate struct FfiConverterOptionDictionaryStringInt64: FfiConverterRustBuff
     }
 }
 
+fileprivate struct FfiConverterOptionTypeComposerDraft: FfiConverterRustBuffer {
+    typealias SwiftType = ComposerDraft?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeComposerDraft.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeComposerDraft.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeEventItemOrigin: FfiConverterRustBuffer {
     typealias SwiftType = EventItemOrigin?
 
@@ -24648,6 +24777,8 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
         return dict
     }
 }
+
+
 
 
 
@@ -25459,6 +25590,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_canonical_alias() != 19786) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_composer_draft() != 39667) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_discard_room_key() != 18081) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25519,6 +25653,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_leave() != 63688) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_load_composer_draft() != 53887) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_mark_as_read() != 16004) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25565,6 +25702,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_room_info() != 41146) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_save_composer_draft() != 56684) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_call_notification() != 43366) {
@@ -25811,6 +25951,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_latest_event() != 11115) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_load_reply_details() != 52892) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_mark_as_read() != 16621) {
