@@ -8230,7 +8230,7 @@ public func FfiConverterTypeTaskHandle_lower(_ value: TaskHandle) -> UnsafeMutab
 
 public protocol TimelineProtocol : AnyObject {
     
-    func addListener(listener: TimelineListener) async  -> RoomTimelineListenerResult
+    func addListener(listener: TimelineListener) async  -> TaskHandle
     
     func createPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind) async throws 
     
@@ -8391,7 +8391,7 @@ open class Timeline:
     
 
     
-open func addListener(listener: TimelineListener)async  -> RoomTimelineListenerResult {
+open func addListener(listener: TimelineListener)async  -> TaskHandle {
     return
         try!  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -8400,10 +8400,10 @@ open func addListener(listener: TimelineListener)async  -> RoomTimelineListenerR
                     FfiConverterCallbackInterfaceTimelineListener.lower(listener)
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterTypeRoomTimelineListenerResult.lift,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeTaskHandle.lift,
             errorHandler: nil
             
         )
@@ -13227,45 +13227,6 @@ public func FfiConverterTypeRoomSubscription_lift(_ buf: RustBuffer) throws -> R
 
 public func FfiConverterTypeRoomSubscription_lower(_ value: RoomSubscription) -> RustBuffer {
     return FfiConverterTypeRoomSubscription.lower(value)
-}
-
-
-public struct RoomTimelineListenerResult {
-    public var items: [TimelineItem]
-    public var itemsStream: TaskHandle
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(items: [TimelineItem], itemsStream: TaskHandle) {
-        self.items = items
-        self.itemsStream = itemsStream
-    }
-}
-
-
-
-public struct FfiConverterTypeRoomTimelineListenerResult: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomTimelineListenerResult {
-        return
-            try RoomTimelineListenerResult(
-                items: FfiConverterSequenceTypeTimelineItem.read(from: &buf), 
-                itemsStream: FfiConverterTypeTaskHandle.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: RoomTimelineListenerResult, into buf: inout [UInt8]) {
-        FfiConverterSequenceTypeTimelineItem.write(value.items, into: &buf)
-        FfiConverterTypeTaskHandle.write(value.itemsStream, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeRoomTimelineListenerResult_lift(_ buf: RustBuffer) throws -> RoomTimelineListenerResult {
-    return try FfiConverterTypeRoomTimelineListenerResult.lift(buf)
-}
-
-public func FfiConverterTypeRoomTimelineListenerResult_lower(_ value: RoomTimelineListenerResult) -> RustBuffer {
-    return FfiConverterTypeRoomTimelineListenerResult.lower(value)
 }
 
 
@@ -25920,7 +25881,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_taskhandle_is_finished() != 29008) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_add_listener() != 58433) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_add_listener() != 18746) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_create_poll() != 37925) {
