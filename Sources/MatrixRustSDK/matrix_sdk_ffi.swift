@@ -6279,7 +6279,7 @@ public protocol RoomListProtocol : AnyObject {
     
     func loadingState(listener: RoomListLoadingStateListener) throws  -> RoomListLoadingStateResult
     
-    func room(roomId: String) async throws  -> RoomListItem
+    func room(roomId: String) throws  -> RoomListItem
     
 }
 
@@ -6349,21 +6349,12 @@ open func loadingState(listener: RoomListLoadingStateListener)throws  -> RoomLis
 })
 }
     
-open func room(roomId: String)async throws  -> RoomListItem {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_roomlist_room(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(roomId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeRoomListItem.lift,
-            errorHandler: FfiConverterTypeRoomListError.lift
-        )
+open func room(roomId: String)throws  -> RoomListItem {
+    return try  FfiConverterTypeRoomListItem.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roomlist_room(self.uniffiClonePointer(),
+        FfiConverterString.lower(roomId),$0
+    )
+})
 }
     
 
@@ -6816,7 +6807,7 @@ public protocol RoomListServiceProtocol : AnyObject {
     
     func applyInput(input: RoomListInput) async throws 
     
-    func room(roomId: String) async throws  -> RoomListItem
+    func room(roomId: String) throws  -> RoomListItem
     
     func state(listener: RoomListServiceStateListener)  -> TaskHandle
     
@@ -6899,21 +6890,12 @@ open func applyInput(input: RoomListInput)async throws  {
         )
 }
     
-open func room(roomId: String)async throws  -> RoomListItem {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_roomlistservice_room(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(roomId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeRoomListItem.lift,
-            errorHandler: FfiConverterTypeRoomListError.lift
-        )
+open func room(roomId: String)throws  -> RoomListItem {
+    return try  FfiConverterTypeRoomListItem.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roomlistservice_room(self.uniffiClonePointer(),
+        FfiConverterString.lower(roomId),$0
+    )
+})
 }
     
 open func state(listener: RoomListServiceStateListener) -> TaskHandle {
@@ -8274,8 +8256,6 @@ public protocol TimelineProtocol : AnyObject {
      */
     func getEventTimelineItemByTransactionId(transactionId: String) async throws  -> EventTimelineItem
     
-    func latestEvent() async  -> EventTimelineItem?
-    
     /**
      * Load the reply details for the given event id.
      *
@@ -8575,24 +8555,6 @@ open func getEventTimelineItemByTransactionId(transactionId: String)async throws
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
             liftFunc: FfiConverterTypeEventTimelineItem.lift,
             errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func latestEvent()async  -> EventTimelineItem? {
-    return
-        try!  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_timeline_latest_event(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterOptionTypeEventTimelineItem.lift,
-            errorHandler: nil
-            
         )
 }
     
@@ -12233,7 +12195,6 @@ public struct RoomInfo {
     public var canonicalAlias: String?
     public var alternativeAliases: [String]
     public var membership: Membership
-    public var latestEvent: EventTimelineItem?
     /**
      * Member who invited the current user to a room that's in the invited
      * state.
@@ -12280,7 +12241,7 @@ public struct RoomInfo {
          */displayName: String?, 
         /**
          * Room name as defined by the room state event only.
-         */rawName: String?, topic: String?, avatarUrl: String?, isDirect: Bool, isPublic: Bool, isSpace: Bool, isTombstoned: Bool, isFavourite: Bool, canonicalAlias: String?, alternativeAliases: [String], membership: Membership, latestEvent: EventTimelineItem?, 
+         */rawName: String?, topic: String?, avatarUrl: String?, isDirect: Bool, isPublic: Bool, isSpace: Bool, isTombstoned: Bool, isFavourite: Bool, canonicalAlias: String?, alternativeAliases: [String], membership: Membership, 
         /**
          * Member who invited the current user to a room that's in the invited
          * state.
@@ -12316,7 +12277,6 @@ public struct RoomInfo {
         self.canonicalAlias = canonicalAlias
         self.alternativeAliases = alternativeAliases
         self.membership = membership
-        self.latestEvent = latestEvent
         self.inviter = inviter
         self.activeMembersCount = activeMembersCount
         self.invitedMembersCount = invitedMembersCount
@@ -12336,6 +12296,124 @@ public struct RoomInfo {
 
 
 
+extension RoomInfo: Equatable, Hashable {
+    public static func ==(lhs: RoomInfo, rhs: RoomInfo) -> Bool {
+        if lhs.id != rhs.id {
+            return false
+        }
+        if lhs.displayName != rhs.displayName {
+            return false
+        }
+        if lhs.rawName != rhs.rawName {
+            return false
+        }
+        if lhs.topic != rhs.topic {
+            return false
+        }
+        if lhs.avatarUrl != rhs.avatarUrl {
+            return false
+        }
+        if lhs.isDirect != rhs.isDirect {
+            return false
+        }
+        if lhs.isPublic != rhs.isPublic {
+            return false
+        }
+        if lhs.isSpace != rhs.isSpace {
+            return false
+        }
+        if lhs.isTombstoned != rhs.isTombstoned {
+            return false
+        }
+        if lhs.isFavourite != rhs.isFavourite {
+            return false
+        }
+        if lhs.canonicalAlias != rhs.canonicalAlias {
+            return false
+        }
+        if lhs.alternativeAliases != rhs.alternativeAliases {
+            return false
+        }
+        if lhs.membership != rhs.membership {
+            return false
+        }
+        if lhs.inviter != rhs.inviter {
+            return false
+        }
+        if lhs.activeMembersCount != rhs.activeMembersCount {
+            return false
+        }
+        if lhs.invitedMembersCount != rhs.invitedMembersCount {
+            return false
+        }
+        if lhs.joinedMembersCount != rhs.joinedMembersCount {
+            return false
+        }
+        if lhs.userPowerLevels != rhs.userPowerLevels {
+            return false
+        }
+        if lhs.highlightCount != rhs.highlightCount {
+            return false
+        }
+        if lhs.notificationCount != rhs.notificationCount {
+            return false
+        }
+        if lhs.userDefinedNotificationMode != rhs.userDefinedNotificationMode {
+            return false
+        }
+        if lhs.hasRoomCall != rhs.hasRoomCall {
+            return false
+        }
+        if lhs.activeRoomCallParticipants != rhs.activeRoomCallParticipants {
+            return false
+        }
+        if lhs.isMarkedUnread != rhs.isMarkedUnread {
+            return false
+        }
+        if lhs.numUnreadMessages != rhs.numUnreadMessages {
+            return false
+        }
+        if lhs.numUnreadNotifications != rhs.numUnreadNotifications {
+            return false
+        }
+        if lhs.numUnreadMentions != rhs.numUnreadMentions {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(displayName)
+        hasher.combine(rawName)
+        hasher.combine(topic)
+        hasher.combine(avatarUrl)
+        hasher.combine(isDirect)
+        hasher.combine(isPublic)
+        hasher.combine(isSpace)
+        hasher.combine(isTombstoned)
+        hasher.combine(isFavourite)
+        hasher.combine(canonicalAlias)
+        hasher.combine(alternativeAliases)
+        hasher.combine(membership)
+        hasher.combine(inviter)
+        hasher.combine(activeMembersCount)
+        hasher.combine(invitedMembersCount)
+        hasher.combine(joinedMembersCount)
+        hasher.combine(userPowerLevels)
+        hasher.combine(highlightCount)
+        hasher.combine(notificationCount)
+        hasher.combine(userDefinedNotificationMode)
+        hasher.combine(hasRoomCall)
+        hasher.combine(activeRoomCallParticipants)
+        hasher.combine(isMarkedUnread)
+        hasher.combine(numUnreadMessages)
+        hasher.combine(numUnreadNotifications)
+        hasher.combine(numUnreadMentions)
+    }
+}
+
+
 public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomInfo {
         return
@@ -12353,7 +12431,6 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 canonicalAlias: FfiConverterOptionString.read(from: &buf), 
                 alternativeAliases: FfiConverterSequenceString.read(from: &buf), 
                 membership: FfiConverterTypeMembership.read(from: &buf), 
-                latestEvent: FfiConverterOptionTypeEventTimelineItem.read(from: &buf), 
                 inviter: FfiConverterOptionTypeRoomMember.read(from: &buf), 
                 activeMembersCount: FfiConverterUInt64.read(from: &buf), 
                 invitedMembersCount: FfiConverterUInt64.read(from: &buf), 
@@ -12385,7 +12462,6 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
         FfiConverterSequenceString.write(value.alternativeAliases, into: &buf)
         FfiConverterTypeMembership.write(value.membership, into: &buf)
-        FfiConverterOptionTypeEventTimelineItem.write(value.latestEvent, into: &buf)
         FfiConverterOptionTypeRoomMember.write(value.inviter, into: &buf)
         FfiConverterUInt64.write(value.activeMembersCount, into: &buf)
         FfiConverterUInt64.write(value.invitedMembersCount, into: &buf)
@@ -25743,7 +25819,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_loading_state() != 21585) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_room() != 36256) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_room() != 8801) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistdynamicentriescontroller_add_one_page() != 47748) {
@@ -25797,7 +25873,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_apply_input() != 31607) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_room() != 11566) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_room() != 5185) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_state() != 64650) {
@@ -25909,9 +25985,6 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_transaction_id() != 64706) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_latest_event() != 11115) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_load_reply_details() != 52892) {
