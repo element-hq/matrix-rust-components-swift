@@ -4637,6 +4637,11 @@ public protocol RoomProtocol : AnyObject {
      */
     func hasActiveRoomCall()  -> Bool
     
+    /**
+     * Returns the room heroes for this room.
+     */
+    func heroes()  -> [RoomHero]
+    
     func id()  -> String
     
     /**
@@ -5207,6 +5212,16 @@ open func getPowerLevels()async throws  -> RoomPowerLevels {
 open func hasActiveRoomCall() -> Bool {
     return try!  FfiConverterBool.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_has_active_room_call(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Returns the room heroes for this room.
+     */
+open func heroes() -> [RoomHero] {
+    return try!  FfiConverterSequenceTypeRoomHero.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_room_heroes(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -12174,6 +12189,92 @@ public func FfiConverterTypeRoomDirectorySearchEntriesResult_lower(_ value: Room
 }
 
 
+/**
+ * Information about a member considered to be a room hero.
+ */
+public struct RoomHero {
+    /**
+     * The user ID of the hero.
+     */
+    public var userId: String
+    /**
+     * The display name of the hero.
+     */
+    public var displayName: String?
+    /**
+     * The avatar URL of the hero.
+     */
+    public var avatarUrl: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The user ID of the hero.
+         */userId: String, 
+        /**
+         * The display name of the hero.
+         */displayName: String?, 
+        /**
+         * The avatar URL of the hero.
+         */avatarUrl: String?) {
+        self.userId = userId
+        self.displayName = displayName
+        self.avatarUrl = avatarUrl
+    }
+}
+
+
+
+extension RoomHero: Equatable, Hashable {
+    public static func ==(lhs: RoomHero, rhs: RoomHero) -> Bool {
+        if lhs.userId != rhs.userId {
+            return false
+        }
+        if lhs.displayName != rhs.displayName {
+            return false
+        }
+        if lhs.avatarUrl != rhs.avatarUrl {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(userId)
+        hasher.combine(displayName)
+        hasher.combine(avatarUrl)
+    }
+}
+
+
+public struct FfiConverterTypeRoomHero: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomHero {
+        return
+            try RoomHero(
+                userId: FfiConverterString.read(from: &buf), 
+                displayName: FfiConverterOptionString.read(from: &buf), 
+                avatarUrl: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RoomHero, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.userId, into: &buf)
+        FfiConverterOptionString.write(value.displayName, into: &buf)
+        FfiConverterOptionString.write(value.avatarUrl, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeRoomHero_lift(_ buf: RustBuffer) throws -> RoomHero {
+    return try FfiConverterTypeRoomHero.lift(buf)
+}
+
+public func FfiConverterTypeRoomHero_lower(_ value: RoomHero) -> RustBuffer {
+    return FfiConverterTypeRoomHero.lower(value)
+}
+
+
 public struct RoomInfo {
     public var id: String
     /**
@@ -12203,6 +12304,7 @@ public struct RoomInfo {
      * store.
      */
     public var inviter: RoomMember?
+    public var heroes: [RoomHero]
     public var activeMembersCount: UInt64
     public var invitedMembersCount: UInt64
     public var joinedMembersCount: UInt64
@@ -12248,7 +12350,7 @@ public struct RoomInfo {
          *
          * Can be missing if the room membership invite event is missing from the
          * store.
-         */inviter: RoomMember?, activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, userPowerLevels: [String: Int64], highlightCount: UInt64, notificationCount: UInt64, userDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], 
+         */inviter: RoomMember?, heroes: [RoomHero], activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, userPowerLevels: [String: Int64], highlightCount: UInt64, notificationCount: UInt64, userDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], 
         /**
          * Whether this room has been explicitly marked as unread
          */isMarkedUnread: Bool, 
@@ -12278,6 +12380,7 @@ public struct RoomInfo {
         self.alternativeAliases = alternativeAliases
         self.membership = membership
         self.inviter = inviter
+        self.heroes = heroes
         self.activeMembersCount = activeMembersCount
         self.invitedMembersCount = invitedMembersCount
         self.joinedMembersCount = joinedMembersCount
@@ -12340,6 +12443,9 @@ extension RoomInfo: Equatable, Hashable {
         if lhs.inviter != rhs.inviter {
             return false
         }
+        if lhs.heroes != rhs.heroes {
+            return false
+        }
         if lhs.activeMembersCount != rhs.activeMembersCount {
             return false
         }
@@ -12397,6 +12503,7 @@ extension RoomInfo: Equatable, Hashable {
         hasher.combine(alternativeAliases)
         hasher.combine(membership)
         hasher.combine(inviter)
+        hasher.combine(heroes)
         hasher.combine(activeMembersCount)
         hasher.combine(invitedMembersCount)
         hasher.combine(joinedMembersCount)
@@ -12432,6 +12539,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 alternativeAliases: FfiConverterSequenceString.read(from: &buf), 
                 membership: FfiConverterTypeMembership.read(from: &buf), 
                 inviter: FfiConverterOptionTypeRoomMember.read(from: &buf), 
+                heroes: FfiConverterSequenceTypeRoomHero.read(from: &buf), 
                 activeMembersCount: FfiConverterUInt64.read(from: &buf), 
                 invitedMembersCount: FfiConverterUInt64.read(from: &buf), 
                 joinedMembersCount: FfiConverterUInt64.read(from: &buf), 
@@ -12463,6 +12571,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.alternativeAliases, into: &buf)
         FfiConverterTypeMembership.write(value.membership, into: &buf)
         FfiConverterOptionTypeRoomMember.write(value.inviter, into: &buf)
+        FfiConverterSequenceTypeRoomHero.write(value.heroes, into: &buf)
         FfiConverterUInt64.write(value.activeMembersCount, into: &buf)
         FfiConverterUInt64.write(value.invitedMembersCount, into: &buf)
         FfiConverterUInt64.write(value.joinedMembersCount, into: &buf)
@@ -24491,6 +24600,28 @@ fileprivate struct FfiConverterSequenceTypeRoomDescription: FfiConverterRustBuff
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeRoomHero: FfiConverterRustBuffer {
+    typealias SwiftType = [RoomHero]
+
+    public static func write(_ value: [RoomHero], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRoomHero.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RoomHero] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RoomHero]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRoomHero.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypeRoomListRange: FfiConverterRustBuffer {
     typealias SwiftType = [RoomListRange]
 
@@ -25654,6 +25785,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_has_active_room_call() != 33588) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_heroes() != 22313) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_id() != 61990) {
