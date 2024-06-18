@@ -4566,7 +4566,7 @@ public protocol RoomProtocol : AnyObject {
     /**
      * Returns a Vec of userId's that participate in the room call.
      *
-     * matrix_rtc memberships with application "m.call" and scope "m.room" are
+     * MatrixRTC memberships with application "m.call" and scope "m.room" are
      * considered. A user can occur twice if they join with two devices.
      * convert to a set depending if the different users are required or the
      * amount of sessions.
@@ -4910,7 +4910,7 @@ open func activeMembersCount() -> UInt64 {
     /**
      * Returns a Vec of userId's that participate in the room call.
      *
-     * matrix_rtc memberships with application "m.call" and scope "m.room" are
+     * MatrixRTC memberships with application "m.call" and scope "m.room" are
      * considered. A user can occur twice if they join with two devices.
      * convert to a set depending if the different users are required or the
      * amount of sessions.
@@ -15673,7 +15673,17 @@ public enum EventSendState {
      * The local event has been sent to the server, but unsuccessfully: The
      * sending has failed.
      */
-    case sendingFailed(error: String
+    case sendingFailed(
+        /**
+         * Stringified error message.
+         */error: String, 
+        /**
+         * Whether the error is considered recoverable or not.
+         *
+         * An error that's recoverable will disable the room's send queue,
+         * while an unrecoverable error will be parked, until the user
+         * decides to cancel sending it.
+         */isRecoverable: Bool
     )
     /**
      * The local event has been sent successfully to the server.
@@ -15692,7 +15702,7 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
         
         case 1: return .notSentYet
         
-        case 2: return .sendingFailed(error: try FfiConverterString.read(from: &buf)
+        case 2: return .sendingFailed(error: try FfiConverterString.read(from: &buf), isRecoverable: try FfiConverterBool.read(from: &buf)
         )
         
         case 3: return .sent(eventId: try FfiConverterString.read(from: &buf)
@@ -15710,9 +15720,10 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
             writeInt(&buf, Int32(1))
         
         
-        case let .sendingFailed(error):
+        case let .sendingFailed(error,isRecoverable):
             writeInt(&buf, Int32(2))
             FfiConverterString.write(error, into: &buf)
+            FfiConverterBool.write(isRecoverable, into: &buf)
             
         
         case let .sent(eventId):
@@ -25585,7 +25596,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_active_members_count() != 61905) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_active_room_call_participants() != 60098) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_active_room_call_participants() != 41533) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_alternative_aliases() != 28555) {
