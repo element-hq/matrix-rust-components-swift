@@ -8231,7 +8231,7 @@ public protocol TimelineProtocol : AnyObject {
     
     func createPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind) async throws 
     
-    func edit(newContent: RoomMessageEventContentWithoutRelation, editItem: EventTimelineItem) async throws 
+    func edit(newContent: RoomMessageEventContentWithoutRelation, eventId: String) async throws 
     
     func editPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind, editItem: EventTimelineItem) async throws 
     
@@ -8333,7 +8333,7 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendReadReceipt(receiptType: ReceiptType, eventId: String) async throws 
     
-    func sendReply(msg: RoomMessageEventContentWithoutRelation, replyItem: EventTimelineItem) async throws 
+    func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String) async throws 
     
     func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
     
@@ -8421,13 +8421,13 @@ open func createPoll(question: String, answers: [String], maxSelections: UInt8, 
         )
 }
     
-open func edit(newContent: RoomMessageEventContentWithoutRelation, editItem: EventTimelineItem)async throws  {
+open func edit(newContent: RoomMessageEventContentWithoutRelation, eventId: String)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_edit(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(newContent),FfiConverterTypeEventTimelineItem.lower(editItem)
+                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(newContent),FfiConverterString.lower(eventId)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -8790,13 +8790,13 @@ open func sendReadReceipt(receiptType: ReceiptType, eventId: String)async throws
         )
 }
     
-open func sendReply(msg: RoomMessageEventContentWithoutRelation, replyItem: EventTimelineItem)async throws  {
+open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_send_reply(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(msg),FfiConverterTypeEventTimelineItem.lower(replyItem)
+                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(msg),FfiConverterString.lower(eventId)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -26108,7 +26108,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_create_poll() != 37925) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 45021) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 48577) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit_poll() != 40066) {
@@ -26168,7 +26168,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_read_receipt() != 37532) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 356) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 64747) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 34287) {
