@@ -707,263 +707,13 @@ public func FfiConverterTypeAbortSendHandle_lower(_ value: AbortSendHandle) -> U
 
 
 
-public protocol AuthenticationServiceProtocol : AnyObject {
-    
-    /**
-     * Updates the service to authenticate with the homeserver for the
-     * specified address.
-     */
-    func configureHomeserver(serverNameOrHomeserverUrl: String) async throws 
-    
-    func homeserverDetails()  -> HomeserverLoginDetails?
-    
-    /**
-     * Performs a password login using the current homeserver.
-     */
-    func login(username: String, password: String, initialDeviceName: String?, deviceId: String?) async throws  -> Client
-    
-    /**
-     * Completes the OIDC login process.
-     */
-    func loginWithOidcCallback(authenticationData: OidcAuthenticationData, callbackUrl: String) async throws  -> Client
-    
-    /**
-     * Requests the URL needed for login in a web view using OIDC. Once the web
-     * view has succeeded, call `login_with_oidc_callback` with the callback it
-     * returns.
-     */
-    func urlForOidcLogin() async throws  -> OidcAuthenticationData
-    
-}
-
-open class AuthenticationService:
-    AuthenticationServiceProtocol {
-    fileprivate let pointer: UnsafeMutableRawPointer!
-
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
-    public struct NoPointer {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
-    }
-
-    /// This constructor can be used to instantiate a fake object.
-    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    ///
-    /// - Warning:
-    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
-    }
-
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_authenticationservice(self.pointer, $0) }
-    }
-    /**
-     * Creates a new service to authenticate a user with.
-     *
-     * # Arguments
-     *
-     * * `session_path` - A path to the directory where the session data will
-     * be stored. A new directory **must** be given for each subsequent
-     * session as the database isn't designed to be shared.
-     *
-     * * `passphrase` - An optional passphrase to use to encrypt the session
-     * data.
-     *
-     * * `user_agent` - An optional user agent to use when making requests.
-     *
-     * * `additional_root_certificates` - Additional root certificates to trust
-     * when making requests when built with rustls.
-     *
-     * * `proxy` - An optional HTTP(S) proxy URL to use when making requests.
-     *
-     * * `oidc_configuration` - Configuration data about the app to use during
-     * OIDC authentication. This is required if OIDC authentication is to be
-     * used.
-     *
-     * * `custom_sliding_sync_proxy` - An optional sliding sync proxy URL that
-     * will override the proxy discovered from the homeserver's well-known.
-     *
-     * * `session_delegate` - A delegate that will handle token refresh etc.
-     * when the cross-process lock is configured.
-     *
-     * * `cross_process_refresh_lock_id` - A process ID to use for
-     * cross-process token refresh locks.
-     */
-public convenience init(sessionPath: String, passphrase: String?, userAgent: String?, additionalRootCertificates: [Data], proxy: String?, oidcConfiguration: OidcConfiguration?, customSlidingSyncProxy: String?, sessionDelegate: ClientSessionDelegate?, crossProcessRefreshLockId: String?) {
-    let pointer =
-        try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_constructor_authenticationservice_new(
-        FfiConverterString.lower(sessionPath),
-        FfiConverterOptionString.lower(passphrase),
-        FfiConverterOptionString.lower(userAgent),
-        FfiConverterSequenceData.lower(additionalRootCertificates),
-        FfiConverterOptionString.lower(proxy),
-        FfiConverterOptionTypeOidcConfiguration.lower(oidcConfiguration),
-        FfiConverterOptionString.lower(customSlidingSyncProxy),
-        FfiConverterOptionCallbackInterfaceClientSessionDelegate.lower(sessionDelegate),
-        FfiConverterOptionString.lower(crossProcessRefreshLockId),$0
-    )
-}
-    self.init(unsafeFromRawPointer: pointer)
-}
-
-    deinit {
-        guard let pointer = pointer else {
-            return
-        }
-
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_authenticationservice(pointer, $0) }
-    }
-
-    
-
-    
-    /**
-     * Updates the service to authenticate with the homeserver for the
-     * specified address.
-     */
-open func configureHomeserver(serverNameOrHomeserverUrl: String)async throws  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_authenticationservice_configure_homeserver(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(serverNameOrHomeserverUrl)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
-            errorHandler: FfiConverterTypeAuthenticationError.lift
-        )
-}
-    
-open func homeserverDetails() -> HomeserverLoginDetails? {
-    return try!  FfiConverterOptionTypeHomeserverLoginDetails.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_authenticationservice_homeserver_details(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-    /**
-     * Performs a password login using the current homeserver.
-     */
-open func login(username: String, password: String, initialDeviceName: String?, deviceId: String?)async throws  -> Client {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_authenticationservice_login(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(username),FfiConverterString.lower(password),FfiConverterOptionString.lower(initialDeviceName),FfiConverterOptionString.lower(deviceId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeClient.lift,
-            errorHandler: FfiConverterTypeAuthenticationError.lift
-        )
-}
-    
-    /**
-     * Completes the OIDC login process.
-     */
-open func loginWithOidcCallback(authenticationData: OidcAuthenticationData, callbackUrl: String)async throws  -> Client {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_authenticationservice_login_with_oidc_callback(
-                    self.uniffiClonePointer(),
-                    FfiConverterTypeOidcAuthenticationData.lower(authenticationData),FfiConverterString.lower(callbackUrl)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeClient.lift,
-            errorHandler: FfiConverterTypeAuthenticationError.lift
-        )
-}
-    
-    /**
-     * Requests the URL needed for login in a web view using OIDC. Once the web
-     * view has succeeded, call `login_with_oidc_callback` with the callback it
-     * returns.
-     */
-open func urlForOidcLogin()async throws  -> OidcAuthenticationData {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_authenticationservice_url_for_oidc_login(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeOidcAuthenticationData.lift,
-            errorHandler: FfiConverterTypeAuthenticationError.lift
-        )
-}
-    
-
-}
-
-public struct FfiConverterTypeAuthenticationService: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
-    typealias SwiftType = AuthenticationService
-
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> AuthenticationService {
-        return AuthenticationService(unsafeFromRawPointer: pointer)
-    }
-
-    public static func lower(_ value: AuthenticationService) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AuthenticationService {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
-    }
-
-    public static func write(_ value: AuthenticationService, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
-    }
-}
-
-
-
-
-public func FfiConverterTypeAuthenticationService_lift(_ pointer: UnsafeMutableRawPointer) throws -> AuthenticationService {
-    return try FfiConverterTypeAuthenticationService.lift(pointer)
-}
-
-public func FfiConverterTypeAuthenticationService_lower(_ value: AuthenticationService) -> UnsafeMutableRawPointer {
-    return FfiConverterTypeAuthenticationService.lower(value)
-}
-
-
-
-
 public protocol ClientProtocol : AnyObject {
+    
+    /**
+     * Aborts an existing OIDC login operation that might have been cancelled,
+     * failed etc.
+     */
+    func abortOidcLogin(authorizationData: OidcAuthorizationData) async 
     
     /**
      * Get the content of the event of the given type out of the account data
@@ -1045,6 +795,11 @@ public protocol ClientProtocol : AnyObject {
      */
     func homeserver()  -> String
     
+    /**
+     * Information about login options for the client's homeserver.
+     */
+    func homeserverLoginDetails() async  -> HomeserverLoginDetails
+    
     func ignoreUser(userId: String) async throws 
     
     func ignoredUsers() async throws  -> [String]
@@ -1072,6 +827,11 @@ public protocol ClientProtocol : AnyObject {
      * Login using a username and password.
      */
     func login(username: String, password: String, initialDeviceName: String?, deviceId: String?) async throws 
+    
+    /**
+     * Completes the OIDC login process.
+     */
+    func loginWithOidcCallback(authorizationData: OidcAuthorizationData, callbackUrl: String) async throws 
     
     /**
      * Log out the current user. This method returns an optional URL that
@@ -1140,6 +900,14 @@ public protocol ClientProtocol : AnyObject {
     
     func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWatcher?) async throws  -> String
     
+    /**
+     * Requests the URL needed for login in a web view using OIDC. Once the web
+     * view has succeeded, call `login_with_oidc_callback` with the callback it
+     * returns. If a failure occurs and a callback isn't available, make sure
+     * to call `abort_oidc_login` to inform the client of this.
+     */
+    func urlForOidcLogin(oidcConfiguration: OidcConfiguration) async throws  -> OidcAuthorizationData
+    
     func userId() throws  -> String
     
 }
@@ -1184,6 +952,28 @@ open class Client:
 
     
 
+    
+    /**
+     * Aborts an existing OIDC login operation that might have been cancelled,
+     * failed etc.
+     */
+open func abortOidcLogin(authorizationData: OidcAuthorizationData)async  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_abort_oidc_login(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeOidcAuthorizationData_lower(authorizationData)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: nil
+            
+        )
+}
     
     /**
      * Get the content of the event of the given type out of the account data
@@ -1511,6 +1301,27 @@ open func homeserver() -> String {
 })
 }
     
+    /**
+     * Information about login options for the client's homeserver.
+     */
+open func homeserverLoginDetails()async  -> HomeserverLoginDetails {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_homeserver_login_details(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeHomeserverLoginDetails.lift,
+            errorHandler: nil
+            
+        )
+}
+    
 open func ignoreUser(userId: String)async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -1611,6 +1422,26 @@ open func login(username: String, password: String, initialDeviceName: String?, 
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Completes the OIDC login process.
+     */
+open func loginWithOidcCallback(authorizationData: OidcAuthorizationData, callbackUrl: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_login_with_oidc_callback(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeOidcAuthorizationData_lower(authorizationData),FfiConverterString.lower(callbackUrl)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeOidcError.lift
         )
 }
     
@@ -1914,6 +1745,29 @@ open func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWat
         )
 }
     
+    /**
+     * Requests the URL needed for login in a web view using OIDC. Once the web
+     * view has succeeded, call `login_with_oidc_callback` with the callback it
+     * returns. If a failure occurs and a callback isn't available, make sure
+     * to call `abort_oidc_login` to inform the client of this.
+     */
+open func urlForOidcLogin(oidcConfiguration: OidcConfiguration)async throws  -> OidcAuthorizationData {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_url_for_oidc_login(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeOidcConfiguration.lower(oidcConfiguration)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeOidcAuthorizationData_lift,
+            errorHandler: FfiConverterTypeOidcError.lift
+        )
+}
+    
 open func userId()throws  -> String {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_client_user_id(self.uniffiClonePointer(),$0
@@ -2017,6 +1871,8 @@ public protocol ClientBuilderProtocol : AnyObject {
     func passphrase(passphrase: String?)  -> ClientBuilder
     
     func proxy(url: String)  -> ClientBuilder
+    
+    func requiresSlidingSync()  -> ClientBuilder
     
     func serverName(serverName: String)  -> ClientBuilder
     
@@ -2223,6 +2079,13 @@ open func proxy(url: String) -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_proxy(self.uniffiClonePointer(),
         FfiConverterString.lower(url),$0
+    )
+})
+}
+    
+open func requiresSlidingSync() -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_requires_sliding_sync(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -4322,120 +4185,6 @@ public func FfiConverterTypeNotificationSettings_lift(_ pointer: UnsafeMutableRa
 
 public func FfiConverterTypeNotificationSettings_lower(_ value: NotificationSettings) -> UnsafeMutableRawPointer {
     return FfiConverterTypeNotificationSettings.lower(value)
-}
-
-
-
-
-/**
- * The data required to authenticate against an OIDC server.
- */
-public protocol OidcAuthenticationDataProtocol : AnyObject {
-    
-    /**
-     * The login URL to use for authentication.
-     */
-    func loginUrl()  -> String
-    
-}
-
-/**
- * The data required to authenticate against an OIDC server.
- */
-open class OidcAuthenticationData:
-    OidcAuthenticationDataProtocol {
-    fileprivate let pointer: UnsafeMutableRawPointer!
-
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
-    public struct NoPointer {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
-    }
-
-    /// This constructor can be used to instantiate a fake object.
-    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    ///
-    /// - Warning:
-    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
-    }
-
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_oidcauthenticationdata(self.pointer, $0) }
-    }
-    // No primary constructor declared for this class.
-
-    deinit {
-        guard let pointer = pointer else {
-            return
-        }
-
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_oidcauthenticationdata(pointer, $0) }
-    }
-
-    
-
-    
-    /**
-     * The login URL to use for authentication.
-     */
-open func loginUrl() -> String {
-    return try!  FfiConverterString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_oidcauthenticationdata_login_url(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-
-}
-
-public struct FfiConverterTypeOidcAuthenticationData: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
-    typealias SwiftType = OidcAuthenticationData
-
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> OidcAuthenticationData {
-        return OidcAuthenticationData(unsafeFromRawPointer: pointer)
-    }
-
-    public static func lower(_ value: OidcAuthenticationData) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OidcAuthenticationData {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
-    }
-
-    public static func write(_ value: OidcAuthenticationData, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
-    }
-}
-
-
-
-
-public func FfiConverterTypeOidcAuthenticationData_lift(_ pointer: UnsafeMutableRawPointer) throws -> OidcAuthenticationData {
-    return try FfiConverterTypeOidcAuthenticationData.lift(pointer)
-}
-
-public func FfiConverterTypeOidcAuthenticationData_lower(_ value: OidcAuthenticationData) -> UnsafeMutableRawPointer {
-    return FfiConverterTypeOidcAuthenticationData.lower(value)
 }
 
 
@@ -15086,166 +14835,6 @@ extension AssetType: Equatable, Hashable {}
 
 
 
-
-public enum AuthenticationError {
-
-    
-    
-    case ClientMissing(message: String)
-    
-    case InvalidServerName(message: String)
-    
-    case ServerUnreachable(message: String)
-    
-    case WellKnownLookupFailed(message: String)
-    
-    case WellKnownDeserializationError(message: String)
-    
-    case SlidingSyncNotAvailable(message: String)
-    
-    case SessionMissing(message: String)
-    
-    case OidcNotSupported(message: String)
-    
-    case OidcMetadataMissing(message: String)
-    
-    case OidcMetadataInvalid(message: String)
-    
-    case OidcRegistrationsPathInvalid(message: String)
-    
-    case OidcCallbackUrlInvalid(message: String)
-    
-    case OidcCancelled(message: String)
-    
-    case OidcError(message: String)
-    
-    case Generic(message: String)
-    
-}
-
-
-public struct FfiConverterTypeAuthenticationError: FfiConverterRustBuffer {
-    typealias SwiftType = AuthenticationError
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AuthenticationError {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-
-        
-
-        
-        case 1: return .ClientMissing(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 2: return .InvalidServerName(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 3: return .ServerUnreachable(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 4: return .WellKnownLookupFailed(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 5: return .WellKnownDeserializationError(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 6: return .SlidingSyncNotAvailable(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 7: return .SessionMissing(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 8: return .OidcNotSupported(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 9: return .OidcMetadataMissing(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 10: return .OidcMetadataInvalid(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 11: return .OidcRegistrationsPathInvalid(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 12: return .OidcCallbackUrlInvalid(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 13: return .OidcCancelled(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 14: return .OidcError(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 15: return .Generic(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: AuthenticationError, into buf: inout [UInt8]) {
-        switch value {
-
-        
-
-        
-        case .ClientMissing(_ /* message is ignored*/):
-            writeInt(&buf, Int32(1))
-        case .InvalidServerName(_ /* message is ignored*/):
-            writeInt(&buf, Int32(2))
-        case .ServerUnreachable(_ /* message is ignored*/):
-            writeInt(&buf, Int32(3))
-        case .WellKnownLookupFailed(_ /* message is ignored*/):
-            writeInt(&buf, Int32(4))
-        case .WellKnownDeserializationError(_ /* message is ignored*/):
-            writeInt(&buf, Int32(5))
-        case .SlidingSyncNotAvailable(_ /* message is ignored*/):
-            writeInt(&buf, Int32(6))
-        case .SessionMissing(_ /* message is ignored*/):
-            writeInt(&buf, Int32(7))
-        case .OidcNotSupported(_ /* message is ignored*/):
-            writeInt(&buf, Int32(8))
-        case .OidcMetadataMissing(_ /* message is ignored*/):
-            writeInt(&buf, Int32(9))
-        case .OidcMetadataInvalid(_ /* message is ignored*/):
-            writeInt(&buf, Int32(10))
-        case .OidcRegistrationsPathInvalid(_ /* message is ignored*/):
-            writeInt(&buf, Int32(11))
-        case .OidcCallbackUrlInvalid(_ /* message is ignored*/):
-            writeInt(&buf, Int32(12))
-        case .OidcCancelled(_ /* message is ignored*/):
-            writeInt(&buf, Int32(13))
-        case .OidcError(_ /* message is ignored*/):
-            writeInt(&buf, Int32(14))
-        case .Generic(_ /* message is ignored*/):
-            writeInt(&buf, Int32(15))
-
-        
-        }
-    }
-}
-
-
-extension AuthenticationError: Equatable, Hashable {}
-
-extension AuthenticationError: Error { }
-
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
@@ -15414,6 +15003,16 @@ public enum ClientBuildError {
 
     
     
+    case InvalidServerName(message: String)
+    
+    case ServerUnreachable(message: String)
+    
+    case WellKnownLookupFailed(message: String)
+    
+    case WellKnownDeserializationError(message: String)
+    
+    case SlidingSyncNotAvailable(message: String)
+    
     case Sdk(message: String)
     
     case Generic(message: String)
@@ -15431,11 +15030,31 @@ public struct FfiConverterTypeClientBuildError: FfiConverterRustBuffer {
         
 
         
-        case 1: return .Sdk(
+        case 1: return .InvalidServerName(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 2: return .Generic(
+        case 2: return .ServerUnreachable(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .WellKnownLookupFailed(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 4: return .WellKnownDeserializationError(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 5: return .SlidingSyncNotAvailable(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 6: return .Sdk(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 7: return .Generic(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -15450,10 +15069,20 @@ public struct FfiConverterTypeClientBuildError: FfiConverterRustBuffer {
         
 
         
-        case .Sdk(_ /* message is ignored*/):
+        case .InvalidServerName(_ /* message is ignored*/):
             writeInt(&buf, Int32(1))
-        case .Generic(_ /* message is ignored*/):
+        case .ServerUnreachable(_ /* message is ignored*/):
             writeInt(&buf, Int32(2))
+        case .WellKnownLookupFailed(_ /* message is ignored*/):
+            writeInt(&buf, Int32(3))
+        case .WellKnownDeserializationError(_ /* message is ignored*/):
+            writeInt(&buf, Int32(4))
+        case .SlidingSyncNotAvailable(_ /* message is ignored*/):
+            writeInt(&buf, Int32(5))
+        case .Sdk(_ /* message is ignored*/):
+            writeInt(&buf, Int32(6))
+        case .Generic(_ /* message is ignored*/):
+            writeInt(&buf, Int32(7))
 
         
         }
@@ -17477,6 +17106,94 @@ public func FfiConverterTypeNotifyType_lower(_ value: NotifyType) -> RustBuffer 
 extension NotifyType: Equatable, Hashable {}
 
 
+
+
+public enum OidcError {
+
+    
+    
+    case NotSupported(message: String)
+    
+    case MetadataInvalid(message: String)
+    
+    case RegistrationsPathInvalid(message: String)
+    
+    case CallbackUrlInvalid(message: String)
+    
+    case Cancelled(message: String)
+    
+    case Generic(message: String)
+    
+}
+
+
+public struct FfiConverterTypeOidcError: FfiConverterRustBuffer {
+    typealias SwiftType = OidcError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OidcError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .NotSupported(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .MetadataInvalid(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .RegistrationsPathInvalid(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 4: return .CallbackUrlInvalid(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 5: return .Cancelled(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 6: return .Generic(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: OidcError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        case .NotSupported(_ /* message is ignored*/):
+            writeInt(&buf, Int32(1))
+        case .MetadataInvalid(_ /* message is ignored*/):
+            writeInt(&buf, Int32(2))
+        case .RegistrationsPathInvalid(_ /* message is ignored*/):
+            writeInt(&buf, Int32(3))
+        case .CallbackUrlInvalid(_ /* message is ignored*/):
+            writeInt(&buf, Int32(4))
+        case .Cancelled(_ /* message is ignored*/):
+            writeInt(&buf, Int32(5))
+        case .Generic(_ /* message is ignored*/):
+            writeInt(&buf, Int32(6))
+
+        
+        }
+    }
+}
+
+
+extension OidcError: Equatable, Hashable {}
+
+extension OidcError: Error { }
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -23349,27 +23066,6 @@ fileprivate struct FfiConverterOptionTypeEventTimelineItem: FfiConverterRustBuff
     }
 }
 
-fileprivate struct FfiConverterOptionTypeHomeserverLoginDetails: FfiConverterRustBuffer {
-    typealias SwiftType = HomeserverLoginDetails?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeHomeserverLoginDetails.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeHomeserverLoginDetails.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeMediaSource: FfiConverterRustBuffer {
     typealias SwiftType = MediaSource?
 
@@ -23680,27 +23376,6 @@ fileprivate struct FfiConverterOptionTypeNotificationPowerLevels: FfiConverterRu
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeNotificationPowerLevels.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-fileprivate struct FfiConverterOptionTypeOidcConfiguration: FfiConverterRustBuffer {
-    typealias SwiftType = OidcConfiguration?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeOidcConfiguration.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeOidcConfiguration.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -24100,27 +23775,6 @@ fileprivate struct FfiConverterOptionCallbackInterfaceClientDelegate: FfiConvert
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterCallbackInterfaceClientDelegate.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-fileprivate struct FfiConverterOptionCallbackInterfaceClientSessionDelegate: FfiConverterRustBuffer {
-    typealias SwiftType = ClientSessionDelegate?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterCallbackInterfaceClientSessionDelegate.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterCallbackInterfaceClientSessionDelegate.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -24970,6 +24624,8 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
 
 
 
+
+
 private let UNIFFI_RUST_FUTURE_POLL_READY: Int8 = 0
 private let UNIFFI_RUST_FUTURE_POLL_MAYBE_READY: Int8 = 1
 
@@ -25304,19 +24960,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_abortsendhandle_abort() != 55658) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_authenticationservice_configure_homeserver() != 11225) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_authenticationservice_homeserver_details() != 39542) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_authenticationservice_login() != 26494) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_authenticationservice_login_with_oidc_callback() != 1852) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_authenticationservice_url_for_oidc_login() != 64804) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_abort_oidc_login() != 22230) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_account_data() != 50433) {
@@ -25382,6 +25026,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_homeserver() != 26427) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_homeserver_login_details() != 63487) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_ignore_user() != 14588) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25395,6 +25042,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_login() != 33276) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_oidc_callback() != 35005) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_logout() != 7576) {
@@ -25457,6 +25107,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_upload_media() != 51195) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc_login() != 43171) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_user_id() != 40531) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25494,6 +25147,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_proxy() != 5659) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_requires_sliding_sync() != 18165) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name() != 29096) {
@@ -25719,9 +25375,6 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettings_unmute_room() != 47580) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_oidcauthenticationdata_login_url() != 43638) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_active_members_count() != 61905) {
@@ -26256,9 +25909,6 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_mediasource_from_json() != 29216) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_constructor_authenticationservice_new() != 23411) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_clientbuilder_new() != 27991) {
