@@ -574,139 +574,6 @@ fileprivate struct FfiConverterDuration: FfiConverterRustBuffer {
 
 
 
-public protocol AbortSendHandleProtocol : AnyObject {
-    
-    /**
-     * Try to abort the sending of the current event.
-     *
-     * If this returns `true`, then the sending could be aborted, because the
-     * event hasn't been sent yet. Otherwise, if this returns `false`, the
-     * event had already been sent and could not be aborted.
-     *
-     * This has an effect only on the first call; subsequent calls will always
-     * return `false`.
-     */
-    func abort() async  -> Bool
-    
-}
-
-open class AbortSendHandle:
-    AbortSendHandleProtocol {
-    fileprivate let pointer: UnsafeMutableRawPointer!
-
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
-    public struct NoPointer {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
-    }
-
-    /// This constructor can be used to instantiate a fake object.
-    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    ///
-    /// - Warning:
-    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
-    }
-
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_abortsendhandle(self.pointer, $0) }
-    }
-    // No primary constructor declared for this class.
-
-    deinit {
-        guard let pointer = pointer else {
-            return
-        }
-
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_abortsendhandle(pointer, $0) }
-    }
-
-    
-
-    
-    /**
-     * Try to abort the sending of the current event.
-     *
-     * If this returns `true`, then the sending could be aborted, because the
-     * event hasn't been sent yet. Otherwise, if this returns `false`, the
-     * event had already been sent and could not be aborted.
-     *
-     * This has an effect only on the first call; subsequent calls will always
-     * return `false`.
-     */
-open func abort()async  -> Bool {
-    return
-        try!  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_abortsendhandle_abort(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: nil
-            
-        )
-}
-    
-
-}
-
-public struct FfiConverterTypeAbortSendHandle: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
-    typealias SwiftType = AbortSendHandle
-
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> AbortSendHandle {
-        return AbortSendHandle(unsafeFromRawPointer: pointer)
-    }
-
-    public static func lower(_ value: AbortSendHandle) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AbortSendHandle {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
-    }
-
-    public static func write(_ value: AbortSendHandle, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
-    }
-}
-
-
-
-
-public func FfiConverterTypeAbortSendHandle_lift(_ pointer: UnsafeMutableRawPointer) throws -> AbortSendHandle {
-    return try FfiConverterTypeAbortSendHandle.lift(pointer)
-}
-
-public func FfiConverterTypeAbortSendHandle_lower(_ value: AbortSendHandle) -> UnsafeMutableRawPointer {
-    return FfiConverterTypeAbortSendHandle.lower(value)
-}
-
-
-
-
 public protocol ClientProtocol : AnyObject {
     
     /**
@@ -756,7 +623,7 @@ public protocol ClientProtocol : AnyObject {
      * This can be controlled for individual rooms, using
      * [`Room::enable_send_queue`].
      */
-    func enableAllSendQueues(enable: Bool) 
+    func enableAllSendQueues(enable: Bool) async 
     
     func encryption()  -> Encryption
     
@@ -1116,11 +983,22 @@ open func displayName()async throws  -> String {
      * This can be controlled for individual rooms, using
      * [`Room::enable_send_queue`].
      */
-open func enableAllSendQueues(enable: Bool) {try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_client_enable_all_send_queues(self.uniffiClonePointer(),
-        FfiConverterBool.lower(enable),$0
-    )
-}
+open func enableAllSendQueues(enable: Bool)async  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_enable_all_send_queues(
+                    self.uniffiClonePointer(),
+                    FfiConverterBool.lower(enable)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: nil
+            
+        )
 }
     
 open func encryption() -> Encryption {
@@ -4489,8 +4367,8 @@ public protocol RoomProtocol : AnyObject {
      *
      * * `event_id` - The ID of the event to redact
      *
-     * * `reason` - The reason for the event being redacted (optional).
-     * its transaction ID (optional). If not given one is created.
+     * * `reason` - The reason for the event being redacted (optional). its
+     * transaction ID (optional). If not given one is created.
      */
     func redact(eventId: String, reason: String?) async throws 
     
@@ -4544,6 +4422,7 @@ public protocol RoomProtocol : AnyObject {
      * This function is supposed to be called whenever the user creates a room
      * call. It will send a `m.call.notify` event if:
      * - there is not yet a running call.
+     *
      * It will configure the notify type: ring or notify based on:
      * - is this a DM room -> ring
      * - is this a group with more than one other member -> notify
@@ -5359,8 +5238,8 @@ open func rawName() -> String? {
      *
      * * `event_id` - The ID of the event to redact
      *
-     * * `reason` - The reason for the event being redacted (optional).
-     * its transaction ID (optional). If not given one is created.
+     * * `reason` - The reason for the event being redacted (optional). its
+     * transaction ID (optional). If not given one is created.
      */
 open func redact(eventId: String, reason: String?)async throws  {
     return
@@ -5519,6 +5398,7 @@ open func sendCallNotification(callId: String, application: RtcApplicationType, 
      * This function is supposed to be called whenever the user creates a room
      * call. It will send a `m.call.notify` event if:
      * - there is not yet a running call.
+     *
      * It will configure the notify type: ring or notify based on:
      * - is this a DM room -> ring
      * - is this a group with more than one other member -> notify
@@ -6325,6 +6205,14 @@ public protocol RoomListItemProtocol : AnyObject {
     func isDirect()  -> Bool
     
     /**
+     * Checks whether the room is encrypted or not.
+     *
+     * **Note**: this info may not be reliable if you don't set up
+     * `m.room.encryption` as required state.
+     */
+    func isEncrypted() async  -> Bool
+    
+    /**
      * Checks whether the Room's timeline has been initialized before.
      */
     func isTimelineInitialized()  -> Bool
@@ -6457,6 +6345,30 @@ open func isDirect() -> Bool {
     uniffi_matrix_sdk_ffi_fn_method_roomlistitem_is_direct(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+    /**
+     * Checks whether the room is encrypted or not.
+     *
+     * **Note**: this info may not be reliable if you don't set up
+     * `m.room.encryption` as required state.
+     */
+open func isEncrypted()async  -> Bool {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_roomlistitem_is_encrypted(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: nil
+            
+        )
 }
     
     /**
@@ -7063,6 +6975,138 @@ public func FfiConverterTypeSendAttachmentJoinHandle_lower(_ value: SendAttachme
 
 
 
+public protocol SendHandleProtocol : AnyObject {
+    
+    /**
+     * Try to abort the sending of the current event.
+     *
+     * If this returns `true`, then the sending could be aborted, because the
+     * event hasn't been sent yet. Otherwise, if this returns `false`, the
+     * event had already been sent and could not be aborted.
+     *
+     * This has an effect only on the first call; subsequent calls will always
+     * return `false`.
+     */
+    func abort() async throws  -> Bool
+    
+}
+
+open class SendHandle:
+    SendHandleProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_sendhandle(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_sendhandle(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Try to abort the sending of the current event.
+     *
+     * If this returns `true`, then the sending could be aborted, because the
+     * event hasn't been sent yet. Otherwise, if this returns `false`, the
+     * event had already been sent and could not be aborted.
+     *
+     * This has an effect only on the first call; subsequent calls will always
+     * return `false`.
+     */
+open func abort()async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_sendhandle_abort(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+
+}
+
+public struct FfiConverterTypeSendHandle: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = SendHandle
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> SendHandle {
+        return SendHandle(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: SendHandle) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SendHandle {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: SendHandle, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeSendHandle_lift(_ pointer: UnsafeMutableRawPointer) throws -> SendHandle {
+    return try FfiConverterTypeSendHandle.lift(pointer)
+}
+
+public func FfiConverterTypeSendHandle_lower(_ value: SendHandle) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeSendHandle.lower(value)
+}
+
+
+
+
 public protocol SessionVerificationControllerProtocol : AnyObject {
     
     func approveVerification() async throws 
@@ -7438,10 +7482,10 @@ open class Span:
      * target passed for second and following creation of a span with the same
      * callsite will be ignored.
      *
-     * This function leaks a little bit of memory for each unique (file + line
-     * + level + target + name) it is called with. Please make sure that the
-     * number of different combinations of those parameters this can be called
-     * with is constant in the final executable.
+     * This function leaks a little bit of memory for each unique (file +
+     * line + level + target + name) it is called with. Please make sure that
+     * the number of different combinations of those parameters this can be
+     * called with is constant in the final executable.
      *
      * For a span to have an effect, you must `.enter()` it at the start of a
      * logical unit of work and `.exit()` it at the end of the same (including
@@ -7980,7 +8024,25 @@ public protocol TimelineProtocol : AnyObject {
     
     func createPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind) async throws 
     
-    func edit(newContent: RoomMessageEventContentWithoutRelation, eventId: String) async throws 
+    /**
+     * Edits an event from the timeline.
+     *
+     * Only works for events that exist as timeline items.
+     *
+     * If it was a local event, this will *try* to edit it, if it was not
+     * being sent already. If the event was a remote event, then it will be
+     * redacted by sending an edit request to the server.
+     *
+     * Returns whether the edit did happen. It can only return false for
+     * local events that are being processed.
+     */
+    func edit(item: EventTimelineItem, newContent: RoomMessageEventContentWithoutRelation) async throws  -> Bool
+    
+    /**
+     * Edit an event given its event id. Useful when we're not sure a remote
+     * timeline event has been fetched by the timeline.
+     */
+    func editByEventId(eventId: String, newContent: RoomMessageEventContentWithoutRelation) async throws 
     
     func editPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind, editItem: EventTimelineItem) async throws 
     
@@ -8068,7 +8130,7 @@ public protocol TimelineProtocol : AnyObject {
      * Returns an abort handle that allows to abort sending, if it hasn't
      * happened yet.
      */
-    func send(msg: RoomMessageEventContentWithoutRelation) async throws  -> AbortSendHandle
+    func send(msg: RoomMessageEventContentWithoutRelation) async throws  -> SendHandle
     
     func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
     
@@ -8170,13 +8232,46 @@ open func createPoll(question: String, answers: [String], maxSelections: UInt8, 
         )
 }
     
-open func edit(newContent: RoomMessageEventContentWithoutRelation, eventId: String)async throws  {
+    /**
+     * Edits an event from the timeline.
+     *
+     * Only works for events that exist as timeline items.
+     *
+     * If it was a local event, this will *try* to edit it, if it was not
+     * being sent already. If the event was a remote event, then it will be
+     * redacted by sending an edit request to the server.
+     *
+     * Returns whether the edit did happen. It can only return false for
+     * local events that are being processed.
+     */
+open func edit(item: EventTimelineItem, newContent: RoomMessageEventContentWithoutRelation)async throws  -> Bool {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_edit(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(newContent),FfiConverterString.lower(eventId)
+                    FfiConverterTypeEventTimelineItem.lower(item),FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(newContent)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Edit an event given its event id. Useful when we're not sure a remote
+     * timeline event has been fetched by the timeline.
+     */
+open func editByEventId(eventId: String, newContent: RoomMessageEventContentWithoutRelation)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_edit_by_event_id(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(eventId),FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(newContent)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -8435,7 +8530,7 @@ open func retryDecryption(sessionIds: [String]) {try! rustCall() {
      * Returns an abort handle that allows to abort sending, if it hasn't
      * happened yet.
      */
-open func send(msg: RoomMessageEventContentWithoutRelation)async throws  -> AbortSendHandle {
+open func send(msg: RoomMessageEventContentWithoutRelation)async throws  -> SendHandle {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -8447,7 +8542,7 @@ open func send(msg: RoomMessageEventContentWithoutRelation)async throws  -> Abor
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeAbortSendHandle.lift,
+            liftFunc: FfiConverterTypeSendHandle.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -12042,6 +12137,7 @@ public struct RoomInfo {
     public var isSpace: Bool
     public var isTombstoned: Bool
     public var isFavourite: Bool
+    public var isEncrypted: Bool
     public var canonicalAlias: String?
     public var alternativeAliases: [String]
     public var membership: Membership
@@ -12092,7 +12188,7 @@ public struct RoomInfo {
          */displayName: String?, 
         /**
          * Room name as defined by the room state event only.
-         */rawName: String?, topic: String?, avatarUrl: String?, isDirect: Bool, isPublic: Bool, isSpace: Bool, isTombstoned: Bool, isFavourite: Bool, canonicalAlias: String?, alternativeAliases: [String], membership: Membership, 
+         */rawName: String?, topic: String?, avatarUrl: String?, isDirect: Bool, isPublic: Bool, isSpace: Bool, isTombstoned: Bool, isFavourite: Bool, isEncrypted: Bool, canonicalAlias: String?, alternativeAliases: [String], membership: Membership, 
         /**
          * Member who invited the current user to a room that's in the invited
          * state.
@@ -12125,6 +12221,7 @@ public struct RoomInfo {
         self.isSpace = isSpace
         self.isTombstoned = isTombstoned
         self.isFavourite = isFavourite
+        self.isEncrypted = isEncrypted
         self.canonicalAlias = canonicalAlias
         self.alternativeAliases = alternativeAliases
         self.membership = membership
@@ -12178,6 +12275,9 @@ extension RoomInfo: Equatable, Hashable {
             return false
         }
         if lhs.isFavourite != rhs.isFavourite {
+            return false
+        }
+        if lhs.isEncrypted != rhs.isEncrypted {
             return false
         }
         if lhs.canonicalAlias != rhs.canonicalAlias {
@@ -12248,6 +12348,7 @@ extension RoomInfo: Equatable, Hashable {
         hasher.combine(isSpace)
         hasher.combine(isTombstoned)
         hasher.combine(isFavourite)
+        hasher.combine(isEncrypted)
         hasher.combine(canonicalAlias)
         hasher.combine(alternativeAliases)
         hasher.combine(membership)
@@ -12284,6 +12385,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 isSpace: FfiConverterBool.read(from: &buf), 
                 isTombstoned: FfiConverterBool.read(from: &buf), 
                 isFavourite: FfiConverterBool.read(from: &buf), 
+                isEncrypted: FfiConverterBool.read(from: &buf), 
                 canonicalAlias: FfiConverterOptionString.read(from: &buf), 
                 alternativeAliases: FfiConverterSequenceString.read(from: &buf), 
                 membership: FfiConverterTypeMembership.read(from: &buf), 
@@ -12316,6 +12418,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isSpace, into: &buf)
         FfiConverterBool.write(value.isTombstoned, into: &buf)
         FfiConverterBool.write(value.isFavourite, into: &buf)
+        FfiConverterBool.write(value.isEncrypted, into: &buf)
         FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
         FfiConverterSequenceString.write(value.alternativeAliases, into: &buf)
         FfiConverterTypeMembership.write(value.membership, into: &buf)
@@ -24827,8 +24930,10 @@ public func messageEventContentNew(msgtype: MessageType)throws  -> RoomMessageEv
  * This function returns a `WidgetSettings` object which can be used
  * to setup a widget using `run_client_widget_api`
  * and to generate the correct url for the widget.
+ *
  * # Arguments
- * * - `props` A struct containing the configuration parameters for a element
+ *
+ * * `props` - A struct containing the configuration parameters for a element
  * call widget.
  */
 public func newVirtualElementCallWidget(props: VirtualElementCallWidgetOptions)throws  -> WidgetSettings {
@@ -24930,7 +25035,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_func_message_event_content_new() != 57839) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_func_new_virtual_element_call_widget() != 48052) {
+    if (uniffi_matrix_sdk_ffi_checksum_func_new_virtual_element_call_widget() != 4988) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_parse_matrix_entity_from() != 49710) {
@@ -24955,9 +25060,6 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roommessageeventcontentwithoutrelation_with_mentions() != 8867) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_abortsendhandle_abort() != 55658) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_abort_oidc_login() != 22230) {
@@ -24987,7 +25089,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_display_name() != 56259) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_all_send_queues() != 24140) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_all_send_queues() != 30834) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_encryption() != 9657) {
@@ -25524,7 +25626,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_raw_name() != 15453) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_redact() != 2549) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_redact() != 45810) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_remove_avatar() != 7230) {
@@ -25545,7 +25647,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_call_notification() != 43366) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_call_notification_if_needed() != 24013) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_call_notification_if_needed() != 53551) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_is_favourite() != 64403) {
@@ -25650,6 +25752,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_direct() != 46873) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_encrypted() != 65150) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_timeline_initialized() != 46855) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25690,6 +25795,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sendattachmentjoinhandle_join() != 49985) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_sendhandle_abort() != 11570) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_approve_verification() != 12154) {
@@ -25761,7 +25869,10 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_create_poll() != 37925) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 48577) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 7521) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit_by_event_id() != 60761) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit_poll() != 40066) {
@@ -25800,7 +25911,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_retry_decryption() != 21112) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send() != 62420) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send() != 9553) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 47157) {
@@ -25920,7 +26031,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_constructor_span_current() != 53698) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_constructor_span_new() != 30597) {
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_span_new() != 14105) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_timelineeventtypefilter_exclude() != 53805) {
