@@ -658,6 +658,12 @@ public protocol ClientProtocol : AnyObject {
     func getSessionVerificationController() async throws  -> SessionVerificationController
     
     /**
+     * Allows generic GET requests to be made through the SDKs internal HTTP
+     * client
+     */
+    func getUrl(url: String) async throws  -> String
+    
+    /**
      * The homeserver this client is configured to use.
      */
     func homeserver()  -> String
@@ -776,6 +782,11 @@ public protocol ClientProtocol : AnyObject {
     func urlForOidcLogin(oidcConfiguration: OidcConfiguration) async throws  -> OidcAuthorizationData
     
     func userId() throws  -> String
+    
+    /**
+     * The server name part of the current user ID
+     */
+    func userIdServerName() throws  -> String
     
 }
 
@@ -1165,6 +1176,27 @@ open func getSessionVerificationController()async throws  -> SessionVerification
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
             liftFunc: FfiConverterTypeSessionVerificationController.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Allows generic GET requests to be made through the SDKs internal HTTP
+     * client
+     */
+open func getUrl(url: String)async throws  -> String {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_get_url(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(url)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -1649,6 +1681,16 @@ open func urlForOidcLogin(oidcConfiguration: OidcConfiguration)async throws  -> 
 open func userId()throws  -> String {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_client_user_id(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * The server name part of the current user ID
+     */
+open func userIdServerName()throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_client_user_id_server_name(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -10127,6 +10169,110 @@ public func FfiConverterTypeCreateRoomParameters_lift(_ buf: RustBuffer) throws 
 
 public func FfiConverterTypeCreateRoomParameters_lower(_ value: CreateRoomParameters) -> RustBuffer {
     return FfiConverterTypeCreateRoomParameters.lower(value)
+}
+
+
+/**
+ * Well-known settings specific to ElementCall
+ */
+public struct ElementCallWellKnown {
+    public var widgetUrl: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(widgetUrl: String) {
+        self.widgetUrl = widgetUrl
+    }
+}
+
+
+
+extension ElementCallWellKnown: Equatable, Hashable {
+    public static func ==(lhs: ElementCallWellKnown, rhs: ElementCallWellKnown) -> Bool {
+        if lhs.widgetUrl != rhs.widgetUrl {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(widgetUrl)
+    }
+}
+
+
+public struct FfiConverterTypeElementCallWellKnown: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ElementCallWellKnown {
+        return
+            try ElementCallWellKnown(
+                widgetUrl: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ElementCallWellKnown, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.widgetUrl, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeElementCallWellKnown_lift(_ buf: RustBuffer) throws -> ElementCallWellKnown {
+    return try FfiConverterTypeElementCallWellKnown.lift(buf)
+}
+
+public func FfiConverterTypeElementCallWellKnown_lower(_ value: ElementCallWellKnown) -> RustBuffer {
+    return FfiConverterTypeElementCallWellKnown.lower(value)
+}
+
+
+/**
+ * Element specific well-known settings
+ */
+public struct ElementWellKnown {
+    public var call: ElementCallWellKnown
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(call: ElementCallWellKnown) {
+        self.call = call
+    }
+}
+
+
+
+extension ElementWellKnown: Equatable, Hashable {
+    public static func ==(lhs: ElementWellKnown, rhs: ElementWellKnown) -> Bool {
+        if lhs.call != rhs.call {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(call)
+    }
+}
+
+
+public struct FfiConverterTypeElementWellKnown: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ElementWellKnown {
+        return
+            try ElementWellKnown(
+                call: FfiConverterTypeElementCallWellKnown.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ElementWellKnown, into buf: inout [UInt8]) {
+        FfiConverterTypeElementCallWellKnown.write(value.call, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeElementWellKnown_lift(_ buf: RustBuffer) throws -> ElementWellKnown {
+    return try FfiConverterTypeElementWellKnown.lift(buf)
+}
+
+public func FfiConverterTypeElementWellKnown_lower(_ value: ElementWellKnown) -> RustBuffer {
+    return FfiConverterTypeElementWellKnown.lower(value)
 }
 
 
@@ -24850,6 +24996,16 @@ public func logEvent(file: String, line: UInt32?, level: LogLevel, target: Strin
     )
 }
 }
+/**
+ * Helper function to parse a string into a ElementWellKnown struct
+ */
+public func makeElementWellKnown(string: String)throws  -> ElementWellKnown {
+    return try  FfiConverterTypeElementWellKnown.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_func_make_element_well_known(
+        FfiConverterString.lower(string),$0
+    )
+})
+}
 public func makeWidgetDriver(settings: WidgetSettings)throws  -> WidgetDriverAndHandle {
     return try  FfiConverterTypeWidgetDriverAndHandle.lift(try rustCallWithError(FfiConverterTypeParseError.lift) {
     uniffi_matrix_sdk_ffi_fn_func_make_widget_driver(
@@ -25008,6 +25164,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_func_log_event() != 62286) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_func_make_element_well_known() != 21379) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_func_make_widget_driver() != 34206) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25125,6 +25284,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_session_verification_controller() != 55934) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_url() != 50489) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_homeserver() != 26427) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25213,6 +25375,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_user_id() != 40531) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_user_id_server_name() != 57725) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_add_root_certificates() != 14763) {
