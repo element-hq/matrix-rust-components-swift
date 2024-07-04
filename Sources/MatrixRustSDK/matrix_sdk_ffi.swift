@@ -5959,7 +5959,7 @@ public func FfiConverterTypeRoomDirectorySearch_lower(_ value: RoomDirectorySear
 
 public protocol RoomListProtocol : AnyObject {
     
-    func entries(listener: RoomListEntriesListener)  -> RoomListEntriesResult
+    func entries(listener: RoomListEntriesListener)  -> TaskHandle
     
     func entriesWithDynamicAdapters(pageSize: UInt32, listener: RoomListEntriesListener)  -> RoomListEntriesWithDynamicAdaptersResult
     
@@ -6010,8 +6010,8 @@ open class RoomList:
     
 
     
-open func entries(listener: RoomListEntriesListener) -> RoomListEntriesResult {
-    return try!  FfiConverterTypeRoomListEntriesResult.lift(try! rustCall() {
+open func entries(listener: RoomListEntriesListener) -> TaskHandle {
+    return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_roomlist_entries(self.uniffiClonePointer(),
         FfiConverterCallbackInterfaceRoomListEntriesListener.lower(listener),$0
     )
@@ -6205,6 +6205,117 @@ public func FfiConverterTypeRoomListDynamicEntriesController_lift(_ pointer: Uns
 
 public func FfiConverterTypeRoomListDynamicEntriesController_lower(_ value: RoomListDynamicEntriesController) -> UnsafeMutableRawPointer {
     return FfiConverterTypeRoomListDynamicEntriesController.lower(value)
+}
+
+
+
+
+public protocol RoomListEntriesWithDynamicAdaptersResultProtocol : AnyObject {
+    
+    func controller()  -> RoomListDynamicEntriesController
+    
+    func entriesStream()  -> TaskHandle
+    
+}
+
+open class RoomListEntriesWithDynamicAdaptersResult:
+    RoomListEntriesWithDynamicAdaptersResultProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_roomlistentrieswithdynamicadaptersresult(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roomlistentrieswithdynamicadaptersresult(pointer, $0) }
+    }
+
+    
+
+    
+open func controller() -> RoomListDynamicEntriesController {
+    return try!  FfiConverterTypeRoomListDynamicEntriesController.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roomlistentrieswithdynamicadaptersresult_controller(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func entriesStream() -> TaskHandle {
+    return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roomlistentrieswithdynamicadaptersresult_entries_stream(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+
+}
+
+public struct FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = RoomListEntriesWithDynamicAdaptersResult
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> RoomListEntriesWithDynamicAdaptersResult {
+        return RoomListEntriesWithDynamicAdaptersResult(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: RoomListEntriesWithDynamicAdaptersResult) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomListEntriesWithDynamicAdaptersResult {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: RoomListEntriesWithDynamicAdaptersResult, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult_lift(_ pointer: UnsafeMutableRawPointer) throws -> RoomListEntriesWithDynamicAdaptersResult {
+    return try FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult.lift(pointer)
+}
+
+public func FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult_lower(_ value: RoomListEntriesWithDynamicAdaptersResult) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult.lower(value)
 }
 
 
@@ -6523,8 +6634,6 @@ public protocol RoomListServiceProtocol : AnyObject {
     
     func allRooms() async throws  -> RoomList
     
-    func applyInput(input: RoomListInput) async throws 
-    
     func room(roomId: String) throws  -> RoomListItem
     
     func state(listener: RoomListServiceStateListener)  -> TaskHandle
@@ -6587,23 +6696,6 @@ open func allRooms()async throws  -> RoomList {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
             liftFunc: FfiConverterTypeRoomList.lift,
-            errorHandler: FfiConverterTypeRoomListError.lift
-        )
-}
-    
-open func applyInput(input: RoomListInput)async throws  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_roomlistservice_apply_input(
-                    self.uniffiClonePointer(),
-                    FfiConverterTypeRoomListInput.lower(input)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
             errorHandler: FfiConverterTypeRoomListError.lift
         )
 }
@@ -12684,84 +12776,6 @@ public func FfiConverterTypeRoomInfo_lower(_ value: RoomInfo) -> RustBuffer {
 }
 
 
-public struct RoomListEntriesResult {
-    public var entries: [RoomListEntry]
-    public var entriesStream: TaskHandle
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(entries: [RoomListEntry], entriesStream: TaskHandle) {
-        self.entries = entries
-        self.entriesStream = entriesStream
-    }
-}
-
-
-
-public struct FfiConverterTypeRoomListEntriesResult: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomListEntriesResult {
-        return
-            try RoomListEntriesResult(
-                entries: FfiConverterSequenceTypeRoomListEntry.read(from: &buf), 
-                entriesStream: FfiConverterTypeTaskHandle.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: RoomListEntriesResult, into buf: inout [UInt8]) {
-        FfiConverterSequenceTypeRoomListEntry.write(value.entries, into: &buf)
-        FfiConverterTypeTaskHandle.write(value.entriesStream, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeRoomListEntriesResult_lift(_ buf: RustBuffer) throws -> RoomListEntriesResult {
-    return try FfiConverterTypeRoomListEntriesResult.lift(buf)
-}
-
-public func FfiConverterTypeRoomListEntriesResult_lower(_ value: RoomListEntriesResult) -> RustBuffer {
-    return FfiConverterTypeRoomListEntriesResult.lower(value)
-}
-
-
-public struct RoomListEntriesWithDynamicAdaptersResult {
-    public var controller: RoomListDynamicEntriesController
-    public var entriesStream: TaskHandle
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(controller: RoomListDynamicEntriesController, entriesStream: TaskHandle) {
-        self.controller = controller
-        self.entriesStream = entriesStream
-    }
-}
-
-
-
-public struct FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomListEntriesWithDynamicAdaptersResult {
-        return
-            try RoomListEntriesWithDynamicAdaptersResult(
-                controller: FfiConverterTypeRoomListDynamicEntriesController.read(from: &buf), 
-                entriesStream: FfiConverterTypeTaskHandle.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: RoomListEntriesWithDynamicAdaptersResult, into buf: inout [UInt8]) {
-        FfiConverterTypeRoomListDynamicEntriesController.write(value.controller, into: &buf)
-        FfiConverterTypeTaskHandle.write(value.entriesStream, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult_lift(_ buf: RustBuffer) throws -> RoomListEntriesWithDynamicAdaptersResult {
-    return try FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult.lift(buf)
-}
-
-public func FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult_lower(_ value: RoomListEntriesWithDynamicAdaptersResult) -> RustBuffer {
-    return FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult.lower(value)
-}
-
-
 public struct RoomListLoadingStateResult {
     public var state: RoomListLoadingState
     public var stateStream: TaskHandle
@@ -12798,63 +12812,6 @@ public func FfiConverterTypeRoomListLoadingStateResult_lift(_ buf: RustBuffer) t
 
 public func FfiConverterTypeRoomListLoadingStateResult_lower(_ value: RoomListLoadingStateResult) -> RustBuffer {
     return FfiConverterTypeRoomListLoadingStateResult.lower(value)
-}
-
-
-public struct RoomListRange {
-    public var start: UInt32
-    public var endInclusive: UInt32
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(start: UInt32, endInclusive: UInt32) {
-        self.start = start
-        self.endInclusive = endInclusive
-    }
-}
-
-
-
-extension RoomListRange: Equatable, Hashable {
-    public static func ==(lhs: RoomListRange, rhs: RoomListRange) -> Bool {
-        if lhs.start != rhs.start {
-            return false
-        }
-        if lhs.endInclusive != rhs.endInclusive {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(start)
-        hasher.combine(endInclusive)
-    }
-}
-
-
-public struct FfiConverterTypeRoomListRange: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomListRange {
-        return
-            try RoomListRange(
-                start: FfiConverterUInt32.read(from: &buf), 
-                endInclusive: FfiConverterUInt32.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: RoomListRange, into buf: inout [UInt8]) {
-        FfiConverterUInt32.write(value.start, into: &buf)
-        FfiConverterUInt32.write(value.endInclusive, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeRoomListRange_lift(_ buf: RustBuffer) throws -> RoomListRange {
-    return try FfiConverterTypeRoomListRange.lift(buf)
-}
-
-public func FfiConverterTypeRoomListRange_lower(_ value: RoomListRange) -> RustBuffer {
-    return FfiConverterTypeRoomListRange.lower(value)
 }
 
 
@@ -13873,21 +13830,35 @@ public func FfiConverterTypeThumbnailInfo_lower(_ value: ThumbnailInfo) -> RustB
 
 
 public struct TracingConfiguration {
+    /**
+     * A filter line following the [RUST_LOG format].
+     *
+     * [RUST_LOG format]: https://rust-lang-nursery.github.io/rust-cookbook/development_tools/debugging/config_log.html
+     */
     public var filter: String
     /**
-     * Controls whether to print to stdout or, equivalent, the system logs on
-     * Android.
+     * Whether to log to stdout, or in the logcat on Android.
      */
     public var writeToStdoutOrSystem: Bool
+    /**
+     * If set, configures rotated log files where to write additional logs.
+     */
     public var writeToFiles: TracingFileConfiguration?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(filter: String, 
+    public init(
         /**
-         * Controls whether to print to stdout or, equivalent, the system logs on
-         * Android.
-         */writeToStdoutOrSystem: Bool, writeToFiles: TracingFileConfiguration?) {
+         * A filter line following the [RUST_LOG format].
+         *
+         * [RUST_LOG format]: https://rust-lang-nursery.github.io/rust-cookbook/development_tools/debugging/config_log.html
+         */filter: String, 
+        /**
+         * Whether to log to stdout, or in the logcat on Android.
+         */writeToStdoutOrSystem: Bool, 
+        /**
+         * If set, configures rotated log files where to write additional logs.
+         */writeToFiles: TracingFileConfiguration?) {
         self.filter = filter
         self.writeToStdoutOrSystem = writeToStdoutOrSystem
         self.writeToFiles = writeToFiles
@@ -13945,15 +13916,48 @@ public func FfiConverterTypeTracingConfiguration_lower(_ value: TracingConfigura
 }
 
 
+/**
+ * Configuration to save logs to (rotated) log-files.
+ */
 public struct TracingFileConfiguration {
+    /**
+     * Base location for all the log files.
+     */
     public var path: String
+    /**
+     * Prefix for the log files' names.
+     */
     public var filePrefix: String
+    /**
+     * Optional suffix for the log file's names.
+     */
     public var fileSuffix: String?
+    /**
+     * Maximum number of rotated files.
+     *
+     * If not set, there's no max limit, i.e. the number of log files is
+     * unlimited.
+     */
     public var maxFiles: UInt64?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(path: String, filePrefix: String, fileSuffix: String?, maxFiles: UInt64?) {
+    public init(
+        /**
+         * Base location for all the log files.
+         */path: String, 
+        /**
+         * Prefix for the log files' names.
+         */filePrefix: String, 
+        /**
+         * Optional suffix for the log file's names.
+         */fileSuffix: String?, 
+        /**
+         * Maximum number of rotated files.
+         *
+         * If not set, there's no max limit, i.e. the number of log files is
+         * unlimited.
+         */maxFiles: UInt64?) {
         self.path = path
         self.filePrefix = filePrefix
         self.fileSuffix = fileSuffix
@@ -19050,24 +19054,24 @@ extension RoomListEntriesDynamicFilterKind: Equatable, Hashable {}
 
 public enum RoomListEntriesUpdate {
     
-    case append(values: [RoomListEntry]
+    case append(values: [RoomListItem]
     )
     case clear
-    case pushFront(value: RoomListEntry
+    case pushFront(value: RoomListItem
     )
-    case pushBack(value: RoomListEntry
+    case pushBack(value: RoomListItem
     )
     case popFront
     case popBack
-    case insert(index: UInt32, value: RoomListEntry
+    case insert(index: UInt32, value: RoomListItem
     )
-    case set(index: UInt32, value: RoomListEntry
+    case set(index: UInt32, value: RoomListItem
     )
     case remove(index: UInt32
     )
     case truncate(length: UInt32
     )
-    case reset(values: [RoomListEntry]
+    case reset(values: [RoomListItem]
     )
 }
 
@@ -19079,25 +19083,25 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .append(values: try FfiConverterSequenceTypeRoomListEntry.read(from: &buf)
+        case 1: return .append(values: try FfiConverterSequenceTypeRoomListItem.read(from: &buf)
         )
         
         case 2: return .clear
         
-        case 3: return .pushFront(value: try FfiConverterTypeRoomListEntry.read(from: &buf)
+        case 3: return .pushFront(value: try FfiConverterTypeRoomListItem.read(from: &buf)
         )
         
-        case 4: return .pushBack(value: try FfiConverterTypeRoomListEntry.read(from: &buf)
+        case 4: return .pushBack(value: try FfiConverterTypeRoomListItem.read(from: &buf)
         )
         
         case 5: return .popFront
         
         case 6: return .popBack
         
-        case 7: return .insert(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeRoomListEntry.read(from: &buf)
+        case 7: return .insert(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeRoomListItem.read(from: &buf)
         )
         
-        case 8: return .set(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeRoomListEntry.read(from: &buf)
+        case 8: return .set(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeRoomListItem.read(from: &buf)
         )
         
         case 9: return .remove(index: try FfiConverterUInt32.read(from: &buf)
@@ -19106,7 +19110,7 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         case 10: return .truncate(length: try FfiConverterUInt32.read(from: &buf)
         )
         
-        case 11: return .reset(values: try FfiConverterSequenceTypeRoomListEntry.read(from: &buf)
+        case 11: return .reset(values: try FfiConverterSequenceTypeRoomListItem.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -19119,7 +19123,7 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         
         case let .append(values):
             writeInt(&buf, Int32(1))
-            FfiConverterSequenceTypeRoomListEntry.write(values, into: &buf)
+            FfiConverterSequenceTypeRoomListItem.write(values, into: &buf)
             
         
         case .clear:
@@ -19128,12 +19132,12 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         
         case let .pushFront(value):
             writeInt(&buf, Int32(3))
-            FfiConverterTypeRoomListEntry.write(value, into: &buf)
+            FfiConverterTypeRoomListItem.write(value, into: &buf)
             
         
         case let .pushBack(value):
             writeInt(&buf, Int32(4))
-            FfiConverterTypeRoomListEntry.write(value, into: &buf)
+            FfiConverterTypeRoomListItem.write(value, into: &buf)
             
         
         case .popFront:
@@ -19147,13 +19151,13 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         case let .insert(index,value):
             writeInt(&buf, Int32(7))
             FfiConverterUInt32.write(index, into: &buf)
-            FfiConverterTypeRoomListEntry.write(value, into: &buf)
+            FfiConverterTypeRoomListItem.write(value, into: &buf)
             
         
         case let .set(index,value):
             writeInt(&buf, Int32(8))
             FfiConverterUInt32.write(index, into: &buf)
-            FfiConverterTypeRoomListEntry.write(value, into: &buf)
+            FfiConverterTypeRoomListItem.write(value, into: &buf)
             
         
         case let .remove(index):
@@ -19168,7 +19172,7 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         
         case let .reset(values):
             writeInt(&buf, Int32(11))
-            FfiConverterSequenceTypeRoomListEntry.write(values, into: &buf)
+            FfiConverterSequenceTypeRoomListItem.write(values, into: &buf)
             
         }
     }
@@ -19183,77 +19187,6 @@ public func FfiConverterTypeRoomListEntriesUpdate_lower(_ value: RoomListEntries
     return FfiConverterTypeRoomListEntriesUpdate.lower(value)
 }
 
-
-
-extension RoomListEntriesUpdate: Equatable, Hashable {}
-
-
-
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
-
-public enum RoomListEntry {
-    
-    case empty
-    case invalidated(roomId: String
-    )
-    case filled(roomId: String
-    )
-}
-
-
-public struct FfiConverterTypeRoomListEntry: FfiConverterRustBuffer {
-    typealias SwiftType = RoomListEntry
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomListEntry {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .empty
-        
-        case 2: return .invalidated(roomId: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 3: return .filled(roomId: try FfiConverterString.read(from: &buf)
-        )
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: RoomListEntry, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case .empty:
-            writeInt(&buf, Int32(1))
-        
-        
-        case let .invalidated(roomId):
-            writeInt(&buf, Int32(2))
-            FfiConverterString.write(roomId, into: &buf)
-            
-        
-        case let .filled(roomId):
-            writeInt(&buf, Int32(3))
-            FfiConverterString.write(roomId, into: &buf)
-            
-        }
-    }
-}
-
-
-public func FfiConverterTypeRoomListEntry_lift(_ buf: RustBuffer) throws -> RoomListEntry {
-    return try FfiConverterTypeRoomListEntry.lift(buf)
-}
-
-public func FfiConverterTypeRoomListEntry_lower(_ value: RoomListEntry) -> RustBuffer {
-    return FfiConverterTypeRoomListEntry.lower(value)
-}
-
-
-
-extension RoomListEntry: Equatable, Hashable {}
 
 
 
@@ -19433,57 +19366,6 @@ public func FfiConverterTypeRoomListFilterCategory_lower(_ value: RoomListFilter
 
 
 extension RoomListFilterCategory: Equatable, Hashable {}
-
-
-
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
-
-public enum RoomListInput {
-    
-    case viewport(ranges: [RoomListRange]
-    )
-}
-
-
-public struct FfiConverterTypeRoomListInput: FfiConverterRustBuffer {
-    typealias SwiftType = RoomListInput
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomListInput {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .viewport(ranges: try FfiConverterSequenceTypeRoomListRange.read(from: &buf)
-        )
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: RoomListInput, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case let .viewport(ranges):
-            writeInt(&buf, Int32(1))
-            FfiConverterSequenceTypeRoomListRange.write(ranges, into: &buf)
-            
-        }
-    }
-}
-
-
-public func FfiConverterTypeRoomListInput_lift(_ buf: RustBuffer) throws -> RoomListInput {
-    return try FfiConverterTypeRoomListInput.lift(buf)
-}
-
-public func FfiConverterTypeRoomListInput_lower(_ value: RoomListInput) -> RustBuffer {
-    return FfiConverterTypeRoomListInput.lower(value)
-}
-
-
-
-extension RoomListInput: Equatable, Hashable {}
 
 
 
@@ -24501,6 +24383,28 @@ fileprivate struct FfiConverterSequenceTypeRoom: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeRoomListItem: FfiConverterRustBuffer {
+    typealias SwiftType = [RoomListItem]
+
+    public static func write(_ value: [RoomListItem], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRoomListItem.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RoomListItem] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RoomListItem]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRoomListItem.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypeSessionVerificationEmoji: FfiConverterRustBuffer {
     typealias SwiftType = [SessionVerificationEmoji]
 
@@ -24699,28 +24603,6 @@ fileprivate struct FfiConverterSequenceTypeRoomHero: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterSequenceTypeRoomListRange: FfiConverterRustBuffer {
-    typealias SwiftType = [RoomListRange]
-
-    public static func write(_ value: [RoomListRange], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for item in value {
-            FfiConverterTypeRoomListRange.write(item, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RoomListRange] {
-        let len: Int32 = try readInt(&buf)
-        var seq = [RoomListRange]()
-        seq.reserveCapacity(Int(len))
-        for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeRoomListRange.read(from: &buf))
-        }
-        return seq
-    }
-}
-
 fileprivate struct FfiConverterSequenceTypeRoomMember: FfiConverterRustBuffer {
     typealias SwiftType = [RoomMember]
 
@@ -24870,28 +24752,6 @@ fileprivate struct FfiConverterSequenceTypeRoomListEntriesUpdate: FfiConverterRu
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeRoomListEntriesUpdate.read(from: &buf))
-        }
-        return seq
-    }
-}
-
-fileprivate struct FfiConverterSequenceTypeRoomListEntry: FfiConverterRustBuffer {
-    typealias SwiftType = [RoomListEntry]
-
-    public static func write(_ value: [RoomListEntry], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for item in value {
-            FfiConverterTypeRoomListEntry.write(item, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RoomListEntry] {
-        let len: Int32 = try readInt(&buf)
-        var seq = [RoomListEntry]()
-        seq.reserveCapacity(Int(len))
-        for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeRoomListEntry.read(from: &buf))
         }
         return seq
     }
@@ -26047,10 +25907,10 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_search() != 26558) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_entries() != 26697) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_entries() != 25290) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_entries_with_dynamic_adapters() != 46829) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_entries_with_dynamic_adapters() != 36097) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_loading_state() != 21585) {
@@ -26066,6 +25926,12 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistdynamicentriescontroller_set_filter() != 61202) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistentrieswithdynamicadaptersresult_controller() != 36258) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistentrieswithdynamicadaptersresult_entries_stream() != 56632) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_avatar_url() != 39097) {
@@ -26108,9 +25974,6 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_all_rooms() != 49704) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_apply_input() != 31607) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_room() != 5185) {
