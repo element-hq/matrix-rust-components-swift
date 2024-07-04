@@ -5393,7 +5393,7 @@ open func saveComposerDraft(draft: ComposerDraft)async throws  {
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_save_composer_draft(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeComposerDraft_lower(draft)
+                    FfiConverterTypeComposerDraft.lower(draft)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -10056,6 +10056,94 @@ public func FfiConverterTypeClientProperties_lift(_ buf: RustBuffer) throws -> C
 
 public func FfiConverterTypeClientProperties_lower(_ value: ClientProperties) -> RustBuffer {
     return FfiConverterTypeClientProperties.lower(value)
+}
+
+
+/**
+ * Current draft of the composer for the room.
+ */
+public struct ComposerDraft {
+    /**
+     * The draft content in plain text.
+     */
+    public var plainText: String
+    /**
+     * If the message is formatted in HTML, the HTML representation of the
+     * message.
+     */
+    public var htmlText: String?
+    /**
+     * The type of draft.
+     */
+    public var draftType: ComposerDraftType
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The draft content in plain text.
+         */plainText: String, 
+        /**
+         * If the message is formatted in HTML, the HTML representation of the
+         * message.
+         */htmlText: String?, 
+        /**
+         * The type of draft.
+         */draftType: ComposerDraftType) {
+        self.plainText = plainText
+        self.htmlText = htmlText
+        self.draftType = draftType
+    }
+}
+
+
+
+extension ComposerDraft: Equatable, Hashable {
+    public static func ==(lhs: ComposerDraft, rhs: ComposerDraft) -> Bool {
+        if lhs.plainText != rhs.plainText {
+            return false
+        }
+        if lhs.htmlText != rhs.htmlText {
+            return false
+        }
+        if lhs.draftType != rhs.draftType {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(plainText)
+        hasher.combine(htmlText)
+        hasher.combine(draftType)
+    }
+}
+
+
+public struct FfiConverterTypeComposerDraft: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ComposerDraft {
+        return
+            try ComposerDraft(
+                plainText: FfiConverterString.read(from: &buf), 
+                htmlText: FfiConverterOptionString.read(from: &buf), 
+                draftType: FfiConverterTypeComposerDraftType.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ComposerDraft, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.plainText, into: &buf)
+        FfiConverterOptionString.write(value.htmlText, into: &buf)
+        FfiConverterTypeComposerDraftType.write(value.draftType, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeComposerDraft_lift(_ buf: RustBuffer) throws -> ComposerDraft {
+    return try FfiConverterTypeComposerDraft.lift(buf)
+}
+
+public func FfiConverterTypeComposerDraft_lower(_ value: ComposerDraft) -> RustBuffer {
+    return FfiConverterTypeComposerDraft.lower(value)
 }
 
 
@@ -15390,6 +15478,92 @@ public struct FfiConverterTypeClientError: FfiConverterRustBuffer {
 extension ClientError: Equatable, Hashable {}
 
 extension ClientError: Error { }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The type of draft of the composer.
+ */
+
+public enum ComposerDraftType {
+    
+    /**
+     * The draft is a new message.
+     */
+    case newMessage
+    /**
+     * The draft is a reply to an event.
+     */
+    case reply(
+        /**
+         * The ID of the event being replied to.
+         */eventId: String
+    )
+    /**
+     * The draft is an edit of an event.
+     */
+    case edit(
+        /**
+         * The ID of the event being edited.
+         */eventId: String
+    )
+}
+
+
+public struct FfiConverterTypeComposerDraftType: FfiConverterRustBuffer {
+    typealias SwiftType = ComposerDraftType
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ComposerDraftType {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .newMessage
+        
+        case 2: return .reply(eventId: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .edit(eventId: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ComposerDraftType, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .newMessage:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .reply(eventId):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(eventId, into: &buf)
+            
+        
+        case let .edit(eventId):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(eventId, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeComposerDraftType_lift(_ buf: RustBuffer) throws -> ComposerDraftType {
+    return try FfiConverterTypeComposerDraftType.lift(buf)
+}
+
+public func FfiConverterTypeComposerDraftType_lower(_ value: ComposerDraftType) -> RustBuffer {
+    return FfiConverterTypeComposerDraftType.lower(value)
+}
+
+
+
+extension ComposerDraftType: Equatable, Hashable {}
+
+
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -23462,6 +23636,27 @@ fileprivate struct FfiConverterOptionTypeAudioInfo: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeComposerDraft: FfiConverterRustBuffer {
+    typealias SwiftType = ComposerDraft?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeComposerDraft.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeComposerDraft.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeFileInfo: FfiConverterRustBuffer {
     typealias SwiftType = FileInfo?
 
@@ -24197,27 +24392,6 @@ fileprivate struct FfiConverterOptionDictionaryStringInt64: FfiConverterRustBuff
     }
 }
 
-fileprivate struct FfiConverterOptionTypeComposerDraft: FfiConverterRustBuffer {
-    typealias SwiftType = ComposerDraft?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeComposerDraft.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeComposerDraft.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeEventItemOrigin: FfiConverterRustBuffer {
     typealias SwiftType = EventItemOrigin?
 
@@ -24859,8 +25033,6 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
         return dict
     }
 }
-
-
 
 
 
@@ -25755,7 +25927,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_leave() != 63688) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_load_composer_draft() != 53887) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_load_composer_draft() != 38115) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_mark_as_read() != 16004) {
@@ -25806,7 +25978,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_room_info() != 41146) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_save_composer_draft() != 56684) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_save_composer_draft() != 62232) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_call_notification() != 43366) {
