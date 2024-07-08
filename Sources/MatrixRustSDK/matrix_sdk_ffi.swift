@@ -752,6 +752,11 @@ public protocol ClientProtocol : AnyObject {
      */
     func setPusher(identifiers: PusherIdentifiers, kind: PusherKind, appDisplayName: String, deviceDisplayName: String, profileTag: String?, lang: String) async throws 
     
+    /**
+     * Returns a handler to start the SSO login process.
+     */
+    func startSsoLogin(redirectUrl: String, idpId: String?) async throws  -> SsoHandler
+    
     func subscribeToIgnoredUsers(listener: IgnoredUsersListener)  -> TaskHandle
     
     /**
@@ -1554,6 +1559,26 @@ open func setPusher(identifiers: PusherIdentifiers, kind: PusherKind, appDisplay
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Returns a handler to start the SSO login process.
+     */
+open func startSsoLogin(redirectUrl: String, idpId: String?)async throws  -> SsoHandler {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_start_sso_login(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(redirectUrl),FfiConverterOptionString.lower(idpId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeSsoHandler.lift,
+            errorHandler: FfiConverterTypeSsoError.lift
         )
 }
     
@@ -7731,6 +7756,149 @@ public func FfiConverterTypeSpan_lower(_ value: Span) -> UnsafeMutableRawPointer
 
 
 
+/**
+ * An object encapsulating the SSO login flow
+ */
+public protocol SsoHandlerProtocol : AnyObject {
+    
+    /**
+     * Completes the SSO login process.
+     */
+    func finish(callbackUrl: String) async throws 
+    
+    /**
+     * Returns the URL for starting SSO authentication. The URL should be
+     * opened in a web view. Once the web view succeeds, call `finish` with
+     * the callback URL.
+     */
+    func url()  -> String
+    
+}
+
+/**
+ * An object encapsulating the SSO login flow
+ */
+open class SsoHandler:
+    SsoHandlerProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_ssohandler(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_ssohandler(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Completes the SSO login process.
+     */
+open func finish(callbackUrl: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_ssohandler_finish(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(callbackUrl)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeSsoError.lift
+        )
+}
+    
+    /**
+     * Returns the URL for starting SSO authentication. The URL should be
+     * opened in a web view. Once the web view succeeds, call `finish` with
+     * the callback URL.
+     */
+open func url() -> String {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_ssohandler_url(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+
+}
+
+public struct FfiConverterTypeSsoHandler: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = SsoHandler
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> SsoHandler {
+        return SsoHandler(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: SsoHandler) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SsoHandler {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: SsoHandler, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeSsoHandler_lift(_ pointer: UnsafeMutableRawPointer) throws -> SsoHandler {
+    return try FfiConverterTypeSsoHandler.lift(pointer)
+}
+
+public func FfiConverterTypeSsoHandler_lower(_ value: SsoHandler) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeSsoHandler.lower(value)
+}
+
+
+
+
 public protocol SyncServiceProtocol : AnyObject {
     
     func roomListService()  -> RoomListService
@@ -12463,7 +12631,6 @@ public struct RoomInfo {
     public var isSpace: Bool
     public var isTombstoned: Bool
     public var isFavourite: Bool
-    public var isEncrypted: Bool
     public var canonicalAlias: String?
     public var alternativeAliases: [String]
     public var membership: Membership
@@ -12514,7 +12681,7 @@ public struct RoomInfo {
          */displayName: String?, 
         /**
          * Room name as defined by the room state event only.
-         */rawName: String?, topic: String?, avatarUrl: String?, isDirect: Bool, isPublic: Bool, isSpace: Bool, isTombstoned: Bool, isFavourite: Bool, isEncrypted: Bool, canonicalAlias: String?, alternativeAliases: [String], membership: Membership, 
+         */rawName: String?, topic: String?, avatarUrl: String?, isDirect: Bool, isPublic: Bool, isSpace: Bool, isTombstoned: Bool, isFavourite: Bool, canonicalAlias: String?, alternativeAliases: [String], membership: Membership, 
         /**
          * Member who invited the current user to a room that's in the invited
          * state.
@@ -12547,7 +12714,6 @@ public struct RoomInfo {
         self.isSpace = isSpace
         self.isTombstoned = isTombstoned
         self.isFavourite = isFavourite
-        self.isEncrypted = isEncrypted
         self.canonicalAlias = canonicalAlias
         self.alternativeAliases = alternativeAliases
         self.membership = membership
@@ -12601,9 +12767,6 @@ extension RoomInfo: Equatable, Hashable {
             return false
         }
         if lhs.isFavourite != rhs.isFavourite {
-            return false
-        }
-        if lhs.isEncrypted != rhs.isEncrypted {
             return false
         }
         if lhs.canonicalAlias != rhs.canonicalAlias {
@@ -12674,7 +12837,6 @@ extension RoomInfo: Equatable, Hashable {
         hasher.combine(isSpace)
         hasher.combine(isTombstoned)
         hasher.combine(isFavourite)
-        hasher.combine(isEncrypted)
         hasher.combine(canonicalAlias)
         hasher.combine(alternativeAliases)
         hasher.combine(membership)
@@ -12711,7 +12873,6 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 isSpace: FfiConverterBool.read(from: &buf), 
                 isTombstoned: FfiConverterBool.read(from: &buf), 
                 isFavourite: FfiConverterBool.read(from: &buf), 
-                isEncrypted: FfiConverterBool.read(from: &buf), 
                 canonicalAlias: FfiConverterOptionString.read(from: &buf), 
                 alternativeAliases: FfiConverterSequenceString.read(from: &buf), 
                 membership: FfiConverterTypeMembership.read(from: &buf), 
@@ -12744,7 +12905,6 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isSpace, into: &buf)
         FfiConverterBool.write(value.isTombstoned, into: &buf)
         FfiConverterBool.write(value.isFavourite, into: &buf)
-        FfiConverterBool.write(value.isEncrypted, into: &buf)
         FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
         FfiConverterSequenceString.write(value.alternativeAliases, into: &buf)
         FfiConverterTypeMembership.write(value.membership, into: &buf)
@@ -19881,6 +20041,70 @@ public func FfiConverterTypeSessionVerificationData_lower(_ value: SessionVerifi
 
 
 
+
+public enum SsoError {
+
+    
+    
+    case CallbackUrlInvalid(message: String)
+    
+    case LoginWithTokenFailed(message: String)
+    
+    case Generic(message: String)
+    
+}
+
+
+public struct FfiConverterTypeSsoError: FfiConverterRustBuffer {
+    typealias SwiftType = SsoError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SsoError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .CallbackUrlInvalid(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .LoginWithTokenFailed(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .Generic(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SsoError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        case .CallbackUrlInvalid(_ /* message is ignored*/):
+            writeInt(&buf, Int32(1))
+        case .LoginWithTokenFailed(_ /* message is ignored*/):
+            writeInt(&buf, Int32(2))
+        case .Generic(_ /* message is ignored*/):
+            writeInt(&buf, Int32(3))
+
+        
+        }
+    }
+}
+
+
+extension SsoError: Equatable, Hashable {}
+
+extension SsoError: Error { }
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
@@ -25382,6 +25606,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_pusher() != 41975) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_start_sso_login() != 34571) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_ignored_users() != 23285) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -26034,6 +26261,12 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_span_is_none() != 33327) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_ssohandler_finish() != 64706) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_ssohandler_url() != 10889) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservice_room_list_service() != 26426) {
