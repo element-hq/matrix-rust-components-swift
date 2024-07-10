@@ -718,6 +718,15 @@ public protocol ClientProtocol : AnyObject {
     func removeAvatar() async throws 
     
     /**
+     * Empty the server version and unstable features cache.
+     *
+     * Since the SDK caches server capabilities (versions and unstable
+     * features), it's possible to have a stale entry in the cache. This
+     * functions makes it possible to force reset it.
+     */
+    func resetServerCapabilities() async throws 
+    
+    /**
      * Resolves the given room alias to a room ID (and a list of servers), if
      * possible.
      */
@@ -1417,6 +1426,30 @@ open func removeAvatar()async throws  {
 }
     
     /**
+     * Empty the server version and unstable features cache.
+     *
+     * Since the SDK caches server capabilities (versions and unstable
+     * features), it's possible to have a stale entry in the cache. This
+     * functions makes it possible to force reset it.
+     */
+open func resetServerCapabilities()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_reset_server_capabilities(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
      * Resolves the given room alias to a room ID (and a list of servers), if
      * possible.
      */
@@ -1823,8 +1856,6 @@ public protocol ClientBuilderProtocol : AnyObject {
     
     func serverNameOrHomeserverUrl(serverNameOrUrl: String)  -> ClientBuilder
     
-    func serverVersions(versions: [String])  -> ClientBuilder
-    
     /**
      * Sets the path that the client will use to store its data once logged in.
      * This path **must** be unique per session as the data stores aren't
@@ -2047,14 +2078,6 @@ open func serverNameOrHomeserverUrl(serverNameOrUrl: String) -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_server_name_or_homeserver_url(self.uniffiClonePointer(),
         FfiConverterString.lower(serverNameOrUrl),$0
-    )
-})
-}
-    
-open func serverVersions(versions: [String]) -> ClientBuilder {
-    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_server_versions(self.uniffiClonePointer(),
-        FfiConverterSequenceString.lower(versions),$0
     )
 })
 }
@@ -25576,6 +25599,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_remove_avatar() != 29033) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_reset_server_capabilities() != 39651) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_resolve_room_alias() != 14306) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25682,9 +25708,6 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name_or_homeserver_url() != 30022) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_versions() != 15644) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_session_path() != 49266) {
