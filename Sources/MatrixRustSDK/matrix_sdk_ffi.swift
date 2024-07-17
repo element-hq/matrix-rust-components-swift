@@ -153,7 +153,7 @@ fileprivate func writeDouble(_ writer: inout [UInt8], _ value: Double) {
 }
 
 // Protocol for types that transfer other types across the FFI. This is
-// analogous go the Rust trait of the same name.
+// analogous to the Rust trait of the same name.
 fileprivate protocol FfiConverter {
     associatedtype FfiType
     associatedtype SwiftType
@@ -253,18 +253,19 @@ fileprivate extension RustCallStatus {
 }
 
 private func rustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
-    try makeRustCall(callback, errorHandler: nil)
+    let neverThrow: ((RustBuffer) throws -> Never)? = nil
+    return try makeRustCall(callback, errorHandler: neverThrow)
 }
 
-private func rustCallWithError<T>(
-    _ errorHandler: @escaping (RustBuffer) throws -> Error,
+private func rustCallWithError<T, E: Swift.Error>(
+    _ errorHandler: @escaping (RustBuffer) throws -> E,
     _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
     try makeRustCall(callback, errorHandler: errorHandler)
 }
 
-private func makeRustCall<T>(
+private func makeRustCall<T, E: Swift.Error>(
     _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T,
-    errorHandler: ((RustBuffer) throws -> Error)?
+    errorHandler: ((RustBuffer) throws -> E)?
 ) throws -> T {
     uniffiEnsureInitialized()
     var callStatus = RustCallStatus.init()
@@ -273,9 +274,9 @@ private func makeRustCall<T>(
     return returnedVal
 }
 
-private func uniffiCheckCallStatus(
+private func uniffiCheckCallStatus<E: Swift.Error>(
     callStatus: RustCallStatus,
-    errorHandler: ((RustBuffer) throws -> Error)?
+    errorHandler: ((RustBuffer) throws -> E)?
 ) throws {
     switch callStatus.code {
         case CALL_SUCCESS:
@@ -2614,6 +2615,12 @@ public protocol EventTimelineItemProtocol : AnyObject {
     
     func eventId()  -> String?
     
+    /**
+     * Gets the [`ShieldState`] which can be used to decorate messages in the
+     * recommended way.
+     */
+    func getShield(strict: Bool)  -> ShieldState?
+    
     func isEditable()  -> Bool
     
     func isLocal()  -> Bool
@@ -2705,6 +2712,18 @@ open func debugInfo() -> EventTimelineItemDebugInfo {
 open func eventId() -> String? {
     return try!  FfiConverterOptionString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_event_id(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Gets the [`ShieldState`] which can be used to decorate messages in the
+     * recommended way.
+     */
+open func getShield(strict: Bool) -> ShieldState? {
+    return try!  FfiConverterOptionTypeShieldState.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_get_shield(self.uniffiClonePointer(),
+        FfiConverterBool.lower(strict),$0
     )
 })
 }
@@ -4342,6 +4361,14 @@ public protocol RoomProtocol : AnyObject {
     func displayName()  -> String?
     
     /**
+     * Edit an event given its event id.
+     *
+     * Useful outside the context of a timeline, or when a timeline doesn't
+     * have the full content of an event.
+     */
+    func edit(eventId: String, newContent: RoomMessageEventContentWithoutRelation) async throws 
+    
+    /**
      * Enable or disable the send queue for that particular room.
      */
     func enableSendQueue(enable: Bool) 
@@ -4894,6 +4921,29 @@ open func displayName() -> String? {
     uniffi_matrix_sdk_ffi_fn_method_room_display_name(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+    /**
+     * Edit an event given its event id.
+     *
+     * Useful outside the context of a timeline, or when a timeline doesn't
+     * have the full content of an event.
+     */
+open func edit(eventId: String, newContent: RoomMessageEventContentWithoutRelation)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_edit(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(eventId),FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(newContent)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
     /**
@@ -8352,8 +8402,6 @@ public protocol TimelineProtocol : AnyObject {
     /**
      * Edits an event from the timeline.
      *
-     * Only works for events that exist as timeline items.
-     *
      * If it was a local event, this will *try* to edit it, if it was not
      * being sent already. If the event was a remote event, then it will be
      * redacted by sending an edit request to the server.
@@ -8362,12 +8410,6 @@ public protocol TimelineProtocol : AnyObject {
      * local events that are being processed.
      */
     func edit(item: EventTimelineItem, newContent: RoomMessageEventContentWithoutRelation) async throws  -> Bool
-    
-    /**
-     * Edit an event given its event id. Useful when we're not sure a remote
-     * timeline event has been fetched by the timeline.
-     */
-    func editByEventId(eventId: String, newContent: RoomMessageEventContentWithoutRelation) async throws 
     
     func editPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind, editItem: EventTimelineItem) async throws 
     
@@ -8560,8 +8602,6 @@ open func createPoll(question: String, answers: [String], maxSelections: UInt8, 
     /**
      * Edits an event from the timeline.
      *
-     * Only works for events that exist as timeline items.
-     *
      * If it was a local event, this will *try* to edit it, if it was not
      * being sent already. If the event was a remote event, then it will be
      * redacted by sending an edit request to the server.
@@ -8582,27 +8622,6 @@ open func edit(item: EventTimelineItem, newContent: RoomMessageEventContentWitho
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
             liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-    /**
-     * Edit an event given its event id. Useful when we're not sure a remote
-     * timeline event has been fetched by the timeline.
-     */
-open func editByEventId(eventId: String, newContent: RoomMessageEventContentWithoutRelation)async throws  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_timeline_edit_by_event_id(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(eventId),FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(newContent)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -15616,7 +15635,11 @@ public struct FfiConverterTypeClientBuildError: FfiConverterRustBuffer {
 
 extension ClientBuildError: Equatable, Hashable {}
 
-extension ClientBuildError: Error { }
+extension ClientBuildError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 
 public enum ClientError {
@@ -15664,7 +15687,11 @@ public struct FfiConverterTypeClientError: FfiConverterRustBuffer {
 
 extension ClientError: Equatable, Hashable {}
 
-extension ClientError: Error { }
+extension ClientError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -16226,7 +16253,11 @@ public struct FfiConverterTypeFocusEventError: FfiConverterRustBuffer {
 
 extension FocusEventError: Equatable, Hashable {}
 
-extension FocusEventError: Error { }
+extension FocusEventError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 
 public enum HumanQrLoginError {
@@ -16318,7 +16349,11 @@ public struct FfiConverterTypeHumanQrLoginError: FfiConverterRustBuffer {
 
 extension HumanQrLoginError: Equatable, Hashable {}
 
-extension HumanQrLoginError: Error { }
+extension HumanQrLoginError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -16492,13 +16527,15 @@ extension MatrixId: Equatable, Hashable {}
 
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum MediaInfoError {
+
     
-    case missingField
-    case invalidField
+    
+    case MissingField(message: String)
+    
+    case InvalidField(message: String)
+    
 }
 
 
@@ -16508,44 +16545,47 @@ public struct FfiConverterTypeMediaInfoError: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MediaInfoError {
         let variant: Int32 = try readInt(&buf)
         switch variant {
+
         
-        case 1: return .missingField
+
         
-        case 2: return .invalidField
+        case 1: return .MissingField(
+            message: try FfiConverterString.read(from: &buf)
+        )
         
+        case 2: return .InvalidField(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: MediaInfoError, into buf: inout [UInt8]) {
         switch value {
+
         
+
         
-        case .missingField:
+        case .MissingField(_ /* message is ignored*/):
             writeInt(&buf, Int32(1))
-        
-        
-        case .invalidField:
+        case .InvalidField(_ /* message is ignored*/):
             writeInt(&buf, Int32(2))
+
         
         }
     }
 }
 
 
-public func FfiConverterTypeMediaInfoError_lift(_ buf: RustBuffer) throws -> MediaInfoError {
-    return try FfiConverterTypeMediaInfoError.lift(buf)
-}
-
-public func FfiConverterTypeMediaInfoError_lower(_ value: MediaInfoError) -> RustBuffer {
-    return FfiConverterTypeMediaInfoError.lower(value)
-}
-
-
-
 extension MediaInfoError: Equatable, Hashable {}
 
-
+extension MediaInfoError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -17660,7 +17700,11 @@ public struct FfiConverterTypeNotificationSettingsError: FfiConverterRustBuffer 
 
 extension NotificationSettingsError: Equatable, Hashable {}
 
-extension NotificationSettingsError: Error { }
+extension NotificationSettingsError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -17803,7 +17847,11 @@ public struct FfiConverterTypeOidcError: FfiConverterRustBuffer {
 
 extension OidcError: Equatable, Hashable {}
 
-extension OidcError: Error { }
+extension OidcError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -18138,7 +18186,11 @@ public struct FfiConverterTypeParseError: FfiConverterRustBuffer {
 
 extension ParseError: Equatable, Hashable {}
 
-extension ParseError: Error { }
+extension ParseError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -18482,7 +18534,11 @@ public struct FfiConverterTypeQrCodeDecodeError: FfiConverterRustBuffer {
 
 extension QrCodeDecodeError: Equatable, Hashable {}
 
-extension QrCodeDecodeError: Error { }
+extension QrCodeDecodeError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -18722,7 +18778,11 @@ public struct FfiConverterTypeRecoveryError: FfiConverterRustBuffer {
 
 extension RecoveryError: Equatable, Hashable {}
 
-extension RecoveryError: Error { }
+extension RecoveryError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -19097,7 +19157,11 @@ public struct FfiConverterTypeRoomError: FfiConverterRustBuffer {
 
 extension RoomError: Equatable, Hashable {}
 
-extension RoomError: Error { }
+extension RoomError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -19495,7 +19559,11 @@ public struct FfiConverterTypeRoomListError: FfiConverterRustBuffer {
 
 extension RoomListError: Equatable, Hashable {}
 
-extension RoomListError: Error { }
+extension RoomListError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -20064,6 +20132,89 @@ public func FfiConverterTypeSessionVerificationData_lower(_ value: SessionVerifi
 
 
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Recommended decorations for decrypted messages, representing the message's
+ * authenticity properties.
+ */
+
+public enum ShieldState {
+    
+    /**
+     * A red shield with a tooltip containing the associated message should be
+     * presented.
+     */
+    case red(message: String
+    )
+    /**
+     * A grey shield with a tooltip containing the associated message should be
+     * presented.
+     */
+    case grey(message: String
+    )
+    /**
+     * No shield should be presented.
+     */
+    case none
+}
+
+
+public struct FfiConverterTypeShieldState: FfiConverterRustBuffer {
+    typealias SwiftType = ShieldState
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ShieldState {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .red(message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .grey(message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .none
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ShieldState, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .red(message):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .grey(message):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case .none:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeShieldState_lift(_ buf: RustBuffer) throws -> ShieldState {
+    return try FfiConverterTypeShieldState.lift(buf)
+}
+
+public func FfiConverterTypeShieldState_lower(_ value: ShieldState) -> RustBuffer {
+    return FfiConverterTypeShieldState.lower(value)
+}
+
+
+
+extension ShieldState: Equatable, Hashable {}
+
+
+
 
 public enum SsoError {
 
@@ -20126,7 +20277,11 @@ public struct FfiConverterTypeSsoError: FfiConverterRustBuffer {
 
 extension SsoError: Equatable, Hashable {}
 
-extension SsoError: Error { }
+extension SsoError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -20577,7 +20732,11 @@ public struct FfiConverterTypeSteadyStateError: FfiConverterRustBuffer {
 
 extension SteadyStateError: Equatable, Hashable {}
 
-extension SteadyStateError: Error { }
+extension SteadyStateError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -24290,6 +24449,27 @@ fileprivate struct FfiConverterOptionTypeRoomNotificationMode: FfiConverterRustB
     }
 }
 
+fileprivate struct FfiConverterOptionTypeShieldState: FfiConverterRustBuffer {
+    typealias SwiftType = ShieldState?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeShieldState.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeShieldState.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeVirtualTimelineItem: FfiConverterRustBuffer {
     typealias SwiftType = VirtualTimelineItem?
 
@@ -25165,7 +25345,7 @@ fileprivate func uniffiRustCallAsync<F, T>(
     completeFunc: (UInt64, UnsafeMutablePointer<RustCallStatus>) -> F,
     freeFunc: (UInt64) -> (),
     liftFunc: (F) throws -> T,
-    errorHandler: ((RustBuffer) throws -> Error)?
+    errorHandler: ((RustBuffer) throws -> Swift.Error)?
 ) async throws -> T {
     // Make sure to call uniffiEnsureInitialized() since future creation doesn't have a
     // RustCallStatus param, so doesn't use makeRustCall()
@@ -25244,10 +25424,11 @@ public func generateWebviewUrl(widgetSettings: WidgetSettings, room: Room, props
  * but should only be done as temporal workarounds until this function is
  * adjusted
  */
-public func getElementCallRequiredPermissions(ownUserId: String) -> WidgetCapabilities {
+public func getElementCallRequiredPermissions(ownUserId: String, ownDeviceId: String) -> WidgetCapabilities {
     return try!  FfiConverterTypeWidgetCapabilities.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_func_get_element_call_required_permissions(
-        FfiConverterString.lower(ownUserId),$0
+        FfiConverterString.lower(ownUserId),
+        FfiConverterString.lower(ownDeviceId),$0
     )
 })
 }
@@ -25421,9 +25602,9 @@ private enum InitializationResult {
     case contractVersionMismatch
     case apiChecksumMismatch
 }
-// Use a global variables to perform the versioning checks. Swift ensures that
+// Use a global variable to perform the versioning checks. Swift ensures that
 // the code inside is only computed once.
-private var initializationResult: InitializationResult {
+private var initializationResult: InitializationResult = {
     // Get the bindings contract version from our ComponentInterface
     let bindings_contract_version = 26
     // Get the scaffolding contract version by calling the into the dylib
@@ -25437,7 +25618,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_func_generate_webview_url() != 6844) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_func_get_element_call_required_permissions() != 51419) {
+    if (uniffi_matrix_sdk_ffi_checksum_func_get_element_call_required_permissions() != 30181) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_log_event() != 62286) {
@@ -25791,6 +25972,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_event_id() != 8156) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_get_shield() != 42061) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_is_editable() != 4716) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25978,6 +26162,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_display_name() != 64194) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_edit() != 61956) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_enable_send_queue() != 23914) {
@@ -26325,10 +26512,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_create_poll() != 37925) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 7521) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit_by_event_id() != 60761) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 9304) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit_poll() != 40066) {
@@ -26619,7 +26803,7 @@ private var initializationResult: InitializationResult {
     uniffiCallbackInitVerificationStateListener()
     uniffiCallbackInitWidgetCapabilitiesProvider()
     return InitializationResult.ok
-}
+}()
 
 private func uniffiEnsureInitialized() {
     switch initializationResult {

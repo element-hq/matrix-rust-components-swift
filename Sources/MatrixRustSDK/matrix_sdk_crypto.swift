@@ -153,7 +153,7 @@ fileprivate func writeDouble(_ writer: inout [UInt8], _ value: Double) {
 }
 
 // Protocol for types that transfer other types across the FFI. This is
-// analogous go the Rust trait of the same name.
+// analogous to the Rust trait of the same name.
 fileprivate protocol FfiConverter {
     associatedtype FfiType
     associatedtype SwiftType
@@ -253,18 +253,19 @@ fileprivate extension RustCallStatus {
 }
 
 private func rustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
-    try makeRustCall(callback, errorHandler: nil)
+    let neverThrow: ((RustBuffer) throws -> Never)? = nil
+    return try makeRustCall(callback, errorHandler: neverThrow)
 }
 
-private func rustCallWithError<T>(
-    _ errorHandler: @escaping (RustBuffer) throws -> Error,
+private func rustCallWithError<T, E: Swift.Error>(
+    _ errorHandler: @escaping (RustBuffer) throws -> E,
     _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
     try makeRustCall(callback, errorHandler: errorHandler)
 }
 
-private func makeRustCall<T>(
+private func makeRustCall<T, E: Swift.Error>(
     _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T,
-    errorHandler: ((RustBuffer) throws -> Error)?
+    errorHandler: ((RustBuffer) throws -> E)?
 ) throws -> T {
     uniffiEnsureInitialized()
     var callStatus = RustCallStatus.init()
@@ -273,9 +274,9 @@ private func makeRustCall<T>(
     return returnedVal
 }
 
-private func uniffiCheckCallStatus(
+private func uniffiCheckCallStatus<E: Swift.Error>(
     callStatus: RustCallStatus,
-    errorHandler: ((RustBuffer) throws -> Error)?
+    errorHandler: ((RustBuffer) throws -> E)?
 ) throws {
     switch callStatus.code {
         case CALL_SUCCESS:
@@ -503,44 +504,51 @@ extension LocalTrust: Equatable, Hashable {}
 
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Error type for the decoding of the [`QrCodeData`].
  */
-
 public enum LoginQrCodeDecodeError {
+
+    
     
     /**
      * The QR code data is no long enough, it's missing some fields.
      */
-    case notEnoughData
+    case NotEnoughData(message: String)
+    
     /**
      * One of the URLs in the QR code data is not a valid UTF-8 encoded string.
      */
-    case notUtf8
+    case NotUtf8(message: String)
+    
     /**
      * One of the URLs in the QR code data could not be parsed.
      */
-    case urlParse
+    case UrlParse(message: String)
+    
     /**
      * The QR code data contains an invalid mode, we expect the login (0x03)
      * mode or the reciprocate mode (0x04).
      */
-    case invalidMode
+    case InvalidMode(message: String)
+    
     /**
      * The QR code data contains an unsupported version.
      */
-    case invalidVersion
+    case InvalidVersion(message: String)
+    
     /**
      * The base64 encoded variant of the QR code data is not a valid base64
      * string.
      */
-    case base64
+    case Base64(message: String)
+    
     /**
      * The QR code data doesn't contain the expected `MATRIX` prefix.
      */
-    case invalidPrefix
+    case InvalidPrefix(message: String)
+    
 }
 
 
@@ -550,74 +558,77 @@ public struct FfiConverterTypeLoginQrCodeDecodeError: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LoginQrCodeDecodeError {
         let variant: Int32 = try readInt(&buf)
         switch variant {
+
         
-        case 1: return .notEnoughData
+
         
-        case 2: return .notUtf8
+        case 1: return .NotEnoughData(
+            message: try FfiConverterString.read(from: &buf)
+        )
         
-        case 3: return .urlParse
+        case 2: return .NotUtf8(
+            message: try FfiConverterString.read(from: &buf)
+        )
         
-        case 4: return .invalidMode
+        case 3: return .UrlParse(
+            message: try FfiConverterString.read(from: &buf)
+        )
         
-        case 5: return .invalidVersion
+        case 4: return .InvalidMode(
+            message: try FfiConverterString.read(from: &buf)
+        )
         
-        case 6: return .base64
+        case 5: return .InvalidVersion(
+            message: try FfiConverterString.read(from: &buf)
+        )
         
-        case 7: return .invalidPrefix
+        case 6: return .Base64(
+            message: try FfiConverterString.read(from: &buf)
+        )
         
+        case 7: return .InvalidPrefix(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: LoginQrCodeDecodeError, into buf: inout [UInt8]) {
         switch value {
+
         
+
         
-        case .notEnoughData:
+        case .NotEnoughData(_ /* message is ignored*/):
             writeInt(&buf, Int32(1))
-        
-        
-        case .notUtf8:
+        case .NotUtf8(_ /* message is ignored*/):
             writeInt(&buf, Int32(2))
-        
-        
-        case .urlParse:
+        case .UrlParse(_ /* message is ignored*/):
             writeInt(&buf, Int32(3))
-        
-        
-        case .invalidMode:
+        case .InvalidMode(_ /* message is ignored*/):
             writeInt(&buf, Int32(4))
-        
-        
-        case .invalidVersion:
+        case .InvalidVersion(_ /* message is ignored*/):
             writeInt(&buf, Int32(5))
-        
-        
-        case .base64:
+        case .Base64(_ /* message is ignored*/):
             writeInt(&buf, Int32(6))
-        
-        
-        case .invalidPrefix:
+        case .InvalidPrefix(_ /* message is ignored*/):
             writeInt(&buf, Int32(7))
+
         
         }
     }
 }
 
 
-public func FfiConverterTypeLoginQrCodeDecodeError_lift(_ buf: RustBuffer) throws -> LoginQrCodeDecodeError {
-    return try FfiConverterTypeLoginQrCodeDecodeError.lift(buf)
-}
-
-public func FfiConverterTypeLoginQrCodeDecodeError_lower(_ value: LoginQrCodeDecodeError) -> RustBuffer {
-    return FfiConverterTypeLoginQrCodeDecodeError.lower(value)
-}
-
-
-
 extension LoginQrCodeDecodeError: Equatable, Hashable {}
 
-
+extension LoginQrCodeDecodeError: Foundation.LocalizedError {
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -776,9 +787,9 @@ private enum InitializationResult {
     case contractVersionMismatch
     case apiChecksumMismatch
 }
-// Use a global variables to perform the versioning checks. Swift ensures that
+// Use a global variable to perform the versioning checks. Swift ensures that
 // the code inside is only computed once.
-private var initializationResult: InitializationResult {
+private var initializationResult: InitializationResult = {
     // Get the bindings contract version from our ComponentInterface
     let bindings_contract_version = 26
     // Get the scaffolding contract version by calling the into the dylib
@@ -788,7 +799,7 @@ private var initializationResult: InitializationResult {
     }
 
     return InitializationResult.ok
-}
+}()
 
 private func uniffiEnsureInitialized() {
     switch initializationResult {
