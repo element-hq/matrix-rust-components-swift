@@ -1841,6 +1841,13 @@ public protocol ClientBuilderProtocol : AnyObject {
     
     func disableAutomaticTokenRefresh()  -> ClientBuilder
     
+    /**
+     * Don't trust any system root certificates, only trust the certificates
+     * provided through
+     * [`add_root_certificates`][ClientBuilder::add_root_certificates].
+     */
+    func disableBuiltInRootCertificates()  -> ClientBuilder
+    
     func disableSslVerification()  -> ClientBuilder
     
     func enableCrossProcessRefreshLock(processId: String, sessionDelegate: ClientSessionDelegate)  -> ClientBuilder
@@ -1867,6 +1874,8 @@ public protocol ClientBuilderProtocol : AnyObject {
     func sessionPath(path: String)  -> ClientBuilder
     
     func setSessionDelegate(sessionDelegate: ClientSessionDelegate)  -> ClientBuilder
+    
+    func simplifiedSlidingSync(enable: Bool)  -> ClientBuilder
     
     func slidingSyncProxy(slidingSyncProxy: String?)  -> ClientBuilder
     
@@ -2020,6 +2029,18 @@ open func disableAutomaticTokenRefresh() -> ClientBuilder {
 })
 }
     
+    /**
+     * Don't trust any system root certificates, only trust the certificates
+     * provided through
+     * [`add_root_certificates`][ClientBuilder::add_root_certificates].
+     */
+open func disableBuiltInRootCertificates() -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_disable_built_in_root_certificates(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
 open func disableSslVerification() -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_disable_ssl_verification(self.uniffiClonePointer(),$0
@@ -2102,6 +2123,14 @@ open func setSessionDelegate(sessionDelegate: ClientSessionDelegate) -> ClientBu
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_set_session_delegate(self.uniffiClonePointer(),
         FfiConverterCallbackInterfaceClientSessionDelegate.lower(sessionDelegate),$0
+    )
+})
+}
+    
+open func simplifiedSlidingSync(enable: Bool) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_simplified_sliding_sync(self.uniffiClonePointer(),
+        FfiConverterBool.lower(enable),$0
     )
 })
 }
@@ -6474,8 +6503,6 @@ public protocol RoomListItemProtocol : AnyObject {
     
     func subscribe(settings: RoomSubscription?) 
     
-    func unsubscribe() 
-    
 }
 
 open class RoomListItem:
@@ -6670,12 +6697,6 @@ open func roomInfo()async throws  -> RoomInfo {
 open func subscribe(settings: RoomSubscription?) {try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_roomlistitem_subscribe(self.uniffiClonePointer(),
         FfiConverterOptionTypeRoomSubscription.lower(settings),$0
-    )
-}
-}
-    
-open func unsubscribe() {try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_unsubscribe(self.uniffiClonePointer(),$0
     )
 }
 }
@@ -25867,6 +25888,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_automatic_token_refresh() != 43839) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_built_in_root_certificates() != 47525) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_ssl_verification() != 2334) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -25895,6 +25919,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_set_session_delegate() != 8576) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_simplified_sliding_sync() != 7554) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_sliding_sync_proxy() != 15622) {
@@ -26405,9 +26432,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_subscribe() != 60003) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_unsubscribe() != 45026) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_all_rooms() != 49704) {
