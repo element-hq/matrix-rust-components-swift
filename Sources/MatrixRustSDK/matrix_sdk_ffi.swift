@@ -4354,6 +4354,8 @@ public protocol RoomProtocol : AnyObject {
     
     func canUserKick(userId: String) async throws  -> Bool
     
+    func canUserPinUnpin(userId: String) async throws  -> Bool
+    
     func canUserRedactOther(userId: String) async throws  -> Bool
     
     func canUserRedactOwn(userId: String) async throws  -> Bool
@@ -4790,6 +4792,23 @@ open func canUserKick(userId: String)async throws  -> Bool {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_can_user_kick(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(userId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+open func canUserPinUnpin(userId: String)async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_can_user_pin_unpin(
                     self.uniffiClonePointer(),
                     FfiConverterString.lower(userId)
                 )
@@ -8496,6 +8515,15 @@ public protocol TimelineProtocol : AnyObject {
     func paginateBackwards(numEvents: UInt16) async throws  -> Bool
     
     /**
+     * Adds a new pinned event by sending an updated `m.room.pinned_events`
+     * event containing the new event id.
+     *
+     * Returns `true` if we sent the request, `false` if the event was already
+     * pinned.
+     */
+    func pinEvent(eventId: String) async throws  -> Bool
+    
+    /**
      * Redacts an event from the timeline.
      *
      * Only works for events that exist as timeline items.
@@ -8541,6 +8569,15 @@ public protocol TimelineProtocol : AnyObject {
     func subscribeToBackPaginationStatus(listener: PaginationStatusListener) async throws  -> TaskHandle
     
     func toggleReaction(eventId: String, key: String) async throws 
+    
+    /**
+     * Adds a new pinned event by sending an updated `m.room.pinned_events`
+     * event without the event id we want to remove.
+     *
+     * Returns `true` if we sent the request, `false` if the event wasn't
+     * pinned
+     */
+    func unpinEvent(eventId: String) async throws  -> Bool
     
 }
 
@@ -8853,6 +8890,30 @@ open func paginateBackwards(numEvents: UInt16)async throws  -> Bool {
 }
     
     /**
+     * Adds a new pinned event by sending an updated `m.room.pinned_events`
+     * event containing the new event id.
+     *
+     * Returns `true` if we sent the request, `false` if the event was already
+     * pinned.
+     */
+open func pinEvent(eventId: String)async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_pin_event(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(eventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
      * Redacts an event from the timeline.
      *
      * Only works for events that exist as timeline items.
@@ -9072,6 +9133,30 @@ open func toggleReaction(eventId: String, key: String)async throws  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Adds a new pinned event by sending an updated `m.room.pinned_events`
+     * event without the event id we want to remove.
+     *
+     * Returns `true` if we sent the request, `false` if the event wasn't
+     * pinned
+     */
+open func unpinEvent(eventId: String)async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_unpin_event(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(eventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -12152,14 +12237,12 @@ public func FfiConverterTypePusherIdentifiers_lower(_ value: PusherIdentifiers) 
 
 public struct Reaction {
     public var key: String
-    public var count: UInt64
     public var senders: [ReactionSenderData]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(key: String, count: UInt64, senders: [ReactionSenderData]) {
+    public init(key: String, senders: [ReactionSenderData]) {
         self.key = key
-        self.count = count
         self.senders = senders
     }
 }
@@ -12171,9 +12254,6 @@ extension Reaction: Equatable, Hashable {
         if lhs.key != rhs.key {
             return false
         }
-        if lhs.count != rhs.count {
-            return false
-        }
         if lhs.senders != rhs.senders {
             return false
         }
@@ -12182,7 +12262,6 @@ extension Reaction: Equatable, Hashable {
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(key)
-        hasher.combine(count)
         hasher.combine(senders)
     }
 }
@@ -12193,14 +12272,12 @@ public struct FfiConverterTypeReaction: FfiConverterRustBuffer {
         return
             try Reaction(
                 key: FfiConverterString.read(from: &buf), 
-                count: FfiConverterUInt64.read(from: &buf), 
                 senders: FfiConverterSequenceTypeReactionSenderData.read(from: &buf)
         )
     }
 
     public static func write(_ value: Reaction, into buf: inout [UInt8]) {
         FfiConverterString.write(value.key, into: &buf)
-        FfiConverterUInt64.write(value.count, into: &buf)
         FfiConverterSequenceTypeReactionSenderData.write(value.senders, into: &buf)
     }
 }
@@ -12734,6 +12811,10 @@ public struct RoomInfo {
      * notification settings.
      */
     public var numUnreadMentions: UInt64
+    /**
+     * The currently pinned event ids
+     */
+    public var pinnedEventIds: [String]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -12766,7 +12847,10 @@ public struct RoomInfo {
         /**
          * Events causing mentions/highlights for the user, according to their
          * notification settings.
-         */numUnreadMentions: UInt64) {
+         */numUnreadMentions: UInt64, 
+        /**
+         * The currently pinned event ids
+         */pinnedEventIds: [String]) {
         self.id = id
         self.displayName = displayName
         self.rawName = rawName
@@ -12795,6 +12879,7 @@ public struct RoomInfo {
         self.numUnreadMessages = numUnreadMessages
         self.numUnreadNotifications = numUnreadNotifications
         self.numUnreadMentions = numUnreadMentions
+        self.pinnedEventIds = pinnedEventIds
     }
 }
 
@@ -12886,6 +12971,9 @@ extension RoomInfo: Equatable, Hashable {
         if lhs.numUnreadMentions != rhs.numUnreadMentions {
             return false
         }
+        if lhs.pinnedEventIds != rhs.pinnedEventIds {
+            return false
+        }
         return true
     }
 
@@ -12918,6 +13006,7 @@ extension RoomInfo: Equatable, Hashable {
         hasher.combine(numUnreadMessages)
         hasher.combine(numUnreadNotifications)
         hasher.combine(numUnreadMentions)
+        hasher.combine(pinnedEventIds)
     }
 }
 
@@ -12953,7 +13042,8 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 isMarkedUnread: FfiConverterBool.read(from: &buf), 
                 numUnreadMessages: FfiConverterUInt64.read(from: &buf), 
                 numUnreadNotifications: FfiConverterUInt64.read(from: &buf), 
-                numUnreadMentions: FfiConverterUInt64.read(from: &buf)
+                numUnreadMentions: FfiConverterUInt64.read(from: &buf), 
+                pinnedEventIds: FfiConverterSequenceString.read(from: &buf)
         )
     }
 
@@ -12986,6 +13076,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.numUnreadMessages, into: &buf)
         FfiConverterUInt64.write(value.numUnreadNotifications, into: &buf)
         FfiConverterUInt64.write(value.numUnreadMentions, into: &buf)
+        FfiConverterSequenceString.write(value.pinnedEventIds, into: &buf)
     }
 }
 
@@ -26164,6 +26255,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_kick() != 12773) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_pin_unpin() != 8341) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_redact_other() != 13274) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -26569,6 +26663,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_paginate_backwards() != 65175) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_pin_event() != 41687) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_redact_event() != 8574) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -26609,6 +26706,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_toggle_reaction() != 10294) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_unpin_event() != 52414) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_append() != 8453) {
