@@ -2254,6 +2254,12 @@ public protocol EncryptionProtocol : AnyObject {
     
     func recoveryStateListener(listener: RecoveryStateListener)  -> TaskHandle
     
+    /**
+     * Completely reset the current user's crypto identity: reset the cross
+     * signing keys, delete the existing backup and recovery key.
+     */
+    func resetIdentity() async throws  -> IdentityResetHandle?
+    
     func resetRecoveryKey() async throws  -> String
     
     func verificationState()  -> VerificationState
@@ -2513,6 +2519,27 @@ open func recoveryStateListener(listener: RecoveryStateListener) -> TaskHandle {
         FfiConverterCallbackInterfaceRecoveryStateListener.lower(listener),$0
     )
 })
+}
+    
+    /**
+     * Completely reset the current user's crypto identity: reset the cross
+     * signing keys, delete the existing backup and recovery key.
+     */
+open func resetIdentity()async throws  -> IdentityResetHandle? {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_reset_identity(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeIdentityResetHandle.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func resetRecoveryKey()async throws  -> String {
@@ -3039,6 +3066,153 @@ public func FfiConverterTypeHomeserverLoginDetails_lift(_ pointer: UnsafeMutable
 
 public func FfiConverterTypeHomeserverLoginDetails_lower(_ value: HomeserverLoginDetails) -> UnsafeMutableRawPointer {
     return FfiConverterTypeHomeserverLoginDetails.lower(value)
+}
+
+
+
+
+public protocol IdentityResetHandleProtocol : AnyObject {
+    
+    /**
+     * Get the underlying [`CrossSigningResetAuthType`] this identity reset
+     * process is using.
+     */
+    func authType()  -> CrossSigningResetAuthType
+    
+    /**
+     * This method starts the identity reset process and
+     * will go through the following steps:
+     *
+     * 1. Disable backing up room keys and delete the active backup
+     * 2. Disable recovery and delete secret storage
+     * 3. Go through the cross-signing key reset flow
+     * 4. Finally, re-enable key backups only if they were enabled before
+     */
+    func reset(auth: AuthData?) async throws 
+    
+}
+
+open class IdentityResetHandle:
+    IdentityResetHandleProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_identityresethandle(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_identityresethandle(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Get the underlying [`CrossSigningResetAuthType`] this identity reset
+     * process is using.
+     */
+open func authType() -> CrossSigningResetAuthType {
+    return try!  FfiConverterTypeCrossSigningResetAuthType.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_identityresethandle_auth_type(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * This method starts the identity reset process and
+     * will go through the following steps:
+     *
+     * 1. Disable backing up room keys and delete the active backup
+     * 2. Disable recovery and delete secret storage
+     * 3. Go through the cross-signing key reset flow
+     * 4. Finally, re-enable key backups only if they were enabled before
+     */
+open func reset(auth: AuthData?)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_identityresethandle_reset(
+                    self.uniffiClonePointer(),
+                    FfiConverterOptionTypeAuthData.lower(auth)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+
+}
+
+public struct FfiConverterTypeIdentityResetHandle: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = IdentityResetHandle
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> IdentityResetHandle {
+        return IdentityResetHandle(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: IdentityResetHandle) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> IdentityResetHandle {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: IdentityResetHandle, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeIdentityResetHandle_lift(_ pointer: UnsafeMutableRawPointer) throws -> IdentityResetHandle {
+    return try FfiConverterTypeIdentityResetHandle.lift(pointer)
+}
+
+public func FfiConverterTypeIdentityResetHandle_lower(_ value: IdentityResetHandle) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeIdentityResetHandle.lower(value)
 }
 
 
@@ -4503,6 +4677,8 @@ public protocol RoomProtocol : AnyObject {
     
     func ownUserId()  -> String
     
+    func pinnedEventsTimeline(internalIdPrefix: String?, maxEventsToLoad: UInt16) async throws  -> Timeline
+    
     /**
      * The raw name as present in the room state event.
      */
@@ -5407,6 +5583,23 @@ open func ownUserId() -> String {
     uniffi_matrix_sdk_ffi_fn_method_room_own_user_id(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+open func pinnedEventsTimeline(internalIdPrefix: String?, maxEventsToLoad: UInt16)async throws  -> Timeline {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_pinned_events_timeline(
+                    self.uniffiClonePointer(),
+                    FfiConverterOptionString.lower(internalIdPrefix),FfiConverterUInt16.lower(maxEventsToLoad)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeTimeline.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
     /**
@@ -10378,6 +10571,75 @@ public func FfiConverterTypeAudioMessageContent_lower(_ value: AudioMessageConte
 }
 
 
+public struct AuthDataPasswordDetails {
+    /**
+     * One of the user's identifiers.
+     */
+    public var identifier: String
+    /**
+     * The plaintext password.
+     */
+    public var password: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * One of the user's identifiers.
+         */identifier: String, 
+        /**
+         * The plaintext password.
+         */password: String) {
+        self.identifier = identifier
+        self.password = password
+    }
+}
+
+
+
+extension AuthDataPasswordDetails: Equatable, Hashable {
+    public static func ==(lhs: AuthDataPasswordDetails, rhs: AuthDataPasswordDetails) -> Bool {
+        if lhs.identifier != rhs.identifier {
+            return false
+        }
+        if lhs.password != rhs.password {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(identifier)
+        hasher.combine(password)
+    }
+}
+
+
+public struct FfiConverterTypeAuthDataPasswordDetails: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AuthDataPasswordDetails {
+        return
+            try AuthDataPasswordDetails(
+                identifier: FfiConverterString.read(from: &buf), 
+                password: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: AuthDataPasswordDetails, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.identifier, into: &buf)
+        FfiConverterString.write(value.password, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeAuthDataPasswordDetails_lift(_ buf: RustBuffer) throws -> AuthDataPasswordDetails {
+    return try FfiConverterTypeAuthDataPasswordDetails.lift(buf)
+}
+
+public func FfiConverterTypeAuthDataPasswordDetails_lower(_ value: AuthDataPasswordDetails) -> RustBuffer {
+    return FfiConverterTypeAuthDataPasswordDetails.lower(value)
+}
+
+
 public struct ClientProperties {
     /**
      * The client_id provides the widget with the option to behave differently
@@ -11997,6 +12259,77 @@ public func FfiConverterTypeOidcConfiguration_lift(_ buf: RustBuffer) throws -> 
 
 public func FfiConverterTypeOidcConfiguration_lower(_ value: OidcConfiguration) -> RustBuffer {
     return FfiConverterTypeOidcConfiguration.lower(value)
+}
+
+
+public struct OidcCrossSigningResetInfo {
+    /**
+     * The error message we received from the homeserver after we attempted to
+     * reset the cross-signing keys.
+     */
+    public var error: String
+    /**
+     * The URL where the user can approve the reset of the cross-signing keys.
+     */
+    public var approvalUrl: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The error message we received from the homeserver after we attempted to
+         * reset the cross-signing keys.
+         */error: String, 
+        /**
+         * The URL where the user can approve the reset of the cross-signing keys.
+         */approvalUrl: String) {
+        self.error = error
+        self.approvalUrl = approvalUrl
+    }
+}
+
+
+
+extension OidcCrossSigningResetInfo: Equatable, Hashable {
+    public static func ==(lhs: OidcCrossSigningResetInfo, rhs: OidcCrossSigningResetInfo) -> Bool {
+        if lhs.error != rhs.error {
+            return false
+        }
+        if lhs.approvalUrl != rhs.approvalUrl {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(error)
+        hasher.combine(approvalUrl)
+    }
+}
+
+
+public struct FfiConverterTypeOidcCrossSigningResetInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OidcCrossSigningResetInfo {
+        return
+            try OidcCrossSigningResetInfo(
+                error: FfiConverterString.read(from: &buf), 
+                approvalUrl: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: OidcCrossSigningResetInfo, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.error, into: &buf)
+        FfiConverterString.write(value.approvalUrl, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeOidcCrossSigningResetInfo_lift(_ buf: RustBuffer) throws -> OidcCrossSigningResetInfo {
+    return try FfiConverterTypeOidcCrossSigningResetInfo.lift(buf)
+}
+
+public func FfiConverterTypeOidcCrossSigningResetInfo_lower(_ value: OidcCrossSigningResetInfo) -> RustBuffer {
+    return FfiConverterTypeOidcCrossSigningResetInfo.lower(value)
 }
 
 
@@ -15493,6 +15826,60 @@ extension AssetType: Equatable, Hashable {}
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
+public enum AuthData {
+    
+    /**
+     * Password-based authentication (`m.login.password`).
+     */
+    case password(passwordDetails: AuthDataPasswordDetails
+    )
+}
+
+
+public struct FfiConverterTypeAuthData: FfiConverterRustBuffer {
+    typealias SwiftType = AuthData
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AuthData {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .password(passwordDetails: try FfiConverterTypeAuthDataPasswordDetails.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: AuthData, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .password(passwordDetails):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeAuthDataPasswordDetails.write(passwordDetails, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeAuthData_lift(_ buf: RustBuffer) throws -> AuthData {
+    return try FfiConverterTypeAuthData.lift(buf)
+}
+
+public func FfiConverterTypeAuthData_lower(_ value: AuthData) -> RustBuffer {
+    return FfiConverterTypeAuthData.lower(value)
+}
+
+
+
+extension AuthData: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 public enum BackupState {
     
     case unknown
@@ -15888,6 +16275,67 @@ public func FfiConverterTypeComposerDraftType_lower(_ value: ComposerDraftType) 
 
 
 extension ComposerDraftType: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum CrossSigningResetAuthType {
+    
+    /**
+     * The homeserver requires user-interactive authentication.
+     */
+    case uiaa
+    case oidc(info: OidcCrossSigningResetInfo
+    )
+}
+
+
+public struct FfiConverterTypeCrossSigningResetAuthType: FfiConverterRustBuffer {
+    typealias SwiftType = CrossSigningResetAuthType
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CrossSigningResetAuthType {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .uiaa
+        
+        case 2: return .oidc(info: try FfiConverterTypeOidcCrossSigningResetInfo.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: CrossSigningResetAuthType, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .uiaa:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .oidc(info):
+            writeInt(&buf, Int32(2))
+            FfiConverterTypeOidcCrossSigningResetInfo.write(info, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeCrossSigningResetAuthType_lift(_ buf: RustBuffer) throws -> CrossSigningResetAuthType {
+    return try FfiConverterTypeCrossSigningResetAuthType.lift(buf)
+}
+
+public func FfiConverterTypeCrossSigningResetAuthType_lower(_ value: CrossSigningResetAuthType) -> RustBuffer {
+    return FfiConverterTypeCrossSigningResetAuthType.lower(value)
+}
+
+
+
+extension CrossSigningResetAuthType: Equatable, Hashable {}
 
 
 
@@ -23889,6 +24337,27 @@ fileprivate struct FfiConverterOptionTypeEventTimelineItem: FfiConverterRustBuff
     }
 }
 
+fileprivate struct FfiConverterOptionTypeIdentityResetHandle: FfiConverterRustBuffer {
+    typealias SwiftType = IdentityResetHandle?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeIdentityResetHandle.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeIdentityResetHandle.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeMediaSource: FfiConverterRustBuffer {
     typealias SwiftType = MediaSource?
 
@@ -24451,6 +24920,27 @@ fileprivate struct FfiConverterOptionTypeAssetType: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeAssetType.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+fileprivate struct FfiConverterOptionTypeAuthData: FfiConverterRustBuffer {
+    typealias SwiftType = AuthData?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeAuthData.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeAuthData.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -26063,6 +26553,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_recovery_state_listener() != 36612) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_reset_identity() != 13780) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_reset_recovery_key() != 20380) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -26139,6 +26632,12 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_url() != 61326) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_identityresethandle_auth_type() != 43501) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_identityresethandle_reset() != 11997) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediafilehandle_path() != 16357) {
@@ -26376,6 +26875,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_own_user_id() != 39510) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_pinned_events_timeline() != 4133) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_raw_name() != 15453) {
