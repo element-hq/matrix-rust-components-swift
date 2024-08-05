@@ -4547,6 +4547,8 @@ public protocol RoomProtocol : AnyObject {
      */
     func clearComposerDraft() async throws 
     
+    func clearPinnedEventsCache() async 
+    
     /**
      * Forces the currently active room key, which is used to encrypt messages,
      * to be rotated.
@@ -5106,6 +5108,24 @@ open func clearComposerDraft()async throws  {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+open func clearPinnedEventsCache()async  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_clear_pinned_events_cache(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: nil
+            
         )
 }
     
@@ -15461,6 +15481,14 @@ public struct WidgetCapabilities {
      * browser/tab/webview that is not connected to the postmessage widget-api.
      */
     public var requiresClient: Bool
+    /**
+     * This allows the widget to ask the client to update delayed events.
+     */
+    public var updateDelayedEvent: Bool
+    /**
+     * This allows the widget to send events with a delay.
+     */
+    public var sendDelayedEvent: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -15477,10 +15505,18 @@ public struct WidgetCapabilities {
          *
          * This means clients should not offer to open the widget in a separate
          * browser/tab/webview that is not connected to the postmessage widget-api.
-         */requiresClient: Bool) {
+         */requiresClient: Bool, 
+        /**
+         * This allows the widget to ask the client to update delayed events.
+         */updateDelayedEvent: Bool, 
+        /**
+         * This allows the widget to send events with a delay.
+         */sendDelayedEvent: Bool) {
         self.read = read
         self.send = send
         self.requiresClient = requiresClient
+        self.updateDelayedEvent = updateDelayedEvent
+        self.sendDelayedEvent = sendDelayedEvent
     }
 }
 
@@ -15497,6 +15533,12 @@ extension WidgetCapabilities: Equatable, Hashable {
         if lhs.requiresClient != rhs.requiresClient {
             return false
         }
+        if lhs.updateDelayedEvent != rhs.updateDelayedEvent {
+            return false
+        }
+        if lhs.sendDelayedEvent != rhs.sendDelayedEvent {
+            return false
+        }
         return true
     }
 
@@ -15504,6 +15546,8 @@ extension WidgetCapabilities: Equatable, Hashable {
         hasher.combine(read)
         hasher.combine(send)
         hasher.combine(requiresClient)
+        hasher.combine(updateDelayedEvent)
+        hasher.combine(sendDelayedEvent)
     }
 }
 
@@ -15514,7 +15558,9 @@ public struct FfiConverterTypeWidgetCapabilities: FfiConverterRustBuffer {
             try WidgetCapabilities(
                 read: FfiConverterSequenceTypeWidgetEventFilter.read(from: &buf), 
                 send: FfiConverterSequenceTypeWidgetEventFilter.read(from: &buf), 
-                requiresClient: FfiConverterBool.read(from: &buf)
+                requiresClient: FfiConverterBool.read(from: &buf), 
+                updateDelayedEvent: FfiConverterBool.read(from: &buf), 
+                sendDelayedEvent: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -15522,6 +15568,8 @@ public struct FfiConverterTypeWidgetCapabilities: FfiConverterRustBuffer {
         FfiConverterSequenceTypeWidgetEventFilter.write(value.read, into: &buf)
         FfiConverterSequenceTypeWidgetEventFilter.write(value.send, into: &buf)
         FfiConverterBool.write(value.requiresClient, into: &buf)
+        FfiConverterBool.write(value.updateDelayedEvent, into: &buf)
+        FfiConverterBool.write(value.sendDelayedEvent, into: &buf)
     }
 }
 
@@ -20705,13 +20753,13 @@ public enum ShieldState {
      * A red shield with a tooltip containing the associated message should be
      * presented.
      */
-    case red(message: String
+    case red(code: ShieldStateCode, message: String
     )
     /**
      * A grey shield with a tooltip containing the associated message should be
      * presented.
      */
-    case grey(message: String
+    case grey(code: ShieldStateCode, message: String
     )
     /**
      * No shield should be presented.
@@ -20727,10 +20775,10 @@ public struct FfiConverterTypeShieldState: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .red(message: try FfiConverterString.read(from: &buf)
+        case 1: return .red(code: try FfiConverterTypeShieldStateCode.read(from: &buf), message: try FfiConverterString.read(from: &buf)
         )
         
-        case 2: return .grey(message: try FfiConverterString.read(from: &buf)
+        case 2: return .grey(code: try FfiConverterTypeShieldStateCode.read(from: &buf), message: try FfiConverterString.read(from: &buf)
         )
         
         case 3: return .none
@@ -20743,13 +20791,15 @@ public struct FfiConverterTypeShieldState: FfiConverterRustBuffer {
         switch value {
         
         
-        case let .red(message):
+        case let .red(code,message):
             writeInt(&buf, Int32(1))
+            FfiConverterTypeShieldStateCode.write(code, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .grey(message):
+        case let .grey(code,message):
             writeInt(&buf, Int32(2))
+            FfiConverterTypeShieldStateCode.write(code, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
@@ -25936,6 +25986,8 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
 
 
 
+
+
 private let UNIFFI_RUST_FUTURE_POLL_READY: Int8 = 0
 private let UNIFFI_RUST_FUTURE_POLL_MAYBE_READY: Int8 = 1
 
@@ -26776,6 +26828,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_composer_draft() != 39667) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_pinned_events_cache() != 46058) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_discard_room_key() != 18081) {
