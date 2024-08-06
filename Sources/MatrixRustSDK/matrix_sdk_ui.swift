@@ -586,6 +586,80 @@ extension LiveBackPaginationStatus: Equatable, Hashable {}
 
 
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The type of change between the previous and current pinned events.
+ */
+
+public enum RoomPinnedEventsChange {
+    
+    /**
+     * Only new event ids were added.
+     */
+    case added
+    /**
+     * Only event ids were removed.
+     */
+    case removed
+    /**
+     * Some change other than only adding or only removing ids happened.
+     */
+    case changed
+}
+
+
+public struct FfiConverterTypeRoomPinnedEventsChange: FfiConverterRustBuffer {
+    typealias SwiftType = RoomPinnedEventsChange
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomPinnedEventsChange {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .added
+        
+        case 2: return .removed
+        
+        case 3: return .changed
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RoomPinnedEventsChange, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .added:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .removed:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .changed:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeRoomPinnedEventsChange_lift(_ buf: RustBuffer) throws -> RoomPinnedEventsChange {
+    return try FfiConverterTypeRoomPinnedEventsChange.lift(buf)
+}
+
+public func FfiConverterTypeRoomPinnedEventsChange_lower(_ value: RoomPinnedEventsChange) -> RustBuffer {
+    return FfiConverterTypeRoomPinnedEventsChange.lower(value)
+}
+
+
+
+extension RoomPinnedEventsChange: Equatable, Hashable {}
+
+
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch

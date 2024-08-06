@@ -18480,7 +18480,8 @@ public enum OtherState {
     case roomJoinRules
     case roomName(name: String?
     )
-    case roomPinnedEvents
+    case roomPinnedEvents(change: RoomPinnedEventsChange
+    )
     case roomPowerLevels(users: [String: Int64], previous: [String: Int64]?
     )
     case roomServerAcl
@@ -18529,7 +18530,8 @@ public struct FfiConverterTypeOtherState: FfiConverterRustBuffer {
         case 12: return .roomName(name: try FfiConverterOptionString.read(from: &buf)
         )
         
-        case 13: return .roomPinnedEvents
+        case 13: return .roomPinnedEvents(change: try FfiConverterTypeRoomPinnedEventsChange.read(from: &buf)
+        )
         
         case 14: return .roomPowerLevels(users: try FfiConverterDictionaryStringInt64.read(from: &buf), previous: try FfiConverterOptionDictionaryStringInt64.read(from: &buf)
         )
@@ -18609,9 +18611,10 @@ public struct FfiConverterTypeOtherState: FfiConverterRustBuffer {
             FfiConverterOptionString.write(name, into: &buf)
             
         
-        case .roomPinnedEvents:
+        case let .roomPinnedEvents(change):
             writeInt(&buf, Int32(13))
-        
+            FfiConverterTypeRoomPinnedEventsChange.write(change, into: &buf)
+            
         
         case let .roomPowerLevels(users,previous):
             writeInt(&buf, Int32(14))
@@ -25972,6 +25975,8 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
         return dict
     }
 }
+
+
 
 
 
