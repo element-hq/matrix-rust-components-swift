@@ -1858,6 +1858,11 @@ public protocol ClientBuilderProtocol : AnyObject {
     
     func proxy(url: String)  -> ClientBuilder
     
+    /**
+     * Add a default request config to this client.
+     */
+    func requestConfig(config: RequestConfig)  -> ClientBuilder
+    
     func requiresSlidingSync()  -> ClientBuilder
     
     func serverName(serverName: String)  -> ClientBuilder
@@ -2077,6 +2082,17 @@ open func proxy(url: String) -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_proxy(self.uniffiClonePointer(),
         FfiConverterString.lower(url),$0
+    )
+})
+}
+    
+    /**
+     * Add a default request config to this client.
+     */
+open func requestConfig(config: RequestConfig) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_request_config(self.uniffiClonePointer(),
+        FfiConverterTypeRequestConfig.lower(config),$0
     )
 })
 }
@@ -12748,6 +12764,106 @@ public func FfiConverterTypeReceipt_lift(_ buf: RustBuffer) throws -> Receipt {
 
 public func FfiConverterTypeReceipt_lower(_ value: Receipt) -> RustBuffer {
     return FfiConverterTypeReceipt.lower(value)
+}
+
+
+/**
+ * The config to use for HTTP requests by default in this client.
+ */
+public struct RequestConfig {
+    /**
+     * Max number of retries.
+     */
+    public var retryLimit: UInt64?
+    /**
+     * Timeout for a request in milliseconds.
+     */
+    public var timeout: UInt64?
+    /**
+     * Max number of concurrent requests. No value means no limits.
+     */
+    public var maxConcurrentRequests: UInt64?
+    /**
+     * Base delay between retries.
+     */
+    public var retryTimeout: UInt64?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Max number of retries.
+         */retryLimit: UInt64?, 
+        /**
+         * Timeout for a request in milliseconds.
+         */timeout: UInt64?, 
+        /**
+         * Max number of concurrent requests. No value means no limits.
+         */maxConcurrentRequests: UInt64?, 
+        /**
+         * Base delay between retries.
+         */retryTimeout: UInt64?) {
+        self.retryLimit = retryLimit
+        self.timeout = timeout
+        self.maxConcurrentRequests = maxConcurrentRequests
+        self.retryTimeout = retryTimeout
+    }
+}
+
+
+
+extension RequestConfig: Equatable, Hashable {
+    public static func ==(lhs: RequestConfig, rhs: RequestConfig) -> Bool {
+        if lhs.retryLimit != rhs.retryLimit {
+            return false
+        }
+        if lhs.timeout != rhs.timeout {
+            return false
+        }
+        if lhs.maxConcurrentRequests != rhs.maxConcurrentRequests {
+            return false
+        }
+        if lhs.retryTimeout != rhs.retryTimeout {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(retryLimit)
+        hasher.combine(timeout)
+        hasher.combine(maxConcurrentRequests)
+        hasher.combine(retryTimeout)
+    }
+}
+
+
+public struct FfiConverterTypeRequestConfig: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RequestConfig {
+        return
+            try RequestConfig(
+                retryLimit: FfiConverterOptionUInt64.read(from: &buf), 
+                timeout: FfiConverterOptionUInt64.read(from: &buf), 
+                maxConcurrentRequests: FfiConverterOptionUInt64.read(from: &buf), 
+                retryTimeout: FfiConverterOptionUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RequestConfig, into buf: inout [UInt8]) {
+        FfiConverterOptionUInt64.write(value.retryLimit, into: &buf)
+        FfiConverterOptionUInt64.write(value.timeout, into: &buf)
+        FfiConverterOptionUInt64.write(value.maxConcurrentRequests, into: &buf)
+        FfiConverterOptionUInt64.write(value.retryTimeout, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeRequestConfig_lift(_ buf: RustBuffer) throws -> RequestConfig {
+    return try FfiConverterTypeRequestConfig.lift(buf)
+}
+
+public func FfiConverterTypeRequestConfig_lower(_ value: RequestConfig) -> RustBuffer {
+    return FfiConverterTypeRequestConfig.lower(value)
 }
 
 
@@ -26542,6 +26658,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_proxy() != 5659) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_request_config() != 58783) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_requires_sliding_sync() != 18165) {
