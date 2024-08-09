@@ -3095,6 +3095,8 @@ public protocol IdentityResetHandleProtocol : AnyObject {
      */
     func authType()  -> CrossSigningResetAuthType
     
+    func cancel() async 
+    
     /**
      * This method starts the identity reset process and
      * will go through the following steps:
@@ -3158,6 +3160,24 @@ open func authType() -> CrossSigningResetAuthType {
     uniffi_matrix_sdk_ffi_fn_method_identityresethandle_auth_type(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+open func cancel()async  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_identityresethandle_cancel(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: nil
+            
+        )
 }
     
     /**
@@ -6749,8 +6769,6 @@ public protocol RoomListItemProtocol : AnyObject {
     
     func roomInfo() async throws  -> RoomInfo
     
-    func subscribe(settings: RoomSubscription?) 
-    
 }
 
 open class RoomListItem:
@@ -6942,13 +6960,6 @@ open func roomInfo()async throws  -> RoomInfo {
         )
 }
     
-open func subscribe(settings: RoomSubscription?) {try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_subscribe(self.uniffiClonePointer(),
-        FfiConverterOptionTypeRoomSubscription.lower(settings),$0
-    )
-}
-}
-    
 
 }
 
@@ -7004,6 +7015,8 @@ public protocol RoomListServiceProtocol : AnyObject {
     func room(roomId: String) throws  -> RoomListItem
     
     func state(listener: RoomListServiceStateListener)  -> TaskHandle
+    
+    func subscribeToRooms(roomIds: [String], settings: RoomSubscription?) throws 
     
     func syncIndicator(delayBeforeShowingInMs: UInt32, delayBeforeHidingInMs: UInt32, listener: RoomListServiceSyncIndicatorListener)  -> TaskHandle
     
@@ -7081,6 +7094,14 @@ open func state(listener: RoomListServiceStateListener) -> TaskHandle {
         FfiConverterCallbackInterfaceRoomListServiceStateListener.lower(listener),$0
     )
 })
+}
+    
+open func subscribeToRooms(roomIds: [String], settings: RoomSubscription?)throws  {try rustCallWithError(FfiConverterTypeRoomListError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roomlistservice_subscribe_to_rooms(self.uniffiClonePointer(),
+        FfiConverterSequenceString.lower(roomIds),
+        FfiConverterOptionTypeRoomSubscription.lower(settings),$0
+    )
+}
 }
     
 open func syncIndicator(delayBeforeShowingInMs: UInt32, delayBeforeHidingInMs: UInt32, listener: RoomListServiceSyncIndicatorListener) -> TaskHandle {
@@ -26813,6 +26834,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_identityresethandle_auth_type() != 43501) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_identityresethandle_cancel() != 57622) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_identityresethandle_reset() != 11997) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -27206,9 +27230,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_room_info() != 32985) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_subscribe() != 60003) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_all_rooms() != 49704) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -27216,6 +27237,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_state() != 64650) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_subscribe_to_rooms() != 21360) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_sync_indicator() != 16821) {
