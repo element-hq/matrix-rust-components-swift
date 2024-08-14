@@ -4583,8 +4583,6 @@ public protocol RoomProtocol : AnyObject {
      */
     func clearComposerDraft() async throws 
     
-    func clearPinnedEventsCache() async 
-    
     /**
      * Forces the currently active room key, which is used to encrypt messages,
      * to be rotated.
@@ -5144,24 +5142,6 @@ open func clearComposerDraft()async throws  {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func clearPinnedEventsCache()async  {
-    return
-        try!  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_clear_pinned_events_cache(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
-            errorHandler: nil
-            
         )
 }
     
@@ -26976,9 +26956,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_composer_draft() != 39667) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_pinned_events_cache() != 46058) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_discard_room_key() != 18081) {
