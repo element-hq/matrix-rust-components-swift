@@ -13259,7 +13259,7 @@ public struct RoomInfo {
     public var userPowerLevels: [String: Int64]
     public var highlightCount: UInt64
     public var notificationCount: UInt64
-    public var userDefinedNotificationMode: RoomNotificationMode?
+    public var cachedUserDefinedNotificationMode: RoomNotificationMode?
     public var hasRoomCall: Bool
     public var activeRoomCallParticipants: [String]
     /**
@@ -13302,7 +13302,7 @@ public struct RoomInfo {
          *
          * Can be missing if the room membership invite event is missing from the
          * store.
-         */inviter: RoomMember?, heroes: [RoomHero], activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, userPowerLevels: [String: Int64], highlightCount: UInt64, notificationCount: UInt64, userDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], 
+         */inviter: RoomMember?, heroes: [RoomHero], activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, userPowerLevels: [String: Int64], highlightCount: UInt64, notificationCount: UInt64, cachedUserDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], 
         /**
          * Whether this room has been explicitly marked as unread
          */isMarkedUnread: Bool, 
@@ -13342,7 +13342,7 @@ public struct RoomInfo {
         self.userPowerLevels = userPowerLevels
         self.highlightCount = highlightCount
         self.notificationCount = notificationCount
-        self.userDefinedNotificationMode = userDefinedNotificationMode
+        self.cachedUserDefinedNotificationMode = cachedUserDefinedNotificationMode
         self.hasRoomCall = hasRoomCall
         self.activeRoomCallParticipants = activeRoomCallParticipants
         self.isMarkedUnread = isMarkedUnread
@@ -13420,7 +13420,7 @@ extension RoomInfo: Equatable, Hashable {
         if lhs.notificationCount != rhs.notificationCount {
             return false
         }
-        if lhs.userDefinedNotificationMode != rhs.userDefinedNotificationMode {
+        if lhs.cachedUserDefinedNotificationMode != rhs.cachedUserDefinedNotificationMode {
             return false
         }
         if lhs.hasRoomCall != rhs.hasRoomCall {
@@ -13469,7 +13469,7 @@ extension RoomInfo: Equatable, Hashable {
         hasher.combine(userPowerLevels)
         hasher.combine(highlightCount)
         hasher.combine(notificationCount)
-        hasher.combine(userDefinedNotificationMode)
+        hasher.combine(cachedUserDefinedNotificationMode)
         hasher.combine(hasRoomCall)
         hasher.combine(activeRoomCallParticipants)
         hasher.combine(isMarkedUnread)
@@ -13506,7 +13506,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 userPowerLevels: FfiConverterDictionaryStringInt64.read(from: &buf), 
                 highlightCount: FfiConverterUInt64.read(from: &buf), 
                 notificationCount: FfiConverterUInt64.read(from: &buf), 
-                userDefinedNotificationMode: FfiConverterOptionTypeRoomNotificationMode.read(from: &buf), 
+                cachedUserDefinedNotificationMode: FfiConverterOptionTypeRoomNotificationMode.read(from: &buf), 
                 hasRoomCall: FfiConverterBool.read(from: &buf), 
                 activeRoomCallParticipants: FfiConverterSequenceString.read(from: &buf), 
                 isMarkedUnread: FfiConverterBool.read(from: &buf), 
@@ -13539,7 +13539,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterDictionaryStringInt64.write(value.userPowerLevels, into: &buf)
         FfiConverterUInt64.write(value.highlightCount, into: &buf)
         FfiConverterUInt64.write(value.notificationCount, into: &buf)
-        FfiConverterOptionTypeRoomNotificationMode.write(value.userDefinedNotificationMode, into: &buf)
+        FfiConverterOptionTypeRoomNotificationMode.write(value.cachedUserDefinedNotificationMode, into: &buf)
         FfiConverterBool.write(value.hasRoomCall, into: &buf)
         FfiConverterSequenceString.write(value.activeRoomCallParticipants, into: &buf)
         FfiConverterBool.write(value.isMarkedUnread, into: &buf)
