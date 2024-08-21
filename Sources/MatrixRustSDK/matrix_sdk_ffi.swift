@@ -1865,6 +1865,12 @@ public protocol ClientBuilderProtocol : AnyObject {
     
     func requiresSlidingSync()  -> ClientBuilder
     
+    /**
+     * Set the strategy to be used for picking recipient devices when sending
+     * an encrypted message.
+     */
+    func roomKeyRecipientStrategy(strategy: CollectStrategy)  -> ClientBuilder
+    
     func serverName(serverName: String)  -> ClientBuilder
     
     func serverNameOrHomeserverUrl(serverNameOrUrl: String)  -> ClientBuilder
@@ -2100,6 +2106,18 @@ open func requestConfig(config: RequestConfig) -> ClientBuilder {
 open func requiresSlidingSync() -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_requires_sliding_sync(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Set the strategy to be used for picking recipient devices when sending
+     * an encrypted message.
+     */
+open func roomKeyRecipientStrategy(strategy: CollectStrategy) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_room_key_recipient_strategy(self.uniffiClonePointer(),
+        FfiConverterTypeCollectStrategy_lower(strategy),$0
     )
 })
 }
@@ -6712,7 +6730,8 @@ public protocol RoomListItemProtocol : AnyObject {
     /**
      * Build a full `Room` FFI object, filling its associated timeline.
      *
-     * If its internal timeline hasn't been initialized, it'll fail.
+     * An error will be returned if the room is a state different than joined
+     * or if its internal timeline hasn't been initialized.
      */
     func fullRoom() throws  -> Room
     
@@ -6730,6 +6749,17 @@ public protocol RoomListItemProtocol : AnyObject {
      */
     func initTimeline(eventTypeFilter: TimelineEventTypeFilter?, internalIdPrefix: String?) async throws 
     
+    /**
+     * Builds a `Room` FFI from an invited room without initializing its
+     * internal timeline
+     *
+     * An error will be returned if the room is a state different than invited
+     *
+     * ⚠️ Holding on to this room instance after it has been joined is not
+     * safe. Use `full_room` instead
+     */
+    func invitedRoom() throws  -> Room
+    
     func isDirect()  -> Bool
     
     /**
@@ -6746,6 +6776,11 @@ public protocol RoomListItemProtocol : AnyObject {
     func isTimelineInitialized()  -> Bool
     
     func latestEvent() async  -> EventTimelineItem?
+    
+    /**
+     * The room's current membership state.
+     */
+    func membership()  -> Membership
     
     func roomInfo() async throws  -> RoomInfo
     
@@ -6821,7 +6856,8 @@ open func displayName() -> String? {
     /**
      * Build a full `Room` FFI object, filling its associated timeline.
      *
-     * If its internal timeline hasn't been initialized, it'll fail.
+     * An error will be returned if the room is a state different than joined
+     * or if its internal timeline hasn't been initialized.
      */
 open func fullRoom()throws  -> Room {
     return try  FfiConverterTypeRoom.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
@@ -6862,6 +6898,22 @@ open func initTimeline(eventTypeFilter: TimelineEventTypeFilter?, internalIdPref
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeRoomListError.lift
         )
+}
+    
+    /**
+     * Builds a `Room` FFI from an invited room without initializing its
+     * internal timeline
+     *
+     * An error will be returned if the room is a state different than invited
+     *
+     * ⚠️ Holding on to this room instance after it has been joined is not
+     * safe. Use `full_room` instead
+     */
+open func invitedRoom()throws  -> Room {
+    return try  FfiConverterTypeRoom.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_invited_room(self.uniffiClonePointer(),$0
+    )
+})
 }
     
 open func isDirect() -> Bool {
@@ -6921,6 +6973,16 @@ open func latestEvent()async  -> EventTimelineItem? {
             errorHandler: nil
             
         )
+}
+    
+    /**
+     * The room's current membership state.
+     */
+open func membership() -> Membership {
+    return try!  FfiConverterTypeMembership.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_membership(self.uniffiClonePointer(),$0
+    )
+})
 }
     
 open func roomInfo()async throws  -> RoomInfo {
@@ -17708,7 +17770,8 @@ public enum MessageLikeEventContent {
     case roomEncrypted
     case roomMessage(messageType: MessageType, inReplyToEventId: String?
     )
-    case roomRedaction
+    case roomRedaction(redactedEventId: String?, reason: String?
+    )
     case sticker
 }
 
@@ -17756,7 +17819,8 @@ public struct FfiConverterTypeMessageLikeEventContent: FfiConverterRustBuffer {
         case 16: return .roomMessage(messageType: try FfiConverterTypeMessageType.read(from: &buf), inReplyToEventId: try FfiConverterOptionString.read(from: &buf)
         )
         
-        case 17: return .roomRedaction
+        case 17: return .roomRedaction(redactedEventId: try FfiConverterOptionString.read(from: &buf), reason: try FfiConverterOptionString.read(from: &buf)
+        )
         
         case 18: return .sticker
         
@@ -17837,9 +17901,11 @@ public struct FfiConverterTypeMessageLikeEventContent: FfiConverterRustBuffer {
             FfiConverterOptionString.write(inReplyToEventId, into: &buf)
             
         
-        case .roomRedaction:
+        case let .roomRedaction(redactedEventId,reason):
             writeInt(&buf, Int32(17))
-        
+            FfiConverterOptionString.write(redactedEventId, into: &buf)
+            FfiConverterOptionString.write(reason, into: &buf)
+            
         
         case .sticker:
             writeInt(&buf, Int32(18))
@@ -20187,6 +20253,8 @@ public enum RoomListError {
     )
     case EventCache(error: String
     )
+    case IncorrectRoomMembership(expected: Membership, actual: Membership
+    )
 }
 
 
@@ -20224,6 +20292,10 @@ public struct FfiConverterTypeRoomListError: FfiConverterRustBuffer {
             )
         case 9: return .EventCache(
             error: try FfiConverterString.read(from: &buf)
+            )
+        case 10: return .IncorrectRoomMembership(
+            expected: try FfiConverterTypeMembership.read(from: &buf), 
+            actual: try FfiConverterTypeMembership.read(from: &buf)
             )
 
          default: throw UniffiInternalError.unexpectedEnumCase
@@ -20279,6 +20351,12 @@ public struct FfiConverterTypeRoomListError: FfiConverterRustBuffer {
         case let .EventCache(error):
             writeInt(&buf, Int32(9))
             FfiConverterString.write(error, into: &buf)
+            
+        
+        case let .IncorrectRoomMembership(expected,actual):
+            writeInt(&buf, Int32(10))
+            FfiConverterTypeMembership.write(expected, into: &buf)
+            FfiConverterTypeMembership.write(actual, into: &buf)
             
         }
     }
@@ -26110,6 +26188,8 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
 
 
 
+
+
 private let UNIFFI_RUST_FUTURE_POLL_READY: Int8 = 0
 private let UNIFFI_RUST_FUTURE_POLL_MAYBE_READY: Int8 = 1
 
@@ -26667,6 +26747,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_requires_sliding_sync() != 18165) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_room_key_recipient_strategy() != 41183) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name() != 29096) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -27183,13 +27266,16 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_display_name() != 8651) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_full_room() != 41333) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_full_room() != 17298) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_id() != 41176) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_init_timeline() != 61817) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_invited_room() != 34665) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_direct() != 46873) {
@@ -27202,6 +27288,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_latest_event() != 41471) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_membership() != 1596) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_room_info() != 32985) {

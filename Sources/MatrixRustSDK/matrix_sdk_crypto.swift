@@ -382,6 +382,27 @@ fileprivate class UniffiHandleMap<T> {
 // Public interface members begin here.
 
 
+fileprivate struct FfiConverterBool : FfiConverter {
+    typealias FfiType = Int8
+    typealias SwiftType = Bool
+
+    public static func lift(_ value: Int8) throws -> Bool {
+        return value != 0
+    }
+
+    public static func lower(_ value: Bool) -> Int8 {
+        return value ? 1 : 0
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Bool {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: Bool, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
 fileprivate struct FfiConverterString: FfiConverter {
     typealias SwiftType = String
     typealias FfiType = RustBuffer
@@ -419,6 +440,100 @@ fileprivate struct FfiConverterString: FfiConverter {
         writeBytes(&buf, value.utf8)
     }
 }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Strategy to collect the devices that should receive room keys for the
+ * current discussion.
+ */
+
+public enum CollectStrategy {
+    
+    /**
+     * Device based sharing strategy.
+     */
+    case deviceBasedStrategy(
+        /**
+         * If `true`, devices that are not trusted will be excluded from the
+         * conversation. A device is trusted if any of the following is true:
+         * - It was manually marked as trusted.
+         * - It was marked as verified via interactive verification.
+         * - It is signed by its owner identity, and this identity has been
+         * trusted via interactive verification.
+         * - It is the current own device of the user.
+         */onlyAllowTrustedDevices: Bool, 
+        /**
+         * If `true`, and a verified user has an unsigned device, key sharing
+         * will fail with a
+         * [`SessionRecipientCollectionError::VerifiedUserHasUnsignedDevice`].
+         *
+         * If `true`, and a verified user has replaced their identity, key
+         * sharing will fail with a
+         * [`SessionRecipientCollectionError::VerifiedUserChangedIdentity`].
+         *
+         * Otherwise, keys are shared with unsigned devices as normal.
+         *
+         * Once the problematic devices are blacklisted or whitelisted the
+         * caller can retry to share a second time.
+         */errorOnVerifiedUserProblem: Bool
+    )
+    /**
+     * Share based on identity. Only distribute to devices signed by their
+     * owner. If a user has no published identity he will not receive
+     * any room keys.
+     */
+    case identityBasedStrategy
+}
+
+
+public struct FfiConverterTypeCollectStrategy: FfiConverterRustBuffer {
+    typealias SwiftType = CollectStrategy
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CollectStrategy {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .deviceBasedStrategy(onlyAllowTrustedDevices: try FfiConverterBool.read(from: &buf), errorOnVerifiedUserProblem: try FfiConverterBool.read(from: &buf)
+        )
+        
+        case 2: return .identityBasedStrategy
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: CollectStrategy, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .deviceBasedStrategy(onlyAllowTrustedDevices,errorOnVerifiedUserProblem):
+            writeInt(&buf, Int32(1))
+            FfiConverterBool.write(onlyAllowTrustedDevices, into: &buf)
+            FfiConverterBool.write(errorOnVerifiedUserProblem, into: &buf)
+            
+        
+        case .identityBasedStrategy:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeCollectStrategy_lift(_ buf: RustBuffer) throws -> CollectStrategy {
+    return try FfiConverterTypeCollectStrategy.lift(buf)
+}
+
+public func FfiConverterTypeCollectStrategy_lower(_ value: CollectStrategy) -> RustBuffer {
+    return FfiConverterTypeCollectStrategy.lower(value)
+}
+
+
+
+extension CollectStrategy: Equatable, Hashable {}
+
+
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
