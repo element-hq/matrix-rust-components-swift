@@ -16832,6 +16832,32 @@ public enum EventSendState {
      */
     case notSentYet
     /**
+     * One or more verified users in the room has an unsigned device.
+     *
+     * Happens only when the room key recipient strategy (as set by
+     * [`ClientBuilder::room_key_recipient_strategy`]) has
+     * [`error_on_verified_user_problem`](CollectStrategy::DeviceBasedStrategy::error_on_verified_user_problem) set.
+     */
+    case verifiedUserHasUnsignedDevice(
+        /**
+         * The unsigned devices belonging to verified users. A map from user ID
+         * to a list of device IDs.
+         */devices: [String: [String]]
+    )
+    /**
+     * One or more verified users in the room has changed identity since they
+     * were verified.
+     *
+     * Happens only when the room key recipient strategy (as set by
+     * [`ClientBuilder::room_key_recipient_strategy`]) has
+     * [`error_on_verified_user_problem`](CollectStrategy::DeviceBasedStrategy::error_on_verified_user_problem) set.
+     */
+    case verifiedUserChangedIdentity(
+        /**
+         * The users that were previously verified, but are no longer
+         */users: [String]
+    )
+    /**
      * The local event has been sent to the server, but unsuccessfully: The
      * sending has failed.
      */
@@ -16864,10 +16890,16 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
         
         case 1: return .notSentYet
         
-        case 2: return .sendingFailed(error: try FfiConverterString.read(from: &buf), isRecoverable: try FfiConverterBool.read(from: &buf)
+        case 2: return .verifiedUserHasUnsignedDevice(devices: try FfiConverterDictionaryStringSequenceString.read(from: &buf)
         )
         
-        case 3: return .sent(eventId: try FfiConverterString.read(from: &buf)
+        case 3: return .verifiedUserChangedIdentity(users: try FfiConverterSequenceString.read(from: &buf)
+        )
+        
+        case 4: return .sendingFailed(error: try FfiConverterString.read(from: &buf), isRecoverable: try FfiConverterBool.read(from: &buf)
+        )
+        
+        case 5: return .sent(eventId: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -16882,14 +16914,24 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
             writeInt(&buf, Int32(1))
         
         
-        case let .sendingFailed(error,isRecoverable):
+        case let .verifiedUserHasUnsignedDevice(devices):
             writeInt(&buf, Int32(2))
+            FfiConverterDictionaryStringSequenceString.write(devices, into: &buf)
+            
+        
+        case let .verifiedUserChangedIdentity(users):
+            writeInt(&buf, Int32(3))
+            FfiConverterSequenceString.write(users, into: &buf)
+            
+        
+        case let .sendingFailed(error,isRecoverable):
+            writeInt(&buf, Int32(4))
             FfiConverterString.write(error, into: &buf)
             FfiConverterBool.write(isRecoverable, into: &buf)
             
         
         case let .sent(eventId):
-            writeInt(&buf, Int32(3))
+            writeInt(&buf, Int32(5))
             FfiConverterString.write(eventId, into: &buf)
             
         }
