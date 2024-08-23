@@ -1876,13 +1876,14 @@ public protocol ClientBuilderProtocol : AnyObject {
     func serverNameOrHomeserverUrl(serverNameOrUrl: String)  -> ClientBuilder
     
     /**
-     * Sets the path that the client will use to store its data once logged in.
-     * This path **must** be unique per session as the data stores aren't
-     * capable of handling multiple users.
+     * Sets the paths that the client will use to store its data and caches.
+     * Both paths **must** be unique per session as the SDK stores aren't
+     * capable of handling multiple users, however it is valid to use the
+     * same path for both stores on a single session.
      *
      * Leaving this unset tells the client to use an in-memory data store.
      */
-    func sessionPath(path: String)  -> ClientBuilder
+    func sessionPaths(dataPath: String, cachePath: String)  -> ClientBuilder
     
     func setSessionDelegate(sessionDelegate: ClientSessionDelegate)  -> ClientBuilder
     
@@ -2139,16 +2140,18 @@ open func serverNameOrHomeserverUrl(serverNameOrUrl: String) -> ClientBuilder {
 }
     
     /**
-     * Sets the path that the client will use to store its data once logged in.
-     * This path **must** be unique per session as the data stores aren't
-     * capable of handling multiple users.
+     * Sets the paths that the client will use to store its data and caches.
+     * Both paths **must** be unique per session as the SDK stores aren't
+     * capable of handling multiple users, however it is valid to use the
+     * same path for both stores on a single session.
      *
      * Leaving this unset tells the client to use an in-memory data store.
      */
-open func sessionPath(path: String) -> ClientBuilder {
+open func sessionPaths(dataPath: String, cachePath: String) -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_session_path(self.uniffiClonePointer(),
-        FfiConverterString.lower(path),$0
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_session_paths(self.uniffiClonePointer(),
+        FfiConverterString.lower(dataPath),
+        FfiConverterString.lower(cachePath),$0
     )
 })
 }
@@ -26798,7 +26801,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name_or_homeserver_url() != 30022) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_session_path() != 49266) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_session_paths() != 54230) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_set_session_delegate() != 8576) {
