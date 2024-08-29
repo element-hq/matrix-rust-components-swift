@@ -594,6 +594,17 @@ public protocol ClientProtocol : AnyObject {
     func accountUrl(action: AccountManagementAction?) async throws  -> String?
     
     /**
+     * Find all sliding sync versions that are available.
+     *
+     * Be careful: This method may hit the store and will send new requests for
+     * each call. It can be costly to call it repeatedly.
+     *
+     * If `.well-known` or `/versions` is unreachable, it will simply move
+     * potential sliding sync versions aside. No error will be reported.
+     */
+    func availableSlidingSyncVersions() async  -> [SlidingSyncVersion]
+    
+    /**
      * Sends a request to retrieve the avatar URL. Will fill the cache used by
      * [`Self::cached_avatar_url`] on success.
      */
@@ -703,6 +714,11 @@ public protocol ClientProtocol : AnyObject {
     func login(username: String, password: String, initialDeviceName: String?, deviceId: String?) async throws 
     
     /**
+     * Login using an email and password.
+     */
+    func loginWithEmail(email: String, password: String, initialDeviceName: String?, deviceId: String?) async throws 
+    
+    /**
      * Completes the OIDC login process.
      */
     func loginWithOidcCallback(authorizationData: OidcAuthorizationData, callbackUrl: String) async throws 
@@ -761,6 +777,11 @@ public protocol ClientProtocol : AnyObject {
      * Registers a pusher with given parameters
      */
     func setPusher(identifiers: PusherIdentifiers, kind: PusherKind, appDisplayName: String, deviceDisplayName: String, profileTag: String?, lang: String) async throws 
+    
+    /**
+     * The sliding sync version.
+     */
+    func slidingSyncVersion()  -> SlidingSyncVersion
     
     /**
      * Returns a handler to start the SSO login process.
@@ -905,6 +926,33 @@ open func accountUrl(action: AccountManagementAction?)async throws  -> String? {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterOptionString.lift,
             errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Find all sliding sync versions that are available.
+     *
+     * Be careful: This method may hit the store and will send new requests for
+     * each call. It can be costly to call it repeatedly.
+     *
+     * If `.well-known` or `/versions` is unreachable, it will simply move
+     * potential sliding sync versions aside. No error will be reported.
+     */
+open func availableSlidingSyncVersions()async  -> [SlidingSyncVersion] {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_available_sliding_sync_versions(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeSlidingSyncVersion.lift,
+            errorHandler: nil
+            
         )
 }
     
@@ -1351,6 +1399,26 @@ open func login(username: String, password: String, initialDeviceName: String?, 
 }
     
     /**
+     * Login using an email and password.
+     */
+open func loginWithEmail(email: String, password: String, initialDeviceName: String?, deviceId: String?)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_login_with_email(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(email),FfiConverterString.lower(password),FfiConverterOptionString.lower(initialDeviceName),FfiConverterOptionString.lower(deviceId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
      * Completes the OIDC login process.
      */
 open func loginWithOidcCallback(authorizationData: OidcAuthorizationData, callbackUrl: String)async throws  {
@@ -1594,6 +1662,16 @@ open func setPusher(identifiers: PusherIdentifiers, kind: PusherKind, appDisplay
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
+}
+    
+    /**
+     * The sliding sync version.
+     */
+open func slidingSyncVersion() -> SlidingSyncVersion {
+    return try!  FfiConverterTypeSlidingSyncVersion.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_sliding_sync_version(self.uniffiClonePointer(),$0
+    )
+})
 }
     
     /**
@@ -1863,8 +1941,6 @@ public protocol ClientBuilderProtocol : AnyObject {
      */
     func requestConfig(config: RequestConfig)  -> ClientBuilder
     
-    func requiresSlidingSync()  -> ClientBuilder
-    
     /**
      * Set the strategy to be used for picking recipient devices when sending
      * an encrypted message.
@@ -1887,9 +1963,7 @@ public protocol ClientBuilderProtocol : AnyObject {
     
     func setSessionDelegate(sessionDelegate: ClientSessionDelegate)  -> ClientBuilder
     
-    func simplifiedSlidingSync(enable: Bool)  -> ClientBuilder
-    
-    func slidingSyncProxy(slidingSyncProxy: String?)  -> ClientBuilder
+    func slidingSyncVersionBuilder(versionBuilder: SlidingSyncVersionBuilder)  -> ClientBuilder
     
     func userAgent(userAgent: String)  -> ClientBuilder
     
@@ -2104,13 +2178,6 @@ open func requestConfig(config: RequestConfig) -> ClientBuilder {
 })
 }
     
-open func requiresSlidingSync() -> ClientBuilder {
-    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_requires_sliding_sync(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
     /**
      * Set the strategy to be used for picking recipient devices when sending
      * an encrypted message.
@@ -2164,18 +2231,10 @@ open func setSessionDelegate(sessionDelegate: ClientSessionDelegate) -> ClientBu
 })
 }
     
-open func simplifiedSlidingSync(enable: Bool) -> ClientBuilder {
+open func slidingSyncVersionBuilder(versionBuilder: SlidingSyncVersionBuilder) -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_simplified_sliding_sync(self.uniffiClonePointer(),
-        FfiConverterBool.lower(enable),$0
-    )
-})
-}
-    
-open func slidingSyncProxy(slidingSyncProxy: String?) -> ClientBuilder {
-    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_sliding_sync_proxy(self.uniffiClonePointer(),
-        FfiConverterOptionString.lower(slidingSyncProxy),$0
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_sliding_sync_version_builder(self.uniffiClonePointer(),
+        FfiConverterTypeSlidingSyncVersionBuilder.lower(versionBuilder),$0
     )
 })
 }
@@ -2956,10 +3015,9 @@ public func FfiConverterTypeEventTimelineItem_lower(_ value: EventTimelineItem) 
 public protocol HomeserverLoginDetailsProtocol : AnyObject {
     
     /**
-     * The URL of the discovered or manually set sliding sync proxy,
-     * if any.
+     * The sliding sync version.
      */
-    func slidingSyncProxy()  -> String?
+    func slidingSyncVersion()  -> SlidingSyncVersion
     
     /**
      * Whether the current homeserver supports login using OIDC.
@@ -3020,12 +3078,11 @@ open class HomeserverLoginDetails:
 
     
     /**
-     * The URL of the discovered or manually set sliding sync proxy,
-     * if any.
+     * The sliding sync version.
      */
-open func slidingSyncProxy() -> String? {
-    return try!  FfiConverterOptionString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_homeserverlogindetails_sliding_sync_proxy(self.uniffiClonePointer(),$0
+open func slidingSyncVersion() -> SlidingSyncVersion {
+    return try!  FfiConverterTypeSlidingSyncVersion.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_homeserverlogindetails_sliding_sync_version(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -8863,7 +8920,22 @@ public protocol TimelineProtocol : AnyObject {
     
     func subscribeToBackPaginationStatus(listener: PaginationStatusListener) async throws  -> TaskHandle
     
-    func toggleReaction(eventId: String, key: String) async throws 
+    /**
+     * Toggle a reaction on an event.
+     *
+     * The `unique_id` parameter is a string returned by
+     * the `TimelineItem::unique_id()` method. As such, this method works both
+     * on local echoes and remote items.
+     *
+     * Adds or redacts a reaction based on the state of the reaction at the
+     * time it is called.
+     *
+     * When redacting a previous reaction, the redaction reason is not set.
+     *
+     * Ensures that only one reaction is sent at a time to avoid race
+     * conditions and spamming the homeserver with requests.
+     */
+    func toggleReaction(uniqueId: String, key: String) async throws 
     
     /**
      * Adds a new pinned event by sending an updated `m.room.pinned_events`
@@ -9415,13 +9487,28 @@ open func subscribeToBackPaginationStatus(listener: PaginationStatusListener)asy
         )
 }
     
-open func toggleReaction(eventId: String, key: String)async throws  {
+    /**
+     * Toggle a reaction on an event.
+     *
+     * The `unique_id` parameter is a string returned by
+     * the `TimelineItem::unique_id()` method. As such, this method works both
+     * on local echoes and remote items.
+     *
+     * Adds or redacts a reaction based on the state of the reaction at the
+     * time it is called.
+     *
+     * When redacting a previous reaction, the redaction reason is not set.
+     *
+     * Ensures that only one reaction is sent at a time to avoid race
+     * conditions and spamming the homeserver with requests.
+     */
+open func toggleReaction(uniqueId: String, key: String)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_toggle_reaction(
                     self.uniffiClonePointer(),
-                    FfiConverterString.lower(eventId),FfiConverterString.lower(key)
+                    FfiConverterString.lower(uniqueId),FfiConverterString.lower(key)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -9522,6 +9609,8 @@ public protocol TimelineDiffProtocol : AnyObject {
     
     func set()  -> SetData?
     
+    func truncate()  -> UInt32?
+    
 }
 
 open class TimelineDiff:
@@ -9617,6 +9706,13 @@ open func reset() -> [TimelineItem]? {
 open func set() -> SetData? {
     return try!  FfiConverterOptionTypeSetData.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timelinediff_set(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func truncate() -> UInt32? {
+    return try!  FfiConverterOptionUInt32.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_timelinediff_truncate(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -14393,9 +14489,9 @@ public struct Session {
      */
     public var oidcData: String?
     /**
-     * The URL for the sliding sync proxy used for this session.
+     * The sliding sync version used for this session.
      */
-    public var slidingSyncProxy: String?
+    public var slidingSyncVersion: SlidingSyncVersion
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -14422,15 +14518,15 @@ public struct Session {
          * authentication.
          */oidcData: String?, 
         /**
-         * The URL for the sliding sync proxy used for this session.
-         */slidingSyncProxy: String?) {
+         * The sliding sync version used for this session.
+         */slidingSyncVersion: SlidingSyncVersion) {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
         self.userId = userId
         self.deviceId = deviceId
         self.homeserverUrl = homeserverUrl
         self.oidcData = oidcData
-        self.slidingSyncProxy = slidingSyncProxy
+        self.slidingSyncVersion = slidingSyncVersion
     }
 }
 
@@ -14456,7 +14552,7 @@ extension Session: Equatable, Hashable {
         if lhs.oidcData != rhs.oidcData {
             return false
         }
-        if lhs.slidingSyncProxy != rhs.slidingSyncProxy {
+        if lhs.slidingSyncVersion != rhs.slidingSyncVersion {
             return false
         }
         return true
@@ -14469,7 +14565,7 @@ extension Session: Equatable, Hashable {
         hasher.combine(deviceId)
         hasher.combine(homeserverUrl)
         hasher.combine(oidcData)
-        hasher.combine(slidingSyncProxy)
+        hasher.combine(slidingSyncVersion)
     }
 }
 
@@ -14484,7 +14580,7 @@ public struct FfiConverterTypeSession: FfiConverterRustBuffer {
                 deviceId: FfiConverterString.read(from: &buf), 
                 homeserverUrl: FfiConverterString.read(from: &buf), 
                 oidcData: FfiConverterOptionString.read(from: &buf), 
-                slidingSyncProxy: FfiConverterOptionString.read(from: &buf)
+                slidingSyncVersion: FfiConverterTypeSlidingSyncVersion.read(from: &buf)
         )
     }
 
@@ -14495,7 +14591,7 @@ public struct FfiConverterTypeSession: FfiConverterRustBuffer {
         FfiConverterString.write(value.deviceId, into: &buf)
         FfiConverterString.write(value.homeserverUrl, into: &buf)
         FfiConverterOptionString.write(value.oidcData, into: &buf)
-        FfiConverterOptionString.write(value.slidingSyncProxy, into: &buf)
+        FfiConverterTypeSlidingSyncVersion.write(value.slidingSyncVersion, into: &buf)
     }
 }
 
@@ -16283,7 +16379,9 @@ public enum ClientBuildError {
     
     case WellKnownDeserializationError(message: String)
     
-    case SlidingSyncNotAvailable(message: String)
+    case SlidingSync(message: String)
+    
+    case SlidingSyncVersion(message: String)
     
     case Sdk(message: String)
     
@@ -16318,15 +16416,19 @@ public struct FfiConverterTypeClientBuildError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 5: return .SlidingSyncNotAvailable(
+        case 5: return .SlidingSync(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 6: return .Sdk(
+        case 6: return .SlidingSyncVersion(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 7: return .Generic(
+        case 7: return .Sdk(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 8: return .Generic(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -16349,12 +16451,14 @@ public struct FfiConverterTypeClientBuildError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(3))
         case .WellKnownDeserializationError(_ /* message is ignored*/):
             writeInt(&buf, Int32(4))
-        case .SlidingSyncNotAvailable(_ /* message is ignored*/):
+        case .SlidingSync(_ /* message is ignored*/):
             writeInt(&buf, Int32(5))
-        case .Sdk(_ /* message is ignored*/):
+        case .SlidingSyncVersion(_ /* message is ignored*/):
             writeInt(&buf, Int32(6))
-        case .Generic(_ /* message is ignored*/):
+        case .Sdk(_ /* message is ignored*/):
             writeInt(&buf, Int32(7))
+        case .Generic(_ /* message is ignored*/):
+            writeInt(&buf, Int32(8))
 
         
         }
@@ -21065,6 +21169,150 @@ public func FfiConverterTypeShieldState_lower(_ value: ShieldState) -> RustBuffe
 
 
 extension ShieldState: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum SlidingSyncVersion {
+    
+    case none
+    case proxy(url: String
+    )
+    case native
+}
+
+
+public struct FfiConverterTypeSlidingSyncVersion: FfiConverterRustBuffer {
+    typealias SwiftType = SlidingSyncVersion
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SlidingSyncVersion {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .none
+        
+        case 2: return .proxy(url: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .native
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SlidingSyncVersion, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .none:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .proxy(url):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(url, into: &buf)
+            
+        
+        case .native:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeSlidingSyncVersion_lift(_ buf: RustBuffer) throws -> SlidingSyncVersion {
+    return try FfiConverterTypeSlidingSyncVersion.lift(buf)
+}
+
+public func FfiConverterTypeSlidingSyncVersion_lower(_ value: SlidingSyncVersion) -> RustBuffer {
+    return FfiConverterTypeSlidingSyncVersion.lower(value)
+}
+
+
+
+extension SlidingSyncVersion: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum SlidingSyncVersionBuilder {
+    
+    case none
+    case proxy(url: String
+    )
+    case native
+    case discoverProxy
+    case discoverNative
+}
+
+
+public struct FfiConverterTypeSlidingSyncVersionBuilder: FfiConverterRustBuffer {
+    typealias SwiftType = SlidingSyncVersionBuilder
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SlidingSyncVersionBuilder {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .none
+        
+        case 2: return .proxy(url: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .native
+        
+        case 4: return .discoverProxy
+        
+        case 5: return .discoverNative
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SlidingSyncVersionBuilder, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .none:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .proxy(url):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(url, into: &buf)
+            
+        
+        case .native:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .discoverProxy:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .discoverNative:
+            writeInt(&buf, Int32(5))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeSlidingSyncVersionBuilder_lift(_ buf: RustBuffer) throws -> SlidingSyncVersionBuilder {
+    return try FfiConverterTypeSlidingSyncVersionBuilder.lift(buf)
+}
+
+public func FfiConverterTypeSlidingSyncVersionBuilder_lower(_ value: SlidingSyncVersionBuilder) -> RustBuffer {
+    return FfiConverterTypeSlidingSyncVersionBuilder.lower(value)
+}
+
+
+
+extension SlidingSyncVersionBuilder: Equatable, Hashable {}
 
 
 
@@ -26079,6 +26327,28 @@ fileprivate struct FfiConverterSequenceTypeRoomListEntriesUpdate: FfiConverterRu
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeSlidingSyncVersion: FfiConverterRustBuffer {
+    typealias SwiftType = [SlidingSyncVersion]
+
+    public static func write(_ value: [SlidingSyncVersion], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeSlidingSyncVersion.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SlidingSyncVersion] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [SlidingSyncVersion]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeSlidingSyncVersion.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypeWidgetEventFilter: FfiConverterRustBuffer {
     typealias SwiftType = [WidgetEventFilter]
 
@@ -26591,6 +26861,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_account_url() != 42373) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_available_sliding_sync_versions() != 35296) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_avatar_url() != 27867) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -26669,6 +26942,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_login() != 33276) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_email() != 11789) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_oidc_callback() != 35005) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -26712,6 +26988,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_pusher() != 41975) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_sliding_sync_version() != 4957) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_start_sso_login() != 34571) {
@@ -26789,9 +27068,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_request_config() != 58783) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_requires_sliding_sync() != 18165) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_room_key_recipient_strategy() != 41183) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -26807,10 +27083,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_set_session_delegate() != 8576) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_simplified_sliding_sync() != 7554) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_sliding_sync_proxy() != 15622) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_sliding_sync_version_builder() != 39381) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_user_agent() != 13719) {
@@ -26927,7 +27200,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_transaction_id() != 40338) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_sliding_sync_proxy() != 46815) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_sliding_sync_version() != 36573) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_supports_oidc_login() != 46090) {
@@ -27521,7 +27794,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_back_pagination_status() != 46161) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_toggle_reaction() != 10294) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_toggle_reaction() != 62959) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_unpin_event() != 52414) {
@@ -27549,6 +27822,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_set() != 13334) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_truncate() != 34040) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timelineevent_event_id() != 11088) {
