@@ -12462,11 +12462,6 @@ public func FfiConverterTypeOidcConfiguration_lower(_ value: OidcConfiguration) 
 
 public struct OidcCrossSigningResetInfo {
     /**
-     * The error message we received from the homeserver after we attempted to
-     * reset the cross-signing keys.
-     */
-    public var error: String
-    /**
      * The URL where the user can approve the reset of the cross-signing keys.
      */
     public var approvalUrl: String
@@ -12475,13 +12470,8 @@ public struct OidcCrossSigningResetInfo {
     // declare one manually.
     public init(
         /**
-         * The error message we received from the homeserver after we attempted to
-         * reset the cross-signing keys.
-         */error: String, 
-        /**
          * The URL where the user can approve the reset of the cross-signing keys.
          */approvalUrl: String) {
-        self.error = error
         self.approvalUrl = approvalUrl
     }
 }
@@ -12490,9 +12480,6 @@ public struct OidcCrossSigningResetInfo {
 
 extension OidcCrossSigningResetInfo: Equatable, Hashable {
     public static func ==(lhs: OidcCrossSigningResetInfo, rhs: OidcCrossSigningResetInfo) -> Bool {
-        if lhs.error != rhs.error {
-            return false
-        }
         if lhs.approvalUrl != rhs.approvalUrl {
             return false
         }
@@ -12500,7 +12487,6 @@ extension OidcCrossSigningResetInfo: Equatable, Hashable {
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(error)
         hasher.combine(approvalUrl)
     }
 }
@@ -12510,13 +12496,11 @@ public struct FfiConverterTypeOidcCrossSigningResetInfo: FfiConverterRustBuffer 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OidcCrossSigningResetInfo {
         return
             try OidcCrossSigningResetInfo(
-                error: FfiConverterString.read(from: &buf), 
                 approvalUrl: FfiConverterString.read(from: &buf)
         )
     }
 
     public static func write(_ value: OidcCrossSigningResetInfo, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.error, into: &buf)
         FfiConverterString.write(value.approvalUrl, into: &buf)
     }
 }
@@ -16957,13 +16941,24 @@ public enum EventSendState {
      *
      * Happens only when the room key recipient strategy (as set by
      * [`ClientBuilder::room_key_recipient_strategy`]) has
-     * [`error_on_verified_user_problem`](CollectStrategy::DeviceBasedStrategy::error_on_verified_user_problem) set.
+     * [`error_on_verified_user_problem`](CollectStrategy::DeviceBasedStrategy::error_on_verified_user_problem)
+     * set, or when using [`CollectStrategy::IdentityBasedStrategy`].
      */
     case verifiedUserChangedIdentity(
         /**
          * The users that were previously verified, but are no longer
          */users: [String]
     )
+    /**
+     * The user does not have cross-signing set up, but
+     * [`CollectStrategy::IdentityBasedStrategy`] was used.
+     */
+    case crossSigningNotSetup
+    /**
+     * The current device is not verified, but
+     * [`CollectStrategy::IdentityBasedStrategy`] was used.
+     */
+    case sendingFromUnverifiedDevice
     /**
      * The local event has been sent to the server, but unsuccessfully: The
      * sending has failed.
@@ -17003,10 +16998,14 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
         case 3: return .verifiedUserChangedIdentity(users: try FfiConverterSequenceString.read(from: &buf)
         )
         
-        case 4: return .sendingFailed(error: try FfiConverterString.read(from: &buf), isRecoverable: try FfiConverterBool.read(from: &buf)
+        case 4: return .crossSigningNotSetup
+        
+        case 5: return .sendingFromUnverifiedDevice
+        
+        case 6: return .sendingFailed(error: try FfiConverterString.read(from: &buf), isRecoverable: try FfiConverterBool.read(from: &buf)
         )
         
-        case 5: return .sent(eventId: try FfiConverterString.read(from: &buf)
+        case 7: return .sent(eventId: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -17031,14 +17030,22 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
             FfiConverterSequenceString.write(users, into: &buf)
             
         
-        case let .sendingFailed(error,isRecoverable):
+        case .crossSigningNotSetup:
             writeInt(&buf, Int32(4))
+        
+        
+        case .sendingFromUnverifiedDevice:
+            writeInt(&buf, Int32(5))
+        
+        
+        case let .sendingFailed(error,isRecoverable):
+            writeInt(&buf, Int32(6))
             FfiConverterString.write(error, into: &buf)
             FfiConverterBool.write(isRecoverable, into: &buf)
             
         
         case let .sent(eventId):
-            writeInt(&buf, Int32(5))
+            writeInt(&buf, Int32(7))
             FfiConverterString.write(eventId, into: &buf)
             
         }
