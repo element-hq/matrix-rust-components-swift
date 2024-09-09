@@ -4708,6 +4708,20 @@ public protocol RoomProtocol : AnyObject {
     func id()  -> String
     
     /**
+     * Set the local trust for the given devices to `LocalTrust::Ignored`
+     * and resend messages that failed to send because said devices are
+     * unverified (in response to
+     * `SessionRecipientCollectionError::VerifiedUserHasUnsignedDevice`).
+     * # Arguments
+     *
+     * * `devices` - The map of users identifiers to device identifiers
+     * received in the error
+     * * `transaction_id` - The send queue transaction identifier of the local
+     * echo the send error applies to
+     */
+    func ignoreDeviceTrustAndResend(devices: [String: [String]], transactionId: String) async throws 
+    
+    /**
      * Ignores a user.
      *
      * # Arguments
@@ -4791,7 +4805,7 @@ public protocol RoomProtocol : AnyObject {
     
     func ownUserId()  -> String
     
-    func pinnedEventsTimeline(internalIdPrefix: String?, maxEventsToLoad: UInt16) async throws  -> Timeline
+    func pinnedEventsTimeline(internalIdPrefix: String?, maxEventsToLoad: UInt16, maxConcurrentRequests: UInt16) async throws  -> Timeline
     
     /**
      * The raw name as present in the room state event.
@@ -4905,6 +4919,22 @@ public protocol RoomProtocol : AnyObject {
     
     func topic()  -> String?
     
+    /**
+     * Attempt to manually resend messages that failed to send due to issues
+     * that should now have been fixed.
+     *
+     * This is useful for example, when there's a
+     * `SessionRecipientCollectionError::VerifiedUserChangedIdentity` error;
+     * the user may have re-verified on a different device and would now
+     * like to send the failed message that's waiting on this device.
+     *
+     * # Arguments
+     *
+     * * `transaction_id` - The send queue transaction identifier of the local
+     * echo that should be unwedged.
+     */
+    func tryResend(transactionId: String) async throws 
+    
     func typingNotice(isTyping: Bool) async throws 
     
     func unbanUser(userId: String, reason: String?) async throws 
@@ -4927,6 +4957,20 @@ public protocol RoomProtocol : AnyObject {
      * * `media_info` - The media info used as avatar image info.
      */
     func uploadAvatar(mimeType: String, data: Data, mediaInfo: ImageInfo?) async throws 
+    
+    /**
+     * Remove verification requirements for the given users and
+     * resend messages that failed to send because their identities were no
+     * longer verified (in response to
+     * `SessionRecipientCollectionError::VerifiedUserChangedIdentity`)
+     *
+     * # Arguments
+     *
+     * * `user_ids` - The list of users identifiers received in the error
+     * * `transaction_id` - The send queue transaction identifier of the local
+     * echo the send error applies to
+     */
+    func withdrawVerificationAndResend(userIds: [String], transactionId: String) async throws 
     
 }
 
@@ -5340,6 +5384,35 @@ open func id() -> String {
 }
     
     /**
+     * Set the local trust for the given devices to `LocalTrust::Ignored`
+     * and resend messages that failed to send because said devices are
+     * unverified (in response to
+     * `SessionRecipientCollectionError::VerifiedUserHasUnsignedDevice`).
+     * # Arguments
+     *
+     * * `devices` - The map of users identifiers to device identifiers
+     * received in the error
+     * * `transaction_id` - The send queue transaction identifier of the local
+     * echo the send error applies to
+     */
+open func ignoreDeviceTrustAndResend(devices: [String: [String]], transactionId: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_ignore_device_trust_and_resend(
+                    self.uniffiClonePointer(),
+                    FfiConverterDictionaryStringSequenceString.lower(devices),FfiConverterString.lower(transactionId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
      * Ignores a user.
      *
      * # Arguments
@@ -5699,13 +5772,13 @@ open func ownUserId() -> String {
 })
 }
     
-open func pinnedEventsTimeline(internalIdPrefix: String?, maxEventsToLoad: UInt16)async throws  -> Timeline {
+open func pinnedEventsTimeline(internalIdPrefix: String?, maxEventsToLoad: UInt16, maxConcurrentRequests: UInt16)async throws  -> Timeline {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_pinned_events_timeline(
                     self.uniffiClonePointer(),
-                    FfiConverterOptionString.lower(internalIdPrefix),FfiConverterUInt16.lower(maxEventsToLoad)
+                    FfiConverterOptionString.lower(internalIdPrefix),FfiConverterUInt16.lower(maxEventsToLoad),FfiConverterUInt16.lower(maxConcurrentRequests)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
@@ -6090,6 +6163,37 @@ open func topic() -> String? {
 })
 }
     
+    /**
+     * Attempt to manually resend messages that failed to send due to issues
+     * that should now have been fixed.
+     *
+     * This is useful for example, when there's a
+     * `SessionRecipientCollectionError::VerifiedUserChangedIdentity` error;
+     * the user may have re-verified on a different device and would now
+     * like to send the failed message that's waiting on this device.
+     *
+     * # Arguments
+     *
+     * * `transaction_id` - The send queue transaction identifier of the local
+     * echo that should be unwedged.
+     */
+open func tryResend(transactionId: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_try_resend(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(transactionId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
 open func typingNotice(isTyping: Bool)async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -6163,6 +6267,35 @@ open func uploadAvatar(mimeType: String, data: Data, mediaInfo: ImageInfo?)async
                 uniffi_matrix_sdk_ffi_fn_method_room_upload_avatar(
                     self.uniffiClonePointer(),
                     FfiConverterString.lower(mimeType),FfiConverterData.lower(data),FfiConverterOptionTypeImageInfo.lower(mediaInfo)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Remove verification requirements for the given users and
+     * resend messages that failed to send because their identities were no
+     * longer verified (in response to
+     * `SessionRecipientCollectionError::VerifiedUserChangedIdentity`)
+     *
+     * # Arguments
+     *
+     * * `user_ids` - The list of users identifiers received in the error
+     * * `transaction_id` - The send queue transaction identifier of the local
+     * echo the send error applies to
+     */
+open func withdrawVerificationAndResend(userIds: [String], transactionId: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_withdraw_verification_and_resend(
+                    self.uniffiClonePointer(),
+                    FfiConverterSequenceString.lower(userIds),FfiConverterString.lower(transactionId)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -27390,6 +27523,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_id() != 61990) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_ignore_device_trust_and_resend() != 18289) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_ignore_user() != 62239) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -27465,7 +27601,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_own_user_id() != 39510) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_pinned_events_timeline() != 4133) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_pinned_events_timeline() != 29596) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_raw_name() != 15453) {
@@ -27528,6 +27664,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_topic() != 59745) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_try_resend() != 40157) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_typing_notice() != 28642) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -27538,6 +27677,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_upload_avatar() != 19069) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_withdraw_verification_and_resend() != 48968) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_is_at_last_page() != 22509) {
