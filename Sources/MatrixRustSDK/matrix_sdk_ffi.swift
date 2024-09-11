@@ -8934,9 +8934,7 @@ public protocol TimelineProtocol : AnyObject {
      * Returns whether the edit did happen. It can only return false for
      * local events that are being processed.
      */
-    func edit(item: EventTimelineItem, newContent: RoomMessageEventContentWithoutRelation) async throws  -> Bool
-    
-    func editPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind, editItem: EventTimelineItem) async throws 
+    func edit(item: EventTimelineItem, newContent: EditedContent) async throws  -> Bool
     
     func endPoll(pollStartId: String, text: String) throws 
     
@@ -9167,36 +9165,19 @@ open func createPoll(question: String, answers: [String], maxSelections: UInt8, 
      * Returns whether the edit did happen. It can only return false for
      * local events that are being processed.
      */
-open func edit(item: EventTimelineItem, newContent: RoomMessageEventContentWithoutRelation)async throws  -> Bool {
+open func edit(item: EventTimelineItem, newContent: EditedContent)async throws  -> Bool {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_edit(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeEventTimelineItem.lower(item),FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(newContent)
+                    FfiConverterTypeEventTimelineItem.lower(item),FfiConverterTypeEditedContent.lower(newContent)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
             liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func editPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind, editItem: EventTimelineItem)async throws  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_timeline_edit_poll(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(question),FfiConverterSequenceString.lower(answers),FfiConverterUInt8.lower(maxSelections),FfiConverterTypePollKind.lower(pollKind),FfiConverterTypeEventTimelineItem.lower(editItem)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -12702,6 +12683,79 @@ public func FfiConverterTypePollAnswer_lift(_ buf: RustBuffer) throws -> PollAns
 
 public func FfiConverterTypePollAnswer_lower(_ value: PollAnswer) -> RustBuffer {
     return FfiConverterTypePollAnswer.lower(value)
+}
+
+
+public struct PollData {
+    public var question: String
+    public var answers: [String]
+    public var maxSelections: UInt8
+    public var pollKind: PollKind
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind) {
+        self.question = question
+        self.answers = answers
+        self.maxSelections = maxSelections
+        self.pollKind = pollKind
+    }
+}
+
+
+
+extension PollData: Equatable, Hashable {
+    public static func ==(lhs: PollData, rhs: PollData) -> Bool {
+        if lhs.question != rhs.question {
+            return false
+        }
+        if lhs.answers != rhs.answers {
+            return false
+        }
+        if lhs.maxSelections != rhs.maxSelections {
+            return false
+        }
+        if lhs.pollKind != rhs.pollKind {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(question)
+        hasher.combine(answers)
+        hasher.combine(maxSelections)
+        hasher.combine(pollKind)
+    }
+}
+
+
+public struct FfiConverterTypePollData: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PollData {
+        return
+            try PollData(
+                question: FfiConverterString.read(from: &buf), 
+                answers: FfiConverterSequenceString.read(from: &buf), 
+                maxSelections: FfiConverterUInt8.read(from: &buf), 
+                pollKind: FfiConverterTypePollKind.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PollData, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.question, into: &buf)
+        FfiConverterSequenceString.write(value.answers, into: &buf)
+        FfiConverterUInt8.write(value.maxSelections, into: &buf)
+        FfiConverterTypePollKind.write(value.pollKind, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypePollData_lift(_ buf: RustBuffer) throws -> PollData {
+    return try FfiConverterTypePollData.lift(buf)
+}
+
+public func FfiConverterTypePollData_lower(_ value: PollData) -> RustBuffer {
+    return FfiConverterTypePollData.lower(value)
 }
 
 
@@ -16787,6 +16841,64 @@ public func FfiConverterTypeCrossSigningResetAuthType_lower(_ value: CrossSignin
 
 
 extension CrossSigningResetAuthType: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum EditedContent {
+    
+    case roomMessage(content: RoomMessageEventContentWithoutRelation
+    )
+    case pollStart(pollData: PollData
+    )
+}
+
+
+public struct FfiConverterTypeEditedContent: FfiConverterRustBuffer {
+    typealias SwiftType = EditedContent
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EditedContent {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .roomMessage(content: try FfiConverterTypeRoomMessageEventContentWithoutRelation.read(from: &buf)
+        )
+        
+        case 2: return .pollStart(pollData: try FfiConverterTypePollData.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: EditedContent, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .roomMessage(content):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeRoomMessageEventContentWithoutRelation.write(content, into: &buf)
+            
+        
+        case let .pollStart(pollData):
+            writeInt(&buf, Int32(2))
+            FfiConverterTypePollData.write(pollData, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeEditedContent_lift(_ buf: RustBuffer) throws -> EditedContent {
+    return try FfiConverterTypeEditedContent.lift(buf)
+}
+
+public func FfiConverterTypeEditedContent_lower(_ value: EditedContent) -> RustBuffer {
+    return FfiConverterTypeEditedContent.lower(value)
+}
+
 
 
 
@@ -27868,10 +27980,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_create_poll() != 37925) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 9304) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit_poll() != 40066) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 14692) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_end_poll() != 31506) {
