@@ -611,6 +611,15 @@ public protocol ClientProtocol : AnyObject {
     func avatarUrl() async throws  -> String?
     
     /**
+     * Waits until an at least partially synced room is received, and returns
+     * it.
+     *
+     * **Note: this function will loop endlessly until either it finds the room
+     * or an externally set timeout happens.**
+     */
+    func awaitRoomRemoteEcho(roomId: String) async throws  -> Room
+    
+    /**
      * Retrieves an avatar cached from a previous call to [`Self::avatar_url`].
      */
     func cachedAvatarUrl() throws  -> String?
@@ -973,6 +982,30 @@ open func avatarUrl()async throws  -> String? {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterOptionString.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Waits until an at least partially synced room is received, and returns
+     * it.
+     *
+     * **Note: this function will loop endlessly until either it finds the room
+     * or an externally set timeout happens.**
+     */
+open func awaitRoomRemoteEcho(roomId: String)async throws  -> Room {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_await_room_remote_echo(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(roomId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeRoom.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -13557,6 +13590,7 @@ public func FfiConverterTypeRoomHero_lower(_ value: RoomHero) -> RustBuffer {
 
 public struct RoomInfo {
     public var id: String
+    public var creator: String?
     /**
      * The room's name from the room state event if received from sync, or one
      * that's been computed otherwise.
@@ -13620,7 +13654,7 @@ public struct RoomInfo {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, 
+    public init(id: String, creator: String?, 
         /**
          * The room's name from the room state event if received from sync, or one
          * that's been computed otherwise.
@@ -13654,6 +13688,7 @@ public struct RoomInfo {
          * The currently pinned event ids
          */pinnedEventIds: [String]) {
         self.id = id
+        self.creator = creator
         self.displayName = displayName
         self.rawName = rawName
         self.topic = topic
@@ -13690,6 +13725,9 @@ public struct RoomInfo {
 extension RoomInfo: Equatable, Hashable {
     public static func ==(lhs: RoomInfo, rhs: RoomInfo) -> Bool {
         if lhs.id != rhs.id {
+            return false
+        }
+        if lhs.creator != rhs.creator {
             return false
         }
         if lhs.displayName != rhs.displayName {
@@ -13781,6 +13819,7 @@ extension RoomInfo: Equatable, Hashable {
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+        hasher.combine(creator)
         hasher.combine(displayName)
         hasher.combine(rawName)
         hasher.combine(topic)
@@ -13818,6 +13857,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         return
             try RoomInfo(
                 id: FfiConverterString.read(from: &buf), 
+                creator: FfiConverterOptionString.read(from: &buf), 
                 displayName: FfiConverterOptionString.read(from: &buf), 
                 rawName: FfiConverterOptionString.read(from: &buf), 
                 topic: FfiConverterOptionString.read(from: &buf), 
@@ -13851,6 +13891,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
 
     public static func write(_ value: RoomInfo, into buf: inout [UInt8]) {
         FfiConverterString.write(value.id, into: &buf)
+        FfiConverterOptionString.write(value.creator, into: &buf)
         FfiConverterOptionString.write(value.displayName, into: &buf)
         FfiConverterOptionString.write(value.rawName, into: &buf)
         FfiConverterOptionString.write(value.topic, into: &buf)
@@ -27117,6 +27158,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_avatar_url() != 27867) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_await_room_remote_echo() != 18126) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_cached_avatar_url() != 58990) {
