@@ -769,6 +769,21 @@ public protocol ClientProtocol : AnyObject {
     
     func searchUsers(searchTerm: String, limit: UInt64) async throws  -> SearchUsersResults
     
+    /**
+     * The URL of the server.
+     *
+     * Not to be confused with the `Self::homeserver`. `server` is usually
+     * the server part in a user ID, e.g. with `@mnt_io:matrix.org`, here
+     * `matrix.org` is the server, whilst `matrix-client.matrix.org` is the
+     * homeserver (at the time of writing — 2024-08-28).
+     *
+     * This value is optional depending on how the `Client` has been built.
+     * If it's been built from a homeserver URL directly, we don't know the
+     * server. However, if the `Client` has been built from a server URL or
+     * name, then the homeserver has been discovered, and we know both.
+     */
+    func server()  -> String?
+    
     func session() throws  -> Session
     
     /**
@@ -1621,6 +1636,26 @@ open func searchUsers(searchTerm: String, limit: UInt64)async throws  -> SearchU
             liftFunc: FfiConverterTypeSearchUsersResults.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
+}
+    
+    /**
+     * The URL of the server.
+     *
+     * Not to be confused with the `Self::homeserver`. `server` is usually
+     * the server part in a user ID, e.g. with `@mnt_io:matrix.org`, here
+     * `matrix.org` is the server, whilst `matrix-client.matrix.org` is the
+     * homeserver (at the time of writing — 2024-08-28).
+     *
+     * This value is optional depending on how the `Client` has been built.
+     * If it's been built from a homeserver URL directly, we don't know the
+     * server. However, if the `Client` has been built from a server URL or
+     * name, then the homeserver has been discovered, and we know both.
+     */
+open func server() -> String? {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_server(self.uniffiClonePointer(),$0
+    )
+})
 }
     
 open func session()throws  -> Session {
@@ -11331,12 +11366,14 @@ public func FfiConverterTypeElementCallWellKnown_lower(_ value: ElementCallWellK
  * Element specific well-known settings
  */
 public struct ElementWellKnown {
-    public var call: ElementCallWellKnown
+    public var call: ElementCallWellKnown?
+    public var registrationHelperUrl: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(call: ElementCallWellKnown) {
+    public init(call: ElementCallWellKnown?, registrationHelperUrl: String?) {
         self.call = call
+        self.registrationHelperUrl = registrationHelperUrl
     }
 }
 
@@ -11347,11 +11384,15 @@ extension ElementWellKnown: Equatable, Hashable {
         if lhs.call != rhs.call {
             return false
         }
+        if lhs.registrationHelperUrl != rhs.registrationHelperUrl {
+            return false
+        }
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(call)
+        hasher.combine(registrationHelperUrl)
     }
 }
 
@@ -11360,12 +11401,14 @@ public struct FfiConverterTypeElementWellKnown: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ElementWellKnown {
         return
             try ElementWellKnown(
-                call: FfiConverterTypeElementCallWellKnown.read(from: &buf)
+                call: FfiConverterOptionTypeElementCallWellKnown.read(from: &buf), 
+                registrationHelperUrl: FfiConverterOptionString.read(from: &buf)
         )
     }
 
     public static func write(_ value: ElementWellKnown, into buf: inout [UInt8]) {
-        FfiConverterTypeElementCallWellKnown.write(value.call, into: &buf)
+        FfiConverterOptionTypeElementCallWellKnown.write(value.call, into: &buf)
+        FfiConverterOptionString.write(value.registrationHelperUrl, into: &buf)
     }
 }
 
@@ -25360,6 +25403,27 @@ fileprivate struct FfiConverterOptionTypeComposerDraft: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeElementCallWellKnown: FfiConverterRustBuffer {
+    typealias SwiftType = ElementCallWellKnown?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeElementCallWellKnown.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeElementCallWellKnown.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeFileInfo: FfiConverterRustBuffer {
     typealias SwiftType = FileInfo?
 
@@ -27269,6 +27333,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_search_users() != 42927) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_server() != 63276) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_session() != 8085) {
