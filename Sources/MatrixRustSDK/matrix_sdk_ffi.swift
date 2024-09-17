@@ -624,7 +624,27 @@ public protocol ClientProtocol : AnyObject {
      */
     func cachedAvatarUrl() throws  -> String?
     
+    /**
+     * Lets the user know whether this is an `m.login.password` based
+     * auth and if the account can actually be deactivated
+     */
+    func canDeactivateAccount()  -> Bool
+    
     func createRoom(request: CreateRoomParameters) async throws  -> String
+    
+    /**
+     * Deactivate this account definitively.
+     * Similarly to `encryption::reset_identity` this
+     * will only work with password-based authentication (`m.login.password`)
+     *
+     * # Arguments
+     *
+     * * `auth_data` - This request uses the [User-Interactive Authentication
+     * API][uiaa]. The first request needs to set this to `None` and will
+     * always fail and the same request needs to be made but this time with
+     * some `auth_data` provided.
+     */
+    func deactivateAccount(authData: AuthData?, eraseData: Bool) async throws 
     
     /**
      * Deletes a pusher of given pusher ids
@@ -1035,6 +1055,17 @@ open func cachedAvatarUrl()throws  -> String? {
 })
 }
     
+    /**
+     * Lets the user know whether this is an `m.login.password` based
+     * auth and if the account can actually be deactivated
+     */
+open func canDeactivateAccount() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_can_deactivate_account(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
 open func createRoom(request: CreateRoomParameters)async throws  -> String {
     return
         try  await uniffiRustCallAsync(
@@ -1048,6 +1079,35 @@ open func createRoom(request: CreateRoomParameters)async throws  -> String {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Deactivate this account definitively.
+     * Similarly to `encryption::reset_identity` this
+     * will only work with password-based authentication (`m.login.password`)
+     *
+     * # Arguments
+     *
+     * * `auth_data` - This request uses the [User-Interactive Authentication
+     * API][uiaa]. The first request needs to set this to `None` and will
+     * always fail and the same request needs to be made but this time with
+     * some `auth_data` provided.
+     */
+open func deactivateAccount(authData: AuthData?, eraseData: Bool)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_deactivate_account(
+                    self.uniffiClonePointer(),
+                    FfiConverterOptionTypeAuthData.lower(authData),FfiConverterBool.lower(eraseData)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -27230,7 +27290,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_cached_avatar_url() != 58990) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_can_deactivate_account() != 39890) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_create_room() != 52700) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_deactivate_account() != 20658) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_delete_pusher() != 45990) {
