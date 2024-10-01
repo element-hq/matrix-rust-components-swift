@@ -633,6 +633,13 @@ public protocol ClientProtocol : AnyObject {
     func createRoom(request: CreateRoomParameters) async throws  -> String
     
     /**
+     * Login using JWT
+     * This is an implementation of the custom_login https://docs.rs/matrix-sdk/latest/matrix_sdk/matrix_auth/struct.MatrixAuth.html#method.login_custom
+     * For more information on logging in with JWT: https://element-hq.github.io/synapse/latest/jwt.html
+     */
+    func customLoginWithJwt(jwt: String, initialDeviceName: String?, deviceId: String?) async throws 
+    
+    /**
      * Deactivate this account definitively.
      * Similarly to `encryption::reset_identity` this
      * will only work with password-based authentication (`m.login.password`)
@@ -1079,6 +1086,28 @@ open func createRoom(request: CreateRoomParameters)async throws  -> String {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Login using JWT
+     * This is an implementation of the custom_login https://docs.rs/matrix-sdk/latest/matrix_sdk/matrix_auth/struct.MatrixAuth.html#method.login_custom
+     * For more information on logging in with JWT: https://element-hq.github.io/synapse/latest/jwt.html
+     */
+open func customLoginWithJwt(jwt: String, initialDeviceName: String?, deviceId: String?)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_custom_login_with_jwt(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(jwt),FfiConverterOptionString.lower(initialDeviceName),FfiConverterOptionString.lower(deviceId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -2466,7 +2495,7 @@ public protocol EncryptionProtocol : AnyObject {
     
     func enableBackups() async throws 
     
-    func enableRecovery(waitForBackupsToUpload: Bool, progressListener: EnableRecoveryProgressListener) async throws  -> String
+    func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, progressListener: EnableRecoveryProgressListener) async throws  -> String
     
     func isLastDevice() async throws  -> Bool
     
@@ -2662,13 +2691,13 @@ open func enableBackups()async throws  {
         )
 }
     
-open func enableRecovery(waitForBackupsToUpload: Bool, progressListener: EnableRecoveryProgressListener)async throws  -> String {
+open func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, progressListener: EnableRecoveryProgressListener)async throws  -> String {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_encryption_enable_recovery(
                     self.uniffiClonePointer(),
-                    FfiConverterBool.lower(waitForBackupsToUpload),FfiConverterCallbackInterfaceEnableRecoveryProgressListener.lower(progressListener)
+                    FfiConverterBool.lower(waitForBackupsToUpload),FfiConverterOptionString.lower(passphrase),FfiConverterCallbackInterfaceEnableRecoveryProgressListener.lower(progressListener)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
@@ -2885,50 +2914,20 @@ public func FfiConverterTypeEncryption_lower(_ value: Encryption) -> UnsafeMutab
 
 
 
-public protocol EventTimelineItemProtocol : AnyObject {
+/**
+ * Wrapper to retrieve the shields info lazily.
+ */
+public protocol EventShieldsProviderProtocol : AnyObject {
     
-    func canBeRepliedTo()  -> Bool
-    
-    func content()  -> TimelineItemContent
-    
-    func debugInfo()  -> EventTimelineItemDebugInfo
-    
-    func eventId()  -> String?
-    
-    /**
-     * Gets the [`ShieldState`] which can be used to decorate messages in the
-     * recommended way.
-     */
-    func getShield(strict: Bool)  -> ShieldState?
-    
-    func isEditable()  -> Bool
-    
-    func isLocal()  -> Bool
-    
-    func isOwn()  -> Bool
-    
-    func isRemote()  -> Bool
-    
-    func localSendState()  -> EventSendState?
-    
-    func origin()  -> EventItemOrigin?
-    
-    func reactions()  -> [Reaction]
-    
-    func readReceipts()  -> [String: Receipt]
-    
-    func sender()  -> String
-    
-    func senderProfile()  -> ProfileDetails
-    
-    func timestamp()  -> UInt64
-    
-    func transactionId()  -> String?
+    func getShields(strict: Bool)  -> ShieldState?
     
 }
 
-open class EventTimelineItem:
-    EventTimelineItemProtocol {
+/**
+ * Wrapper to retrieve the shields info lazily.
+ */
+open class EventShieldsProvider:
+    EventShieldsProviderProtocol {
     fileprivate let pointer: UnsafeMutableRawPointer!
 
     /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
@@ -2953,7 +2952,7 @@ open class EventTimelineItem:
     }
 
     public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_eventtimelineitem(self.pointer, $0) }
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_eventshieldsprovider(self.pointer, $0) }
     }
     // No primary constructor declared for this class.
 
@@ -2962,153 +2961,37 @@ open class EventTimelineItem:
             return
         }
 
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_eventtimelineitem(pointer, $0) }
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_eventshieldsprovider(pointer, $0) }
     }
 
     
 
     
-open func canBeRepliedTo() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_can_be_replied_to(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func content() -> TimelineItemContent {
-    return try!  FfiConverterTypeTimelineItemContent.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_content(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func debugInfo() -> EventTimelineItemDebugInfo {
-    return try!  FfiConverterTypeEventTimelineItemDebugInfo.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_debug_info(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func eventId() -> String? {
-    return try!  FfiConverterOptionString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_event_id(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-    /**
-     * Gets the [`ShieldState`] which can be used to decorate messages in the
-     * recommended way.
-     */
-open func getShield(strict: Bool) -> ShieldState? {
+open func getShields(strict: Bool) -> ShieldState? {
     return try!  FfiConverterOptionTypeShieldState.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_get_shield(self.uniffiClonePointer(),
+    uniffi_matrix_sdk_ffi_fn_method_eventshieldsprovider_get_shields(self.uniffiClonePointer(),
         FfiConverterBool.lower(strict),$0
     )
 })
 }
     
-open func isEditable() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_is_editable(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func isLocal() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_is_local(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func isOwn() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_is_own(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func isRemote() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_is_remote(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func localSendState() -> EventSendState? {
-    return try!  FfiConverterOptionTypeEventSendState.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_local_send_state(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func origin() -> EventItemOrigin? {
-    return try!  FfiConverterOptionTypeEventItemOrigin.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_origin(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func reactions() -> [Reaction] {
-    return try!  FfiConverterSequenceTypeReaction.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_reactions(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func readReceipts() -> [String: Receipt] {
-    return try!  FfiConverterDictionaryStringTypeReceipt.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_read_receipts(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func sender() -> String {
-    return try!  FfiConverterString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_sender(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func senderProfile() -> ProfileDetails {
-    return try!  FfiConverterTypeProfileDetails.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_sender_profile(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func timestamp() -> UInt64 {
-    return try!  FfiConverterUInt64.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_timestamp(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func transactionId() -> String? {
-    return try!  FfiConverterOptionString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitem_transaction_id(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
 
 }
 
-public struct FfiConverterTypeEventTimelineItem: FfiConverter {
+public struct FfiConverterTypeEventShieldsProvider: FfiConverter {
 
     typealias FfiType = UnsafeMutableRawPointer
-    typealias SwiftType = EventTimelineItem
+    typealias SwiftType = EventShieldsProvider
 
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> EventTimelineItem {
-        return EventTimelineItem(unsafeFromRawPointer: pointer)
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> EventShieldsProvider {
+        return EventShieldsProvider(unsafeFromRawPointer: pointer)
     }
 
-    public static func lower(_ value: EventTimelineItem) -> UnsafeMutableRawPointer {
+    public static func lower(_ value: EventShieldsProvider) -> UnsafeMutableRawPointer {
         return value.uniffiClonePointer()
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EventTimelineItem {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EventShieldsProvider {
         let v: UInt64 = try readInt(&buf)
         // The Rust code won't compile if a pointer won't fit in a UInt64.
         // We have to go via `UInt` because that's the thing that's the size of a pointer.
@@ -3119,7 +3002,7 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverter {
         return try lift(ptr!)
     }
 
-    public static func write(_ value: EventTimelineItem, into buf: inout [UInt8]) {
+    public static func write(_ value: EventShieldsProvider, into buf: inout [UInt8]) {
         // This fiddling is because `Int` is the thing that's the same size as a pointer.
         // The Rust code won't compile if a pointer won't fit in a `UInt64`.
         writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
@@ -3129,12 +3012,122 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverter {
 
 
 
-public func FfiConverterTypeEventTimelineItem_lift(_ pointer: UnsafeMutableRawPointer) throws -> EventTimelineItem {
-    return try FfiConverterTypeEventTimelineItem.lift(pointer)
+public func FfiConverterTypeEventShieldsProvider_lift(_ pointer: UnsafeMutableRawPointer) throws -> EventShieldsProvider {
+    return try FfiConverterTypeEventShieldsProvider.lift(pointer)
 }
 
-public func FfiConverterTypeEventTimelineItem_lower(_ value: EventTimelineItem) -> UnsafeMutableRawPointer {
-    return FfiConverterTypeEventTimelineItem.lower(value)
+public func FfiConverterTypeEventShieldsProvider_lower(_ value: EventShieldsProvider) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeEventShieldsProvider.lower(value)
+}
+
+
+
+
+/**
+ * Wrapper to retrieve the debug info lazily instead of immediately
+ * transforming it for each timeline event.
+ */
+public protocol EventTimelineItemDebugInfoProviderProtocol : AnyObject {
+    
+    func get()  -> EventTimelineItemDebugInfo
+    
+}
+
+/**
+ * Wrapper to retrieve the debug info lazily instead of immediately
+ * transforming it for each timeline event.
+ */
+open class EventTimelineItemDebugInfoProvider:
+    EventTimelineItemDebugInfoProviderProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_eventtimelineitemdebuginfoprovider(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_eventtimelineitemdebuginfoprovider(pointer, $0) }
+    }
+
+    
+
+    
+open func get() -> EventTimelineItemDebugInfo {
+    return try!  FfiConverterTypeEventTimelineItemDebugInfo.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitemdebuginfoprovider_get(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+
+}
+
+public struct FfiConverterTypeEventTimelineItemDebugInfoProvider: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = EventTimelineItemDebugInfoProvider
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> EventTimelineItemDebugInfoProvider {
+        return EventTimelineItemDebugInfoProvider(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: EventTimelineItemDebugInfoProvider) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EventTimelineItemDebugInfoProvider {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: EventTimelineItemDebugInfoProvider, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeEventTimelineItemDebugInfoProvider_lift(_ pointer: UnsafeMutableRawPointer) throws -> EventTimelineItemDebugInfoProvider {
+    return try FfiConverterTypeEventTimelineItemDebugInfoProvider.lift(pointer)
+}
+
+public func FfiConverterTypeEventTimelineItemDebugInfoProvider_lower(_ value: EventTimelineItemDebugInfoProvider) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeEventTimelineItemDebugInfoProvider.lower(value)
 }
 
 
@@ -3460,6 +3453,117 @@ public func FfiConverterTypeIdentityResetHandle_lower(_ value: IdentityResetHand
 
 
 
+public protocol InReplyToDetailsProtocol : AnyObject {
+    
+    func event()  -> RepliedToEventDetails
+    
+    func eventId()  -> String
+    
+}
+
+open class InReplyToDetails:
+    InReplyToDetailsProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_inreplytodetails(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_inreplytodetails(pointer, $0) }
+    }
+
+    
+
+    
+open func event() -> RepliedToEventDetails {
+    return try!  FfiConverterTypeRepliedToEventDetails.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_inreplytodetails_event(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func eventId() -> String {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_inreplytodetails_event_id(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+
+}
+
+public struct FfiConverterTypeInReplyToDetails: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = InReplyToDetails
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> InReplyToDetails {
+        return InReplyToDetails(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: InReplyToDetails) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> InReplyToDetails {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: InReplyToDetails, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeInReplyToDetails_lift(_ pointer: UnsafeMutableRawPointer) throws -> InReplyToDetails {
+    return try FfiConverterTypeInReplyToDetails.lift(pointer)
+}
+
+public func FfiConverterTypeInReplyToDetails_lower(_ value: InReplyToDetails) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeInReplyToDetails.lower(value)
+}
+
+
+
+
 /**
  * A file handle that takes ownership of a media file on disk. When the handle
  * is dropped, the file will be removed from the disk.
@@ -3700,153 +3804,6 @@ public func FfiConverterTypeMediaSource_lift(_ pointer: UnsafeMutableRawPointer)
 
 public func FfiConverterTypeMediaSource_lower(_ value: MediaSource) -> UnsafeMutableRawPointer {
     return FfiConverterTypeMediaSource.lower(value)
-}
-
-
-
-
-public protocol MessageProtocol : AnyObject {
-    
-    func body()  -> String
-    
-    func content()  -> RoomMessageEventContentWithoutRelation
-    
-    func inReplyTo()  -> InReplyToDetails?
-    
-    func isEdited()  -> Bool
-    
-    func isThreaded()  -> Bool
-    
-    func msgtype()  -> MessageType
-    
-}
-
-open class Message:
-    MessageProtocol {
-    fileprivate let pointer: UnsafeMutableRawPointer!
-
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
-    public struct NoPointer {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
-    }
-
-    /// This constructor can be used to instantiate a fake object.
-    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    ///
-    /// - Warning:
-    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
-    }
-
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_message(self.pointer, $0) }
-    }
-    // No primary constructor declared for this class.
-
-    deinit {
-        guard let pointer = pointer else {
-            return
-        }
-
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_message(pointer, $0) }
-    }
-
-    
-
-    
-open func body() -> String {
-    return try!  FfiConverterString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_message_body(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func content() -> RoomMessageEventContentWithoutRelation {
-    return try!  FfiConverterTypeRoomMessageEventContentWithoutRelation.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_message_content(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func inReplyTo() -> InReplyToDetails? {
-    return try!  FfiConverterOptionTypeInReplyToDetails.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_message_in_reply_to(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func isEdited() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_message_is_edited(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func isThreaded() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_message_is_threaded(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func msgtype() -> MessageType {
-    return try!  FfiConverterTypeMessageType.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_message_msgtype(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-
-}
-
-public struct FfiConverterTypeMessage: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
-    typealias SwiftType = Message
-
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> Message {
-        return Message(unsafeFromRawPointer: pointer)
-    }
-
-    public static func lower(_ value: Message) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Message {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
-    }
-
-    public static func write(_ value: Message, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
-    }
-}
-
-
-
-
-public func FfiConverterTypeMessage_lift(_ pointer: UnsafeMutableRawPointer) throws -> Message {
-    return try FfiConverterTypeMessage.lift(pointer)
-}
-
-public func FfiConverterTypeMessage_lower(_ value: Message) -> UnsafeMutableRawPointer {
-    return FfiConverterTypeMessage.lower(value)
 }
 
 
@@ -9050,6 +9007,8 @@ public protocol TimelineProtocol : AnyObject {
     
     func addListener(listener: TimelineListener) async  -> TaskHandle
     
+    func createMessageContent(msgType: MessageType)  -> RoomMessageEventContentWithoutRelation?
+    
     func createPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind) async throws 
     
     /**
@@ -9062,9 +9021,9 @@ public protocol TimelineProtocol : AnyObject {
      * Returns whether the edit did happen. It can only return false for
      * local events that are being processed.
      */
-    func edit(item: EventTimelineItem, newContent: EditedContent) async throws  -> Bool
+    func edit(eventOrTransactionId: EventOrTransactionId, newContent: EditedContent) async throws  -> Bool
     
-    func endPoll(pollStartId: String, text: String) throws 
+    func endPoll(pollStartEventId: String, text: String) throws 
     
     func fetchDetailsForEvent(eventId: String) async throws 
     
@@ -9143,10 +9102,9 @@ public protocol TimelineProtocol : AnyObject {
      * being sent already. If the event was a remote event, then it will be
      * redacted by sending a redaction request to the server.
      *
-     * Returns whether the redaction did happen. It can only return false for
-     * local events that are being processed.
+     * Will return an error if the event couldn't be redacted.
      */
-    func redactEvent(item: EventTimelineItem, reason: String?) async throws  -> Bool
+    func redactEvent(eventOrTransactionId: EventOrTransactionId, reason: String?) async throws 
     
     func retryDecryption(sessionIds: [String]) 
     
@@ -9167,7 +9125,7 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?) async 
     
-    func sendPollResponse(pollStartId: String, answers: [String]) async throws 
+    func sendPollResponse(pollStartEventId: String, answers: [String]) async throws 
     
     func sendReadReceipt(receiptType: ReceiptType, eventId: String) async throws 
     
@@ -9266,6 +9224,14 @@ open func addListener(listener: TimelineListener)async  -> TaskHandle {
         )
 }
     
+open func createMessageContent(msgType: MessageType) -> RoomMessageEventContentWithoutRelation? {
+    return try!  FfiConverterOptionTypeRoomMessageEventContentWithoutRelation.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_timeline_create_message_content(self.uniffiClonePointer(),
+        FfiConverterTypeMessageType.lower(msgType),$0
+    )
+})
+}
+    
 open func createPoll(question: String, answers: [String], maxSelections: UInt8, pollKind: PollKind)async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -9293,13 +9259,13 @@ open func createPoll(question: String, answers: [String], maxSelections: UInt8, 
      * Returns whether the edit did happen. It can only return false for
      * local events that are being processed.
      */
-open func edit(item: EventTimelineItem, newContent: EditedContent)async throws  -> Bool {
+open func edit(eventOrTransactionId: EventOrTransactionId, newContent: EditedContent)async throws  -> Bool {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_edit(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeEventTimelineItem.lower(item),FfiConverterTypeEditedContent.lower(newContent)
+                    FfiConverterTypeEventOrTransactionId.lower(eventOrTransactionId),FfiConverterTypeEditedContent.lower(newContent)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
@@ -9310,9 +9276,9 @@ open func edit(item: EventTimelineItem, newContent: EditedContent)async throws  
         )
 }
     
-open func endPoll(pollStartId: String, text: String)throws  {try rustCallWithError(FfiConverterTypeClientError.lift) {
+open func endPoll(pollStartEventId: String, text: String)throws  {try rustCallWithError(FfiConverterTypeClientError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_end_poll(self.uniffiClonePointer(),
-        FfiConverterString.lower(pollStartId),
+        FfiConverterString.lower(pollStartEventId),
         FfiConverterString.lower(text),$0
     )
 }
@@ -9394,9 +9360,9 @@ open func getEventTimelineItemByEventId(eventId: String)async throws  -> EventTi
                     FfiConverterString.lower(eventId)
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterTypeEventTimelineItem.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
@@ -9420,9 +9386,9 @@ open func getEventTimelineItemByTransactionId(transactionId: String)async throws
                     FfiConverterString.lower(transactionId)
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterTypeEventTimelineItem.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
@@ -9443,9 +9409,9 @@ open func loadReplyDetails(eventIdStr: String)async throws  -> InReplyToDetails 
                     FfiConverterString.lower(eventIdStr)
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
             liftFunc: FfiConverterTypeInReplyToDetails.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
@@ -9531,22 +9497,21 @@ open func pinEvent(eventId: String)async throws  -> Bool {
      * being sent already. If the event was a remote event, then it will be
      * redacted by sending a redaction request to the server.
      *
-     * Returns whether the redaction did happen. It can only return false for
-     * local events that are being processed.
+     * Will return an error if the event couldn't be redacted.
      */
-open func redactEvent(item: EventTimelineItem, reason: String?)async throws  -> Bool {
+open func redactEvent(eventOrTransactionId: EventOrTransactionId, reason: String?)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_redact_event(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeEventTimelineItem.lower(item),FfiConverterOptionString.lower(reason)
+                    FfiConverterTypeEventOrTransactionId.lower(eventOrTransactionId),FfiConverterOptionString.lower(reason)
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -9635,13 +9600,13 @@ open func sendLocation(body: String, geoUri: String, description: String?, zoomL
         )
 }
     
-open func sendPollResponse(pollStartId: String, answers: [String])async throws  {
+open func sendPollResponse(pollStartEventId: String, answers: [String])async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_send_poll_response(
                     self.uniffiClonePointer(),
-                    FfiConverterString.lower(pollStartId),FfiConverterSequenceString.lower(answers)
+                    FfiConverterString.lower(pollStartEventId),FfiConverterSequenceString.lower(answers)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -10369,117 +10334,6 @@ public func FfiConverterTypeTimelineItem_lift(_ pointer: UnsafeMutableRawPointer
 
 public func FfiConverterTypeTimelineItem_lower(_ value: TimelineItem) -> UnsafeMutableRawPointer {
     return FfiConverterTypeTimelineItem.lower(value)
-}
-
-
-
-
-public protocol TimelineItemContentProtocol : AnyObject {
-    
-    func asMessage()  -> Message?
-    
-    func kind()  -> TimelineItemContentKind
-    
-}
-
-open class TimelineItemContent:
-    TimelineItemContentProtocol {
-    fileprivate let pointer: UnsafeMutableRawPointer!
-
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
-    public struct NoPointer {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
-    }
-
-    /// This constructor can be used to instantiate a fake object.
-    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    ///
-    /// - Warning:
-    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
-    }
-
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_timelineitemcontent(self.pointer, $0) }
-    }
-    // No primary constructor declared for this class.
-
-    deinit {
-        guard let pointer = pointer else {
-            return
-        }
-
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_timelineitemcontent(pointer, $0) }
-    }
-
-    
-
-    
-open func asMessage() -> Message? {
-    return try!  FfiConverterOptionTypeMessage.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timelineitemcontent_as_message(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func kind() -> TimelineItemContentKind {
-    return try!  FfiConverterTypeTimelineItemContentKind.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timelineitemcontent_kind(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-
-}
-
-public struct FfiConverterTypeTimelineItemContent: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
-    typealias SwiftType = TimelineItemContent
-
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> TimelineItemContent {
-        return TimelineItemContent(unsafeFromRawPointer: pointer)
-    }
-
-    public static func lower(_ value: TimelineItemContent) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineItemContent {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
-    }
-
-    public static func write(_ value: TimelineItemContent, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
-    }
-}
-
-
-
-
-public func FfiConverterTypeTimelineItemContent_lift(_ pointer: UnsafeMutableRawPointer) throws -> TimelineItemContent {
-    return try FfiConverterTypeTimelineItemContent.lift(pointer)
-}
-
-public func FfiConverterTypeTimelineItemContent_lower(_ value: TimelineItemContent) -> UnsafeMutableRawPointer {
-    return FfiConverterTypeTimelineItemContent.lower(value)
 }
 
 
@@ -11539,6 +11393,101 @@ public func FfiConverterTypeEmoteMessageContent_lower(_ value: EmoteMessageConte
 }
 
 
+public struct EventTimelineItem {
+    public var isLocal: Bool
+    public var isRemote: Bool
+    public var eventOrTransactionId: EventOrTransactionId
+    public var sender: String
+    public var senderProfile: ProfileDetails
+    public var isOwn: Bool
+    public var isEditable: Bool
+    public var content: TimelineItemContent
+    public var timestamp: UInt64
+    public var reactions: [Reaction]
+    public var debugInfoProvider: EventTimelineItemDebugInfoProvider
+    public var localSendState: EventSendState?
+    public var readReceipts: [String: Receipt]
+    public var origin: EventItemOrigin?
+    public var canBeRepliedTo: Bool
+    public var shieldsProvider: EventShieldsProvider
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(isLocal: Bool, isRemote: Bool, eventOrTransactionId: EventOrTransactionId, sender: String, senderProfile: ProfileDetails, isOwn: Bool, isEditable: Bool, content: TimelineItemContent, timestamp: UInt64, reactions: [Reaction], debugInfoProvider: EventTimelineItemDebugInfoProvider, localSendState: EventSendState?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, shieldsProvider: EventShieldsProvider) {
+        self.isLocal = isLocal
+        self.isRemote = isRemote
+        self.eventOrTransactionId = eventOrTransactionId
+        self.sender = sender
+        self.senderProfile = senderProfile
+        self.isOwn = isOwn
+        self.isEditable = isEditable
+        self.content = content
+        self.timestamp = timestamp
+        self.reactions = reactions
+        self.debugInfoProvider = debugInfoProvider
+        self.localSendState = localSendState
+        self.readReceipts = readReceipts
+        self.origin = origin
+        self.canBeRepliedTo = canBeRepliedTo
+        self.shieldsProvider = shieldsProvider
+    }
+}
+
+
+
+public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EventTimelineItem {
+        return
+            try EventTimelineItem(
+                isLocal: FfiConverterBool.read(from: &buf), 
+                isRemote: FfiConverterBool.read(from: &buf), 
+                eventOrTransactionId: FfiConverterTypeEventOrTransactionId.read(from: &buf), 
+                sender: FfiConverterString.read(from: &buf), 
+                senderProfile: FfiConverterTypeProfileDetails.read(from: &buf), 
+                isOwn: FfiConverterBool.read(from: &buf), 
+                isEditable: FfiConverterBool.read(from: &buf), 
+                content: FfiConverterTypeTimelineItemContent.read(from: &buf), 
+                timestamp: FfiConverterUInt64.read(from: &buf), 
+                reactions: FfiConverterSequenceTypeReaction.read(from: &buf), 
+                debugInfoProvider: FfiConverterTypeEventTimelineItemDebugInfoProvider.read(from: &buf), 
+                localSendState: FfiConverterOptionTypeEventSendState.read(from: &buf), 
+                readReceipts: FfiConverterDictionaryStringTypeReceipt.read(from: &buf), 
+                origin: FfiConverterOptionTypeEventItemOrigin.read(from: &buf), 
+                canBeRepliedTo: FfiConverterBool.read(from: &buf), 
+                shieldsProvider: FfiConverterTypeEventShieldsProvider.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: EventTimelineItem, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.isLocal, into: &buf)
+        FfiConverterBool.write(value.isRemote, into: &buf)
+        FfiConverterTypeEventOrTransactionId.write(value.eventOrTransactionId, into: &buf)
+        FfiConverterString.write(value.sender, into: &buf)
+        FfiConverterTypeProfileDetails.write(value.senderProfile, into: &buf)
+        FfiConverterBool.write(value.isOwn, into: &buf)
+        FfiConverterBool.write(value.isEditable, into: &buf)
+        FfiConverterTypeTimelineItemContent.write(value.content, into: &buf)
+        FfiConverterUInt64.write(value.timestamp, into: &buf)
+        FfiConverterSequenceTypeReaction.write(value.reactions, into: &buf)
+        FfiConverterTypeEventTimelineItemDebugInfoProvider.write(value.debugInfoProvider, into: &buf)
+        FfiConverterOptionTypeEventSendState.write(value.localSendState, into: &buf)
+        FfiConverterDictionaryStringTypeReceipt.write(value.readReceipts, into: &buf)
+        FfiConverterOptionTypeEventItemOrigin.write(value.origin, into: &buf)
+        FfiConverterBool.write(value.canBeRepliedTo, into: &buf)
+        FfiConverterTypeEventShieldsProvider.write(value.shieldsProvider, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeEventTimelineItem_lift(_ buf: RustBuffer) throws -> EventTimelineItem {
+    return try FfiConverterTypeEventTimelineItem.lift(buf)
+}
+
+public func FfiConverterTypeEventTimelineItem_lower(_ value: EventTimelineItem) -> RustBuffer {
+    return FfiConverterTypeEventTimelineItem.lower(value)
+}
+
+
 public struct EventTimelineItemDebugInfo {
     public var model: String
     public var originalJson: String?
@@ -11934,45 +11883,6 @@ public func FfiConverterTypeImageMessageContent_lower(_ value: ImageMessageConte
 }
 
 
-public struct InReplyToDetails {
-    public var eventId: String
-    public var event: RepliedToEventDetails
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(eventId: String, event: RepliedToEventDetails) {
-        self.eventId = eventId
-        self.event = event
-    }
-}
-
-
-
-public struct FfiConverterTypeInReplyToDetails: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> InReplyToDetails {
-        return
-            try InReplyToDetails(
-                eventId: FfiConverterString.read(from: &buf), 
-                event: FfiConverterTypeRepliedToEventDetails.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: InReplyToDetails, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.eventId, into: &buf)
-        FfiConverterTypeRepliedToEventDetails.write(value.event, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeInReplyToDetails_lift(_ buf: RustBuffer) throws -> InReplyToDetails {
-    return try FfiConverterTypeInReplyToDetails.lift(buf)
-}
-
-public func FfiConverterTypeInReplyToDetails_lower(_ value: InReplyToDetails) -> RustBuffer {
-    return FfiConverterTypeInReplyToDetails.lower(value)
-}
-
-
 public struct InsertData {
     public var index: UInt32
     public var item: TimelineItem
@@ -12208,6 +12118,61 @@ public func FfiConverterTypeMentions_lift(_ buf: RustBuffer) throws -> Mentions 
 
 public func FfiConverterTypeMentions_lower(_ value: Mentions) -> RustBuffer {
     return FfiConverterTypeMentions.lower(value)
+}
+
+
+public struct MessageContent {
+    public var msgType: MessageType
+    public var body: String
+    public var inReplyTo: InReplyToDetails?
+    public var threadRoot: String?
+    public var isEdited: Bool
+    public var mentions: Mentions?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(msgType: MessageType, body: String, inReplyTo: InReplyToDetails?, threadRoot: String?, isEdited: Bool, mentions: Mentions?) {
+        self.msgType = msgType
+        self.body = body
+        self.inReplyTo = inReplyTo
+        self.threadRoot = threadRoot
+        self.isEdited = isEdited
+        self.mentions = mentions
+    }
+}
+
+
+
+public struct FfiConverterTypeMessageContent: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MessageContent {
+        return
+            try MessageContent(
+                msgType: FfiConverterTypeMessageType.read(from: &buf), 
+                body: FfiConverterString.read(from: &buf), 
+                inReplyTo: FfiConverterOptionTypeInReplyToDetails.read(from: &buf), 
+                threadRoot: FfiConverterOptionString.read(from: &buf), 
+                isEdited: FfiConverterBool.read(from: &buf), 
+                mentions: FfiConverterOptionTypeMentions.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MessageContent, into buf: inout [UInt8]) {
+        FfiConverterTypeMessageType.write(value.msgType, into: &buf)
+        FfiConverterString.write(value.body, into: &buf)
+        FfiConverterOptionTypeInReplyToDetails.write(value.inReplyTo, into: &buf)
+        FfiConverterOptionString.write(value.threadRoot, into: &buf)
+        FfiConverterBool.write(value.isEdited, into: &buf)
+        FfiConverterOptionTypeMentions.write(value.mentions, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeMessageContent_lift(_ buf: RustBuffer) throws -> MessageContent {
+    return try FfiConverterTypeMessageContent.lift(buf)
+}
+
+public func FfiConverterTypeMessageContent_lower(_ value: MessageContent) -> RustBuffer {
+    return FfiConverterTypeMessageContent.lower(value)
 }
 
 
@@ -17296,6 +17261,71 @@ public func FfiConverterTypeEncryptionSystem_lower(_ value: EncryptionSystem) ->
 
 
 extension EncryptionSystem: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Contains the 2 possible identifiers of an event, either it has a remote
+ * event id or a local transaction id, never both or none.
+ */
+
+public enum EventOrTransactionId {
+    
+    case eventId(eventId: String
+    )
+    case transactionId(transactionId: String
+    )
+}
+
+
+public struct FfiConverterTypeEventOrTransactionId: FfiConverterRustBuffer {
+    typealias SwiftType = EventOrTransactionId
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EventOrTransactionId {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .eventId(eventId: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .transactionId(transactionId: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: EventOrTransactionId, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .eventId(eventId):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(eventId, into: &buf)
+            
+        
+        case let .transactionId(transactionId):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(transactionId, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeEventOrTransactionId_lift(_ buf: RustBuffer) throws -> EventOrTransactionId {
+    return try FfiConverterTypeEventOrTransactionId.lift(buf)
+}
+
+public func FfiConverterTypeEventOrTransactionId_lower(_ value: EventOrTransactionId) -> RustBuffer {
+    return FfiConverterTypeEventOrTransactionId.lower(value)
+}
+
+
+
+extension EventOrTransactionId: Equatable, Hashable {}
 
 
 
@@ -22483,9 +22513,10 @@ public func FfiConverterTypeTimelineEventType_lower(_ value: TimelineEventType) 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
-public enum TimelineItemContentKind {
+public enum TimelineItemContent {
     
-    case message
+    case message(content: MessageContent
+    )
     case redactedMessage
     case sticker(body: String, info: ImageInfo, source: MediaSource
     )
@@ -22508,14 +22539,15 @@ public enum TimelineItemContentKind {
 }
 
 
-public struct FfiConverterTypeTimelineItemContentKind: FfiConverterRustBuffer {
-    typealias SwiftType = TimelineItemContentKind
+public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
+    typealias SwiftType = TimelineItemContent
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineItemContentKind {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineItemContent {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .message
+        case 1: return .message(content: try FfiConverterTypeMessageContent.read(from: &buf)
+        )
         
         case 2: return .redactedMessage
         
@@ -22551,13 +22583,14 @@ public struct FfiConverterTypeTimelineItemContentKind: FfiConverterRustBuffer {
         }
     }
 
-    public static func write(_ value: TimelineItemContentKind, into buf: inout [UInt8]) {
+    public static func write(_ value: TimelineItemContent, into buf: inout [UInt8]) {
         switch value {
         
         
-        case .message:
+        case let .message(content):
             writeInt(&buf, Int32(1))
-        
+            FfiConverterTypeMessageContent.write(content, into: &buf)
+            
         
         case .redactedMessage:
             writeInt(&buf, Int32(2))
@@ -22632,12 +22665,12 @@ public struct FfiConverterTypeTimelineItemContentKind: FfiConverterRustBuffer {
 }
 
 
-public func FfiConverterTypeTimelineItemContentKind_lift(_ buf: RustBuffer) throws -> TimelineItemContentKind {
-    return try FfiConverterTypeTimelineItemContentKind.lift(buf)
+public func FfiConverterTypeTimelineItemContent_lift(_ buf: RustBuffer) throws -> TimelineItemContent {
+    return try FfiConverterTypeTimelineItemContent.lift(buf)
 }
 
-public func FfiConverterTypeTimelineItemContentKind_lower(_ value: TimelineItemContentKind) -> RustBuffer {
-    return FfiConverterTypeTimelineItemContentKind.lower(value)
+public func FfiConverterTypeTimelineItemContent_lower(_ value: TimelineItemContent) -> RustBuffer {
+    return FfiConverterTypeTimelineItemContent.lower(value)
 }
 
 
@@ -25253,27 +25286,6 @@ fileprivate struct FfiConverterOptionDuration: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionTypeEventTimelineItem: FfiConverterRustBuffer {
-    typealias SwiftType = EventTimelineItem?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeEventTimelineItem.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeEventTimelineItem.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeIdentityResetHandle: FfiConverterRustBuffer {
     typealias SwiftType = IdentityResetHandle?
 
@@ -25290,6 +25302,27 @@ fileprivate struct FfiConverterOptionTypeIdentityResetHandle: FfiConverterRustBu
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeIdentityResetHandle.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+fileprivate struct FfiConverterOptionTypeInReplyToDetails: FfiConverterRustBuffer {
+    typealias SwiftType = InReplyToDetails?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeInReplyToDetails.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeInReplyToDetails.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -25316,27 +25349,6 @@ fileprivate struct FfiConverterOptionTypeMediaSource: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionTypeMessage: FfiConverterRustBuffer {
-    typealias SwiftType = Message?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeMessage.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeMessage.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeRoom: FfiConverterRustBuffer {
     typealias SwiftType = Room?
 
@@ -25353,6 +25365,27 @@ fileprivate struct FfiConverterOptionTypeRoom: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeRoom.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+fileprivate struct FfiConverterOptionTypeRoomMessageEventContentWithoutRelation: FfiConverterRustBuffer {
+    typealias SwiftType = RoomMessageEventContentWithoutRelation?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRoomMessageEventContentWithoutRelation.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRoomMessageEventContentWithoutRelation.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -25484,6 +25517,27 @@ fileprivate struct FfiConverterOptionTypeElementCallWellKnown: FfiConverterRustB
     }
 }
 
+fileprivate struct FfiConverterOptionTypeEventTimelineItem: FfiConverterRustBuffer {
+    typealias SwiftType = EventTimelineItem?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeEventTimelineItem.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeEventTimelineItem.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeFileInfo: FfiConverterRustBuffer {
     typealias SwiftType = FileInfo?
 
@@ -25547,27 +25601,6 @@ fileprivate struct FfiConverterOptionTypeImageInfo: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionTypeInReplyToDetails: FfiConverterRustBuffer {
-    typealias SwiftType = InReplyToDetails?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeInReplyToDetails.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeInReplyToDetails.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeInsertData: FfiConverterRustBuffer {
     typealias SwiftType = InsertData?
 
@@ -25605,6 +25638,27 @@ fileprivate struct FfiConverterOptionTypeMatrixEntity: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeMatrixEntity.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+fileprivate struct FfiConverterOptionTypeMentions: FfiConverterRustBuffer {
+    typealias SwiftType = Mentions?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeMentions.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeMentions.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -26968,6 +27022,17 @@ fileprivate func uniffiFutureContinuationCallback(handle: UInt64, pollResult: In
         print("uniffiFutureContinuationCallback invalid handle")
     }
 }
+/**
+ * Creates a [`RoomMessageEventContentWithoutRelation`] given a
+ * [`MessageContent`] value.
+ */
+public func contentWithoutRelationFromMessage(message: MessageContent)throws  -> RoomMessageEventContentWithoutRelation {
+    return try  FfiConverterTypeRoomMessageEventContentWithoutRelation.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_func_content_without_relation_from_message(
+        FfiConverterTypeMessageContent.lower(message),$0
+    )
+})
+}
 public func genTransactionId() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_func_gen_transaction_id($0
@@ -27200,6 +27265,9 @@ private var initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_func_content_without_relation_from_message() != 1366) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_func_gen_transaction_id() != 15808) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -27294,6 +27362,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_create_room() != 52700) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_custom_login_with_jwt() != 19710) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_deactivate_account() != 20658) {
@@ -27542,7 +27613,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_backups() != 55446) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_recovery() != 9043) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_recovery() != 64351) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_is_last_device() != 27955) {
@@ -27578,55 +27649,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_wait_for_e2ee_initialization_tasks() != 41585) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_can_be_replied_to() != 42922) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_eventshieldsprovider_get_shields() != 28772) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_content() != 41060) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_debug_info() != 31359) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_event_id() != 8156) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_get_shield() != 42061) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_is_editable() != 4716) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_is_local() != 12539) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_is_own() != 50903) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_is_remote() != 5953) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_local_send_state() != 53866) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_origin() != 19585) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_reactions() != 42968) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_read_receipts() != 22462) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_sender() != 58860) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_sender_profile() != 3911) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_timestamp() != 44397) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitem_transaction_id() != 40338) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitemdebuginfoprovider_get() != 57546) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_sliding_sync_version() != 36573) {
@@ -27650,28 +27676,16 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_identityresethandle_reset() != 11997) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_inreplytodetails_event() != 51792) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_inreplytodetails_event_id() != 5876) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediafilehandle_path() != 16357) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediafilehandle_persist() != 12883) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_message_body() != 21198) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_message_content() != 57046) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_message_in_reply_to() != 16154) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_message_is_edited() != 60975) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_message_is_threaded() != 9404) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_message_msgtype() != 14062) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_notification() != 2524) {
@@ -28043,7 +28057,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_timeline_initialized() != 46855) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_latest_event() != 41471) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_latest_event() != 38259) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_membership() != 1596) {
@@ -28154,13 +28168,16 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_add_listener() != 18746) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_create_message_content() != 21811) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_create_poll() != 37925) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 14692) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 27268) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_end_poll() != 31506) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_end_poll() != 61329) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_fetch_details_for_event() != 54068) {
@@ -28172,13 +28189,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_focused_paginate_forwards() != 51003) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_event_id() != 28091) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_event_id() != 33999) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_transaction_id() != 64706) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_transaction_id() != 54739) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_load_reply_details() != 52892) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_load_reply_details() != 54225) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_mark_as_read() != 16621) {
@@ -28190,7 +28207,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_pin_event() != 41687) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_redact_event() != 8574) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_redact_event() != 48707) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_retry_decryption() != 21112) {
@@ -28211,7 +28228,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_location() != 47400) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_poll_response() != 59076) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_poll_response() != 7453) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_read_receipt() != 37532) {
@@ -28274,7 +28291,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timelineevent_timestamp() != 58123) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelineitem_as_event() != 52211) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timelineitem_as_event() != 6106) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timelineitem_as_virtual() != 50960) {
@@ -28284,12 +28301,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timelineitem_unique_id() != 30409) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelineitemcontent_as_message() != 45784) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelineitemcontent_kind() != 44789) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_unreadnotificationscount_has_notifications() != 33024) {
