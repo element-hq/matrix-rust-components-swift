@@ -6691,8 +6691,6 @@ public func FfiConverterTypeRoomDirectorySearch_lower(_ value: RoomDirectorySear
 
 public protocol RoomListProtocol : AnyObject {
     
-    func entries(listener: RoomListEntriesListener)  -> TaskHandle
-    
     func entriesWithDynamicAdapters(pageSize: UInt32, listener: RoomListEntriesListener)  -> RoomListEntriesWithDynamicAdaptersResult
     
     func loadingState(listener: RoomListLoadingStateListener) throws  -> RoomListLoadingStateResult
@@ -6741,14 +6739,6 @@ open class RoomList:
 
     
 
-    
-open func entries(listener: RoomListEntriesListener) -> TaskHandle {
-    return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_roomlist_entries(self.uniffiClonePointer(),
-        FfiConverterCallbackInterfaceRoomListEntriesListener.lower(listener),$0
-    )
-})
-}
     
 open func entriesWithDynamicAdapters(pageSize: UInt32, listener: RoomListEntriesListener) -> RoomListEntriesWithDynamicAdaptersResult {
     return try!  FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult.lift(try! rustCall() {
@@ -28608,9 +28598,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_search() != 26558) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_entries() != 25290) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_entries_with_dynamic_adapters() != 36097) {
