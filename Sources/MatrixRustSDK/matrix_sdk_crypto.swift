@@ -441,6 +441,68 @@ fileprivate struct FfiConverterString: FfiConverter {
     }
 }
 
+
+/**
+ * Settings for decrypting messages
+ */
+public struct DecryptionSettings {
+    /**
+     * The trust level in the sender's device that is required to decrypt the
+     * event. If the sender's device is not sufficiently trusted,
+     * [`MegolmError::SenderIdentityNotTrusted`] will be returned.
+     */
+    public var senderDeviceTrustRequirement: TrustRequirement
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The trust level in the sender's device that is required to decrypt the
+         * event. If the sender's device is not sufficiently trusted,
+         * [`MegolmError::SenderIdentityNotTrusted`] will be returned.
+         */senderDeviceTrustRequirement: TrustRequirement) {
+        self.senderDeviceTrustRequirement = senderDeviceTrustRequirement
+    }
+}
+
+
+
+extension DecryptionSettings: Equatable, Hashable {
+    public static func ==(lhs: DecryptionSettings, rhs: DecryptionSettings) -> Bool {
+        if lhs.senderDeviceTrustRequirement != rhs.senderDeviceTrustRequirement {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(senderDeviceTrustRequirement)
+    }
+}
+
+
+public struct FfiConverterTypeDecryptionSettings: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DecryptionSettings {
+        return
+            try DecryptionSettings(
+                senderDeviceTrustRequirement: FfiConverterTypeTrustRequirement.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DecryptionSettings, into buf: inout [UInt8]) {
+        FfiConverterTypeTrustRequirement.write(value.senderDeviceTrustRequirement, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeDecryptionSettings_lift(_ buf: RustBuffer) throws -> DecryptionSettings {
+    return try FfiConverterTypeDecryptionSettings.lift(buf)
+}
+
+public func FfiConverterTypeDecryptionSettings_lower(_ value: DecryptionSettings) -> RustBuffer {
+    return FfiConverterTypeDecryptionSettings.lower(value)
+}
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
@@ -532,6 +594,99 @@ public func FfiConverterTypeCollectStrategy_lower(_ value: CollectStrategy) -> R
 
 
 extension CollectStrategy: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The state of an identity - verified, pinned etc.
+ */
+
+public enum IdentityState {
+    
+    /**
+     * The user is verified with us
+     */
+    case verified
+    /**
+     * Either this is the first identity we have seen for this user, or the
+     * user has acknowledged a change of identity explicitly e.g. by
+     * clicking OK on a notification.
+     */
+    case pinned
+    /**
+     * The user's identity has changed since it was pinned. The user should be
+     * notified about this and given the opportunity to acknowledge the
+     * change, which will make the new identity pinned.
+     * When the user acknowledges the change, the app should call
+     * [`crate::OtherUserIdentity::pin_current_master_key`].
+     */
+    case pinViolation
+    /**
+     * The user's identity has changed, and before that it was verified. This
+     * is a serious problem. The user can either verify again to make this
+     * identity verified, or withdraw verification
+     * [`UserIdentity::withdraw_verification`] to make it pinned.
+     */
+    case verificationViolation
+}
+
+
+public struct FfiConverterTypeIdentityState: FfiConverterRustBuffer {
+    typealias SwiftType = IdentityState
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> IdentityState {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .verified
+        
+        case 2: return .pinned
+        
+        case 3: return .pinViolation
+        
+        case 4: return .verificationViolation
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: IdentityState, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .verified:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .pinned:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .pinViolation:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .verificationViolation:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeIdentityState_lift(_ buf: RustBuffer) throws -> IdentityState {
+    return try FfiConverterTypeIdentityState.lift(buf)
+}
+
+public func FfiConverterTypeIdentityState_lower(_ value: IdentityState) -> RustBuffer {
+    return FfiConverterTypeIdentityState.lower(value)
+}
+
+
+
+extension IdentityState: Equatable, Hashable {}
 
 
 
@@ -828,6 +983,82 @@ public func FfiConverterTypeSignatureState_lower(_ value: SignatureState) -> Rus
 
 
 extension SignatureState: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The trust level in the sender's device that is required to decrypt an
+ * event.
+ */
+
+public enum TrustRequirement {
+    
+    /**
+     * Decrypt events from everyone regardless of trust.
+     */
+    case untrusted
+    /**
+     * Only decrypt events from cross-signed devices or legacy sessions (Megolm
+     * sessions created before we started collecting trust information).
+     */
+    case crossSignedOrLegacy
+    /**
+     * Only decrypt events from cross-signed devices.
+     */
+    case crossSigned
+}
+
+
+public struct FfiConverterTypeTrustRequirement: FfiConverterRustBuffer {
+    typealias SwiftType = TrustRequirement
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TrustRequirement {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .untrusted
+        
+        case 2: return .crossSignedOrLegacy
+        
+        case 3: return .crossSigned
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: TrustRequirement, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .untrusted:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .crossSignedOrLegacy:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .crossSigned:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeTrustRequirement_lift(_ buf: RustBuffer) throws -> TrustRequirement {
+    return try FfiConverterTypeTrustRequirement.lift(buf)
+}
+
+public func FfiConverterTypeTrustRequirement_lower(_ value: TrustRequirement) -> RustBuffer {
+    return FfiConverterTypeTrustRequirement.lower(value)
+}
+
+
+
+extension TrustRequirement: Equatable, Hashable {}
 
 
 

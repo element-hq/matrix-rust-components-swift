@@ -2099,6 +2099,11 @@ public protocol ClientBuilderProtocol : AnyObject {
     func requestConfig(config: RequestConfig)  -> ClientBuilder
     
     /**
+     * Set the trust requirement to be used when decrypting events.
+     */
+    func roomDecryptionTrustRequirement(trustRequirement: TrustRequirement)  -> ClientBuilder
+    
+    /**
      * Set the strategy to be used for picking recipient devices when sending
      * an encrypted message.
      */
@@ -2336,6 +2341,17 @@ open func requestConfig(config: RequestConfig) -> ClientBuilder {
 }
     
     /**
+     * Set the trust requirement to be used when decrypting events.
+     */
+open func roomDecryptionTrustRequirement(trustRequirement: TrustRequirement) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_room_decryption_trust_requirement(self.uniffiClonePointer(),
+        FfiConverterTypeTrustRequirement_lower(trustRequirement),$0
+    )
+})
+}
+    
+    /**
      * Set the strategy to be used for picking recipient devices when sending
      * an encrypted message.
      */
@@ -2496,6 +2512,16 @@ public protocol EncryptionProtocol : AnyObject {
     func enableBackups() async throws 
     
     func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, progressListener: EnableRecoveryProgressListener) async throws  -> String
+    
+    /**
+     * Get the E2EE identity of a user.
+     *
+     * Returns Ok(None) if this user does not exist.
+     *
+     * Returns an error if there was a problem contacting the crypto store, or
+     * if our client is not logged in.
+     */
+    func getUserIdentity(userId: String) async throws  -> UserIdentity?
     
     func isLastDevice() async throws  -> Bool
     
@@ -2705,6 +2731,31 @@ open func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, prog
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeRecoveryError.lift
+        )
+}
+    
+    /**
+     * Get the E2EE identity of a user.
+     *
+     * Returns Ok(None) if this user does not exist.
+     *
+     * Returns an error if there was a problem contacting the crypto store, or
+     * if our client is not logged in.
+     */
+open func getUserIdentity(userId: String)async throws  -> UserIdentity? {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_get_user_identity(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(userId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeUserIdentity.lift,
+            errorHandler: FfiConverterTypeClientError.lift
         )
 }
     
@@ -4986,6 +5037,8 @@ public protocol RoomProtocol : AnyObject {
      */
     func setUnreadFlag(newValue: Bool) async throws 
     
+    func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener)  -> TaskHandle
+    
     func subscribeToRoomInfoUpdates(listener: RoomInfoListener)  -> TaskHandle
     
     func subscribeToTypingNotifications(listener: TypingNotificationsListener)  -> TaskHandle
@@ -6166,6 +6219,14 @@ open func setUnreadFlag(newValue: Bool)async throws  {
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
+}
+    
+open func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener) -> TaskHandle {
+    return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_identity_status_changes(self.uniffiClonePointer(),
+        FfiConverterCallbackInterfaceIdentityStatusChangeListener.lower(listener),$0
+    )
+})
 }
     
 open func subscribeToRoomInfoUpdates(listener: RoomInfoListener) -> TaskHandle {
@@ -10460,6 +10521,181 @@ public func FfiConverterTypeUnreadNotificationsCount_lower(_ value: UnreadNotifi
 
 
 /**
+ * The E2EE identity of a user.
+ */
+public protocol UserIdentityProtocol : AnyObject {
+    
+    /**
+     * Get the public part of the Master key of this user identity.
+     *
+     * The public part of the Master key is usually used to uniquely identify
+     * the identity.
+     *
+     * Returns None if the master key does not actually contain any keys.
+     */
+    func masterKey()  -> String?
+    
+    /**
+     * Remember this identity, ensuring it does not result in a pin violation.
+     *
+     * When we first see a user, we assume their cryptographic identity has not
+     * been tampered with by the homeserver or another entity with
+     * man-in-the-middle capabilities. We remember this identity and call this
+     * action "pinning".
+     *
+     * If the identity presented for the user changes later on, the newly
+     * presented identity is considered to be in "pin violation". This
+     * method explicitly accepts the new identity, allowing it to replace
+     * the previously pinned one and bringing it out of pin violation.
+     *
+     * UIs should display a warning to the user when encountering an identity
+     * which is not verified and is in pin violation.
+     */
+    func pin() async throws 
+    
+}
+
+/**
+ * The E2EE identity of a user.
+ */
+open class UserIdentity:
+    UserIdentityProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_useridentity(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_useridentity(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Get the public part of the Master key of this user identity.
+     *
+     * The public part of the Master key is usually used to uniquely identify
+     * the identity.
+     *
+     * Returns None if the master key does not actually contain any keys.
+     */
+open func masterKey() -> String? {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_useridentity_master_key(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Remember this identity, ensuring it does not result in a pin violation.
+     *
+     * When we first see a user, we assume their cryptographic identity has not
+     * been tampered with by the homeserver or another entity with
+     * man-in-the-middle capabilities. We remember this identity and call this
+     * action "pinning".
+     *
+     * If the identity presented for the user changes later on, the newly
+     * presented identity is considered to be in "pin violation". This
+     * method explicitly accepts the new identity, allowing it to replace
+     * the previously pinned one and bringing it out of pin violation.
+     *
+     * UIs should display a warning to the user when encountering an identity
+     * which is not verified and is in pin violation.
+     */
+open func pin()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_useridentity_pin(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+
+}
+
+public struct FfiConverterTypeUserIdentity: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = UserIdentity
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> UserIdentity {
+        return UserIdentity(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: UserIdentity) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UserIdentity {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: UserIdentity, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeUserIdentity_lift(_ pointer: UnsafeMutableRawPointer) throws -> UserIdentity {
+    return try FfiConverterTypeUserIdentity.lift(pointer)
+}
+
+public func FfiConverterTypeUserIdentity_lower(_ value: UserIdentity) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeUserIdentity.lower(value)
+}
+
+
+
+
+/**
  * An object that handles all interactions of a widget living inside a webview
  * or IFrame with the Matrix world.
  */
@@ -10807,9 +11043,27 @@ public func FfiConverterTypeAudioInfo_lower(_ value: AudioInfo) -> RustBuffer {
 
 
 public struct AudioMessageContent {
+    /**
+     * The original body field, deserialized from the event. Prefer the use of
+     * `filename` and `caption` over this.
+     */
     public var body: String
+    /**
+     * The original formatted body field, deserialized from the event. Prefer
+     * the use of `filename` and `formatted_caption` over this.
+     */
     public var formatted: FormattedBody?
-    public var filename: String?
+    /**
+     * The original filename field, deserialized from the event. Prefer the use
+     * of `filename` over this.
+     */
+    public var rawFilename: String?
+    /**
+     * The computed filename, for use in a client.
+     */
+    public var filename: String
+    public var caption: String?
+    public var formattedCaption: FormattedBody?
     public var source: MediaSource
     public var info: AudioInfo?
     public var audio: UnstableAudioDetailsContent?
@@ -10817,10 +11071,28 @@ public struct AudioMessageContent {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(body: String, formatted: FormattedBody?, filename: String?, source: MediaSource, info: AudioInfo?, audio: UnstableAudioDetailsContent?, voice: UnstableVoiceContent?) {
+    public init(
+        /**
+         * The original body field, deserialized from the event. Prefer the use of
+         * `filename` and `caption` over this.
+         */body: String, 
+        /**
+         * The original formatted body field, deserialized from the event. Prefer
+         * the use of `filename` and `formatted_caption` over this.
+         */formatted: FormattedBody?, 
+        /**
+         * The original filename field, deserialized from the event. Prefer the use
+         * of `filename` over this.
+         */rawFilename: String?, 
+        /**
+         * The computed filename, for use in a client.
+         */filename: String, caption: String?, formattedCaption: FormattedBody?, source: MediaSource, info: AudioInfo?, audio: UnstableAudioDetailsContent?, voice: UnstableVoiceContent?) {
         self.body = body
         self.formatted = formatted
+        self.rawFilename = rawFilename
         self.filename = filename
+        self.caption = caption
+        self.formattedCaption = formattedCaption
         self.source = source
         self.info = info
         self.audio = audio
@@ -10836,7 +11108,10 @@ public struct FfiConverterTypeAudioMessageContent: FfiConverterRustBuffer {
             try AudioMessageContent(
                 body: FfiConverterString.read(from: &buf), 
                 formatted: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
-                filename: FfiConverterOptionString.read(from: &buf), 
+                rawFilename: FfiConverterOptionString.read(from: &buf), 
+                filename: FfiConverterString.read(from: &buf), 
+                caption: FfiConverterOptionString.read(from: &buf), 
+                formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
                 source: FfiConverterTypeMediaSource.read(from: &buf), 
                 info: FfiConverterOptionTypeAudioInfo.read(from: &buf), 
                 audio: FfiConverterOptionTypeUnstableAudioDetailsContent.read(from: &buf), 
@@ -10847,7 +11122,10 @@ public struct FfiConverterTypeAudioMessageContent: FfiConverterRustBuffer {
     public static func write(_ value: AudioMessageContent, into buf: inout [UInt8]) {
         FfiConverterString.write(value.body, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formatted, into: &buf)
-        FfiConverterOptionString.write(value.filename, into: &buf)
+        FfiConverterOptionString.write(value.rawFilename, into: &buf)
+        FfiConverterString.write(value.filename, into: &buf)
+        FfiConverterOptionString.write(value.caption, into: &buf)
+        FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
         FfiConverterTypeMediaSource.write(value.source, into: &buf)
         FfiConverterOptionTypeAudioInfo.write(value.info, into: &buf)
         FfiConverterOptionTypeUnstableAudioDetailsContent.write(value.audio, into: &buf)
@@ -11601,18 +11879,54 @@ public func FfiConverterTypeFileInfo_lower(_ value: FileInfo) -> RustBuffer {
 
 
 public struct FileMessageContent {
+    /**
+     * The original body field, deserialized from the event. Prefer the use of
+     * `filename` and `caption` over this.
+     */
     public var body: String
+    /**
+     * The original formatted body field, deserialized from the event. Prefer
+     * the use of `filename` and `formatted_caption` over this.
+     */
     public var formatted: FormattedBody?
-    public var filename: String?
+    /**
+     * The original filename field, deserialized from the event. Prefer the use
+     * of `filename` over this.
+     */
+    public var rawFilename: String?
+    /**
+     * The computed filename, for use in a client.
+     */
+    public var filename: String
+    public var caption: String?
+    public var formattedCaption: FormattedBody?
     public var source: MediaSource
     public var info: FileInfo?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(body: String, formatted: FormattedBody?, filename: String?, source: MediaSource, info: FileInfo?) {
+    public init(
+        /**
+         * The original body field, deserialized from the event. Prefer the use of
+         * `filename` and `caption` over this.
+         */body: String, 
+        /**
+         * The original formatted body field, deserialized from the event. Prefer
+         * the use of `filename` and `formatted_caption` over this.
+         */formatted: FormattedBody?, 
+        /**
+         * The original filename field, deserialized from the event. Prefer the use
+         * of `filename` over this.
+         */rawFilename: String?, 
+        /**
+         * The computed filename, for use in a client.
+         */filename: String, caption: String?, formattedCaption: FormattedBody?, source: MediaSource, info: FileInfo?) {
         self.body = body
         self.formatted = formatted
+        self.rawFilename = rawFilename
         self.filename = filename
+        self.caption = caption
+        self.formattedCaption = formattedCaption
         self.source = source
         self.info = info
     }
@@ -11626,7 +11940,10 @@ public struct FfiConverterTypeFileMessageContent: FfiConverterRustBuffer {
             try FileMessageContent(
                 body: FfiConverterString.read(from: &buf), 
                 formatted: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
-                filename: FfiConverterOptionString.read(from: &buf), 
+                rawFilename: FfiConverterOptionString.read(from: &buf), 
+                filename: FfiConverterString.read(from: &buf), 
+                caption: FfiConverterOptionString.read(from: &buf), 
+                formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
                 source: FfiConverterTypeMediaSource.read(from: &buf), 
                 info: FfiConverterOptionTypeFileInfo.read(from: &buf)
         )
@@ -11635,7 +11952,10 @@ public struct FfiConverterTypeFileMessageContent: FfiConverterRustBuffer {
     public static func write(_ value: FileMessageContent, into buf: inout [UInt8]) {
         FfiConverterString.write(value.body, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formatted, into: &buf)
-        FfiConverterOptionString.write(value.filename, into: &buf)
+        FfiConverterOptionString.write(value.rawFilename, into: &buf)
+        FfiConverterString.write(value.filename, into: &buf)
+        FfiConverterOptionString.write(value.caption, into: &buf)
+        FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
         FfiConverterTypeMediaSource.write(value.source, into: &buf)
         FfiConverterOptionTypeFileInfo.write(value.info, into: &buf)
     }
@@ -11773,6 +12093,75 @@ public func FfiConverterTypeHttpPusherData_lower(_ value: HttpPusherData) -> Rus
 }
 
 
+public struct IdentityStatusChange {
+    /**
+     * The user ID of the user whose identity status changed
+     */
+    public var userId: String
+    /**
+     * The new state of the identity of the user.
+     */
+    public var changedTo: IdentityState
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The user ID of the user whose identity status changed
+         */userId: String, 
+        /**
+         * The new state of the identity of the user.
+         */changedTo: IdentityState) {
+        self.userId = userId
+        self.changedTo = changedTo
+    }
+}
+
+
+
+extension IdentityStatusChange: Equatable, Hashable {
+    public static func ==(lhs: IdentityStatusChange, rhs: IdentityStatusChange) -> Bool {
+        if lhs.userId != rhs.userId {
+            return false
+        }
+        if lhs.changedTo != rhs.changedTo {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(userId)
+        hasher.combine(changedTo)
+    }
+}
+
+
+public struct FfiConverterTypeIdentityStatusChange: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> IdentityStatusChange {
+        return
+            try IdentityStatusChange(
+                userId: FfiConverterString.read(from: &buf), 
+                changedTo: FfiConverterTypeIdentityState.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: IdentityStatusChange, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.userId, into: &buf)
+        FfiConverterTypeIdentityState.write(value.changedTo, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeIdentityStatusChange_lift(_ buf: RustBuffer) throws -> IdentityStatusChange {
+    return try FfiConverterTypeIdentityStatusChange.lift(buf)
+}
+
+public func FfiConverterTypeIdentityStatusChange_lower(_ value: IdentityStatusChange) -> RustBuffer {
+    return FfiConverterTypeIdentityStatusChange.lower(value)
+}
+
+
 public struct ImageInfo {
     public var height: UInt64?
     public var width: UInt64?
@@ -11833,18 +12222,54 @@ public func FfiConverterTypeImageInfo_lower(_ value: ImageInfo) -> RustBuffer {
 
 
 public struct ImageMessageContent {
+    /**
+     * The original body field, deserialized from the event. Prefer the use of
+     * `filename` and `caption` over this.
+     */
     public var body: String
+    /**
+     * The original formatted body field, deserialized from the event. Prefer
+     * the use of `filename` and `formatted_caption` over this.
+     */
     public var formatted: FormattedBody?
-    public var filename: String?
+    /**
+     * The original filename field, deserialized from the event. Prefer the use
+     * of `filename` over this.
+     */
+    public var rawFilename: String?
+    /**
+     * The computed filename, for use in a client.
+     */
+    public var filename: String
+    public var caption: String?
+    public var formattedCaption: FormattedBody?
     public var source: MediaSource
     public var info: ImageInfo?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(body: String, formatted: FormattedBody?, filename: String?, source: MediaSource, info: ImageInfo?) {
+    public init(
+        /**
+         * The original body field, deserialized from the event. Prefer the use of
+         * `filename` and `caption` over this.
+         */body: String, 
+        /**
+         * The original formatted body field, deserialized from the event. Prefer
+         * the use of `filename` and `formatted_caption` over this.
+         */formatted: FormattedBody?, 
+        /**
+         * The original filename field, deserialized from the event. Prefer the use
+         * of `filename` over this.
+         */rawFilename: String?, 
+        /**
+         * The computed filename, for use in a client.
+         */filename: String, caption: String?, formattedCaption: FormattedBody?, source: MediaSource, info: ImageInfo?) {
         self.body = body
         self.formatted = formatted
+        self.rawFilename = rawFilename
         self.filename = filename
+        self.caption = caption
+        self.formattedCaption = formattedCaption
         self.source = source
         self.info = info
     }
@@ -11858,7 +12283,10 @@ public struct FfiConverterTypeImageMessageContent: FfiConverterRustBuffer {
             try ImageMessageContent(
                 body: FfiConverterString.read(from: &buf), 
                 formatted: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
-                filename: FfiConverterOptionString.read(from: &buf), 
+                rawFilename: FfiConverterOptionString.read(from: &buf), 
+                filename: FfiConverterString.read(from: &buf), 
+                caption: FfiConverterOptionString.read(from: &buf), 
+                formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
                 source: FfiConverterTypeMediaSource.read(from: &buf), 
                 info: FfiConverterOptionTypeImageInfo.read(from: &buf)
         )
@@ -11867,7 +12295,10 @@ public struct FfiConverterTypeImageMessageContent: FfiConverterRustBuffer {
     public static func write(_ value: ImageMessageContent, into buf: inout [UInt8]) {
         FfiConverterString.write(value.body, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formatted, into: &buf)
-        FfiConverterOptionString.write(value.filename, into: &buf)
+        FfiConverterOptionString.write(value.rawFilename, into: &buf)
+        FfiConverterString.write(value.filename, into: &buf)
+        FfiConverterOptionString.write(value.caption, into: &buf)
+        FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
         FfiConverterTypeMediaSource.write(value.source, into: &buf)
         FfiConverterOptionTypeImageInfo.write(value.info, into: &buf)
     }
@@ -14620,12 +15051,12 @@ public func FfiConverterTypeRoomPreview_lower(_ value: RoomPreview) -> RustBuffe
 
 public struct RoomSubscription {
     public var requiredState: [RequiredState]?
-    public var timelineLimit: UInt32?
+    public var timelineLimit: UInt32
     public var includeHeroes: Bool?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(requiredState: [RequiredState]?, timelineLimit: UInt32?, includeHeroes: Bool?) {
+    public init(requiredState: [RequiredState]?, timelineLimit: UInt32, includeHeroes: Bool?) {
         self.requiredState = requiredState
         self.timelineLimit = timelineLimit
         self.includeHeroes = includeHeroes
@@ -14661,14 +15092,14 @@ public struct FfiConverterTypeRoomSubscription: FfiConverterRustBuffer {
         return
             try RoomSubscription(
                 requiredState: FfiConverterOptionSequenceTypeRequiredState.read(from: &buf), 
-                timelineLimit: FfiConverterOptionUInt32.read(from: &buf), 
+                timelineLimit: FfiConverterUInt32.read(from: &buf), 
                 includeHeroes: FfiConverterOptionBool.read(from: &buf)
         )
     }
 
     public static func write(_ value: RoomSubscription, into buf: inout [UInt8]) {
         FfiConverterOptionSequenceTypeRequiredState.write(value.requiredState, into: &buf)
-        FfiConverterOptionUInt32.write(value.timelineLimit, into: &buf)
+        FfiConverterUInt32.write(value.timelineLimit, into: &buf)
         FfiConverterOptionBool.write(value.includeHeroes, into: &buf)
     }
 }
@@ -15697,18 +16128,54 @@ public func FfiConverterTypeVideoInfo_lower(_ value: VideoInfo) -> RustBuffer {
 
 
 public struct VideoMessageContent {
+    /**
+     * The original body field, deserialized from the event. Prefer the use of
+     * `filename` and `caption` over this.
+     */
     public var body: String
+    /**
+     * The original formatted body field, deserialized from the event. Prefer
+     * the use of `filename` and `formatted_caption` over this.
+     */
     public var formatted: FormattedBody?
-    public var filename: String?
+    /**
+     * The original filename field, deserialized from the event. Prefer the use
+     * of `filename` over this.
+     */
+    public var rawFilename: String?
+    /**
+     * The computed filename, for use in a client.
+     */
+    public var filename: String
+    public var caption: String?
+    public var formattedCaption: FormattedBody?
     public var source: MediaSource
     public var info: VideoInfo?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(body: String, formatted: FormattedBody?, filename: String?, source: MediaSource, info: VideoInfo?) {
+    public init(
+        /**
+         * The original body field, deserialized from the event. Prefer the use of
+         * `filename` and `caption` over this.
+         */body: String, 
+        /**
+         * The original formatted body field, deserialized from the event. Prefer
+         * the use of `filename` and `formatted_caption` over this.
+         */formatted: FormattedBody?, 
+        /**
+         * The original filename field, deserialized from the event. Prefer the use
+         * of `filename` over this.
+         */rawFilename: String?, 
+        /**
+         * The computed filename, for use in a client.
+         */filename: String, caption: String?, formattedCaption: FormattedBody?, source: MediaSource, info: VideoInfo?) {
         self.body = body
         self.formatted = formatted
+        self.rawFilename = rawFilename
         self.filename = filename
+        self.caption = caption
+        self.formattedCaption = formattedCaption
         self.source = source
         self.info = info
     }
@@ -15722,7 +16189,10 @@ public struct FfiConverterTypeVideoMessageContent: FfiConverterRustBuffer {
             try VideoMessageContent(
                 body: FfiConverterString.read(from: &buf), 
                 formatted: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
-                filename: FfiConverterOptionString.read(from: &buf), 
+                rawFilename: FfiConverterOptionString.read(from: &buf), 
+                filename: FfiConverterString.read(from: &buf), 
+                caption: FfiConverterOptionString.read(from: &buf), 
+                formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
                 source: FfiConverterTypeMediaSource.read(from: &buf), 
                 info: FfiConverterOptionTypeVideoInfo.read(from: &buf)
         )
@@ -15731,7 +16201,10 @@ public struct FfiConverterTypeVideoMessageContent: FfiConverterRustBuffer {
     public static func write(_ value: VideoMessageContent, into buf: inout [UInt8]) {
         FfiConverterString.write(value.body, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formatted, into: &buf)
-        FfiConverterOptionString.write(value.filename, into: &buf)
+        FfiConverterOptionString.write(value.rawFilename, into: &buf)
+        FfiConverterString.write(value.filename, into: &buf)
+        FfiConverterOptionString.write(value.caption, into: &buf)
+        FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
         FfiConverterTypeMediaSource.write(value.source, into: &buf)
         FfiConverterOptionTypeVideoInfo.write(value.info, into: &buf)
     }
@@ -23371,6 +23844,87 @@ extension FfiConverterCallbackInterfaceEnableRecoveryProgressListener : FfiConve
 
 
 
+public protocol IdentityStatusChangeListener : AnyObject {
+    
+    func call(identityStatusChange: [IdentityStatusChange]) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceIdentityStatusChangeListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceIdentityStatusChangeListener = UniffiVTableCallbackInterfaceIdentityStatusChangeListener(
+        call: { (
+            uniffiHandle: UInt64,
+            identityStatusChange: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceIdentityStatusChangeListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.call(
+                     identityStatusChange: try FfiConverterSequenceTypeIdentityStatusChange.lift(identityStatusChange)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceIdentityStatusChangeListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface IdentityStatusChangeListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitIdentityStatusChangeListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_identitystatuschangelistener(&UniffiCallbackInterfaceIdentityStatusChangeListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceIdentityStatusChangeListener {
+    fileprivate static var handleMap = UniffiHandleMap<IdentityStatusChangeListener>()
+}
+
+extension FfiConverterCallbackInterfaceIdentityStatusChangeListener : FfiConverter {
+    typealias SwiftType = IdentityStatusChangeListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
 public protocol IgnoredUsersListener : AnyObject {
     
     func call(ignoredUserIds: [String]) 
@@ -25454,6 +26008,27 @@ fileprivate struct FfiConverterOptionTypeTimelineItem: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeUserIdentity: FfiConverterRustBuffer {
+    typealias SwiftType = UserIdentity?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeUserIdentity.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeUserIdentity.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeAudioInfo: FfiConverterRustBuffer {
     typealias SwiftType = AudioInfo?
 
@@ -26512,6 +27087,28 @@ fileprivate struct FfiConverterSequenceTypeTimelineItem: FfiConverterRustBuffer 
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeIdentityStatusChange: FfiConverterRustBuffer {
+    typealias SwiftType = [IdentityStatusChange]
+
+    public static func write(_ value: [IdentityStatusChange], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeIdentityStatusChange.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [IdentityStatusChange] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [IdentityStatusChange]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeIdentityStatusChange.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypePollAnswer: FfiConverterRustBuffer {
     typealias SwiftType = [PollAnswer]
 
@@ -26956,6 +27553,10 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
         return dict
     }
 }
+
+
+
+
 
 
 
@@ -27568,6 +28169,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_request_config() != 58783) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_room_decryption_trust_requirement() != 2776) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_room_key_recipient_strategy() != 41183) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -27614,6 +28218,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_recovery() != 64351) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_get_user_identity() != 40601) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_is_last_device() != 27955) {
@@ -27947,6 +28554,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_unread_flag() != 2381) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_identity_status_changes() != 14290) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_room_info_updates() != 48209) {
@@ -28312,6 +28922,12 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_unreadnotificationscount_notification_count() != 35655) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_master_key() != 4041) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_pin() != 62925) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_widgetdriver_run() != 7519) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -28361,6 +28977,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_enablerecoveryprogresslistener_on_update() != 13538) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_identitystatuschangelistener_call() != 57311) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_ignoreduserslistener_call() != 47519) {
@@ -28444,6 +29063,7 @@ private var initializationResult: InitializationResult = {
     uniffiCallbackInitClientDelegate()
     uniffiCallbackInitClientSessionDelegate()
     uniffiCallbackInitEnableRecoveryProgressListener()
+    uniffiCallbackInitIdentityStatusChangeListener()
     uniffiCallbackInitIgnoredUsersListener()
     uniffiCallbackInitNotificationSettingsDelegate()
     uniffiCallbackInitPaginationStatusListener()
