@@ -679,7 +679,7 @@ public protocol ClientProtocol : AnyObject {
     
     func getMediaContent(mediaSource: MediaSource) async throws  -> Data
     
-    func getMediaFile(mediaSource: MediaSource, body: String?, mimeType: String, useCache: Bool, tempDir: String?) async throws  -> MediaFileHandle
+    func getMediaFile(mediaSource: MediaSource, filename: String?, mimeType: String, useCache: Bool, tempDir: String?) async throws  -> MediaFileHandle
     
     func getMediaThumbnail(mediaSource: MediaSource, width: UInt64, height: UInt64) async throws  -> Data
     
@@ -743,6 +743,11 @@ public protocol ClientProtocol : AnyObject {
      * alias into an ID.
      */
     func joinRoomByIdOrAlias(roomIdOrAlias: String, serverNames: [String]) async throws  -> Room
+    
+    /**
+     * Knock on a room to join it using its ID or alias.
+     */
+    func knock(roomIdOrAlias: String) async throws  -> Room
     
     /**
      * Login using a username and password.
@@ -1244,13 +1249,13 @@ open func getMediaContent(mediaSource: MediaSource)async throws  -> Data {
         )
 }
     
-open func getMediaFile(mediaSource: MediaSource, body: String?, mimeType: String, useCache: Bool, tempDir: String?)async throws  -> MediaFileHandle {
+open func getMediaFile(mediaSource: MediaSource, filename: String?, mimeType: String, useCache: Bool, tempDir: String?)async throws  -> MediaFileHandle {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_get_media_file(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeMediaSource.lower(mediaSource),FfiConverterOptionString.lower(body),FfiConverterString.lower(mimeType),FfiConverterBool.lower(useCache),FfiConverterOptionString.lower(tempDir)
+                    FfiConverterTypeMediaSource.lower(mediaSource),FfiConverterOptionString.lower(filename),FfiConverterString.lower(mimeType),FfiConverterBool.lower(useCache),FfiConverterOptionString.lower(tempDir)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
@@ -1505,6 +1510,26 @@ open func joinRoomByIdOrAlias(roomIdOrAlias: String, serverNames: [String])async
                 uniffi_matrix_sdk_ffi_fn_method_client_join_room_by_id_or_alias(
                     self.uniffiClonePointer(),
                     FfiConverterString.lower(roomIdOrAlias),FfiConverterSequenceString.lower(serverNames)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeRoom.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Knock on a room to join it using its ID or alias.
+     */
+open func knock(roomIdOrAlias: String)async throws  -> Room {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_knock(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(roomIdOrAlias)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
@@ -2965,225 +2990,6 @@ public func FfiConverterTypeEncryption_lower(_ value: Encryption) -> UnsafeMutab
 
 
 
-/**
- * Wrapper to retrieve the shields info lazily.
- */
-public protocol EventShieldsProviderProtocol : AnyObject {
-    
-    func getShields(strict: Bool)  -> ShieldState?
-    
-}
-
-/**
- * Wrapper to retrieve the shields info lazily.
- */
-open class EventShieldsProvider:
-    EventShieldsProviderProtocol {
-    fileprivate let pointer: UnsafeMutableRawPointer!
-
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
-    public struct NoPointer {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
-    }
-
-    /// This constructor can be used to instantiate a fake object.
-    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    ///
-    /// - Warning:
-    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
-    }
-
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_eventshieldsprovider(self.pointer, $0) }
-    }
-    // No primary constructor declared for this class.
-
-    deinit {
-        guard let pointer = pointer else {
-            return
-        }
-
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_eventshieldsprovider(pointer, $0) }
-    }
-
-    
-
-    
-open func getShields(strict: Bool) -> ShieldState? {
-    return try!  FfiConverterOptionTypeShieldState.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventshieldsprovider_get_shields(self.uniffiClonePointer(),
-        FfiConverterBool.lower(strict),$0
-    )
-})
-}
-    
-
-}
-
-public struct FfiConverterTypeEventShieldsProvider: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
-    typealias SwiftType = EventShieldsProvider
-
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> EventShieldsProvider {
-        return EventShieldsProvider(unsafeFromRawPointer: pointer)
-    }
-
-    public static func lower(_ value: EventShieldsProvider) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EventShieldsProvider {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
-    }
-
-    public static func write(_ value: EventShieldsProvider, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
-    }
-}
-
-
-
-
-public func FfiConverterTypeEventShieldsProvider_lift(_ pointer: UnsafeMutableRawPointer) throws -> EventShieldsProvider {
-    return try FfiConverterTypeEventShieldsProvider.lift(pointer)
-}
-
-public func FfiConverterTypeEventShieldsProvider_lower(_ value: EventShieldsProvider) -> UnsafeMutableRawPointer {
-    return FfiConverterTypeEventShieldsProvider.lower(value)
-}
-
-
-
-
-/**
- * Wrapper to retrieve the debug info lazily instead of immediately
- * transforming it for each timeline event.
- */
-public protocol EventTimelineItemDebugInfoProviderProtocol : AnyObject {
-    
-    func get()  -> EventTimelineItemDebugInfo
-    
-}
-
-/**
- * Wrapper to retrieve the debug info lazily instead of immediately
- * transforming it for each timeline event.
- */
-open class EventTimelineItemDebugInfoProvider:
-    EventTimelineItemDebugInfoProviderProtocol {
-    fileprivate let pointer: UnsafeMutableRawPointer!
-
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
-    public struct NoPointer {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
-    }
-
-    /// This constructor can be used to instantiate a fake object.
-    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    ///
-    /// - Warning:
-    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
-    }
-
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_eventtimelineitemdebuginfoprovider(self.pointer, $0) }
-    }
-    // No primary constructor declared for this class.
-
-    deinit {
-        guard let pointer = pointer else {
-            return
-        }
-
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_eventtimelineitemdebuginfoprovider(pointer, $0) }
-    }
-
-    
-
-    
-open func get() -> EventTimelineItemDebugInfo {
-    return try!  FfiConverterTypeEventTimelineItemDebugInfo.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_eventtimelineitemdebuginfoprovider_get(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-
-}
-
-public struct FfiConverterTypeEventTimelineItemDebugInfoProvider: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
-    typealias SwiftType = EventTimelineItemDebugInfoProvider
-
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> EventTimelineItemDebugInfoProvider {
-        return EventTimelineItemDebugInfoProvider(unsafeFromRawPointer: pointer)
-    }
-
-    public static func lower(_ value: EventTimelineItemDebugInfoProvider) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EventTimelineItemDebugInfoProvider {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
-    }
-
-    public static func write(_ value: EventTimelineItemDebugInfoProvider, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
-    }
-}
-
-
-
-
-public func FfiConverterTypeEventTimelineItemDebugInfoProvider_lift(_ pointer: UnsafeMutableRawPointer) throws -> EventTimelineItemDebugInfoProvider {
-    return try FfiConverterTypeEventTimelineItemDebugInfoProvider.lift(pointer)
-}
-
-public func FfiConverterTypeEventTimelineItemDebugInfoProvider_lower(_ value: EventTimelineItemDebugInfoProvider) -> UnsafeMutableRawPointer {
-    return FfiConverterTypeEventTimelineItemDebugInfoProvider.lower(value)
-}
-
-
-
-
 public protocol HomeserverLoginDetailsProtocol : AnyObject {
     
     /**
@@ -3610,6 +3416,136 @@ public func FfiConverterTypeInReplyToDetails_lift(_ pointer: UnsafeMutableRawPoi
 
 public func FfiConverterTypeInReplyToDetails_lower(_ value: InReplyToDetails) -> UnsafeMutableRawPointer {
     return FfiConverterTypeInReplyToDetails.lower(value)
+}
+
+
+
+
+/**
+ * Wrapper to retrieve some timeline item info lazily.
+ */
+public protocol LazyTimelineItemProviderProtocol : AnyObject {
+    
+    /**
+     * Returns some debug information for this event timeline item.
+     */
+    func debugInfo()  -> EventTimelineItemDebugInfo
+    
+    /**
+     * Returns the shields for this event timeline item.
+     */
+    func getShields(strict: Bool)  -> ShieldState?
+    
+}
+
+/**
+ * Wrapper to retrieve some timeline item info lazily.
+ */
+open class LazyTimelineItemProvider:
+    LazyTimelineItemProviderProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_lazytimelineitemprovider(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_lazytimelineitemprovider(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Returns some debug information for this event timeline item.
+     */
+open func debugInfo() -> EventTimelineItemDebugInfo {
+    return try!  FfiConverterTypeEventTimelineItemDebugInfo.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_lazytimelineitemprovider_debug_info(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Returns the shields for this event timeline item.
+     */
+open func getShields(strict: Bool) -> ShieldState? {
+    return try!  FfiConverterOptionTypeShieldState.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_lazytimelineitemprovider_get_shields(self.uniffiClonePointer(),
+        FfiConverterBool.lower(strict),$0
+    )
+})
+}
+    
+
+}
+
+public struct FfiConverterTypeLazyTimelineItemProvider: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = LazyTimelineItemProvider
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> LazyTimelineItemProvider {
+        return LazyTimelineItemProvider(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: LazyTimelineItemProvider) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LazyTimelineItemProvider {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: LazyTimelineItemProvider, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeLazyTimelineItemProvider_lift(_ pointer: UnsafeMutableRawPointer) throws -> LazyTimelineItemProvider {
+    return try FfiConverterTypeLazyTimelineItemProvider.lift(pointer)
+}
+
+public func FfiConverterTypeLazyTimelineItemProvider_lower(_ value: LazyTimelineItemProvider) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeLazyTimelineItemProvider.lower(value)
 }
 
 
@@ -11662,7 +11598,9 @@ public func FfiConverterTypeEmoteMessageContent_lower(_ value: EmoteMessageConte
 
 
 public struct EventTimelineItem {
-    public var isLocal: Bool
+    /**
+     * Indicates that an event is remote.
+     */
     public var isRemote: Bool
     public var eventOrTransactionId: EventOrTransactionId
     public var sender: String
@@ -11672,17 +11610,18 @@ public struct EventTimelineItem {
     public var content: TimelineItemContent
     public var timestamp: UInt64
     public var reactions: [Reaction]
-    public var debugInfoProvider: EventTimelineItemDebugInfoProvider
     public var localSendState: EventSendState?
     public var readReceipts: [String: Receipt]
     public var origin: EventItemOrigin?
     public var canBeRepliedTo: Bool
-    public var shieldsProvider: EventShieldsProvider
+    public var lazyProvider: LazyTimelineItemProvider
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(isLocal: Bool, isRemote: Bool, eventOrTransactionId: EventOrTransactionId, sender: String, senderProfile: ProfileDetails, isOwn: Bool, isEditable: Bool, content: TimelineItemContent, timestamp: UInt64, reactions: [Reaction], debugInfoProvider: EventTimelineItemDebugInfoProvider, localSendState: EventSendState?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, shieldsProvider: EventShieldsProvider) {
-        self.isLocal = isLocal
+    public init(
+        /**
+         * Indicates that an event is remote.
+         */isRemote: Bool, eventOrTransactionId: EventOrTransactionId, sender: String, senderProfile: ProfileDetails, isOwn: Bool, isEditable: Bool, content: TimelineItemContent, timestamp: UInt64, reactions: [Reaction], localSendState: EventSendState?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, lazyProvider: LazyTimelineItemProvider) {
         self.isRemote = isRemote
         self.eventOrTransactionId = eventOrTransactionId
         self.sender = sender
@@ -11692,12 +11631,11 @@ public struct EventTimelineItem {
         self.content = content
         self.timestamp = timestamp
         self.reactions = reactions
-        self.debugInfoProvider = debugInfoProvider
         self.localSendState = localSendState
         self.readReceipts = readReceipts
         self.origin = origin
         self.canBeRepliedTo = canBeRepliedTo
-        self.shieldsProvider = shieldsProvider
+        self.lazyProvider = lazyProvider
     }
 }
 
@@ -11707,7 +11645,6 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EventTimelineItem {
         return
             try EventTimelineItem(
-                isLocal: FfiConverterBool.read(from: &buf), 
                 isRemote: FfiConverterBool.read(from: &buf), 
                 eventOrTransactionId: FfiConverterTypeEventOrTransactionId.read(from: &buf), 
                 sender: FfiConverterString.read(from: &buf), 
@@ -11717,17 +11654,15 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
                 content: FfiConverterTypeTimelineItemContent.read(from: &buf), 
                 timestamp: FfiConverterUInt64.read(from: &buf), 
                 reactions: FfiConverterSequenceTypeReaction.read(from: &buf), 
-                debugInfoProvider: FfiConverterTypeEventTimelineItemDebugInfoProvider.read(from: &buf), 
                 localSendState: FfiConverterOptionTypeEventSendState.read(from: &buf), 
                 readReceipts: FfiConverterDictionaryStringTypeReceipt.read(from: &buf), 
                 origin: FfiConverterOptionTypeEventItemOrigin.read(from: &buf), 
                 canBeRepliedTo: FfiConverterBool.read(from: &buf), 
-                shieldsProvider: FfiConverterTypeEventShieldsProvider.read(from: &buf)
+                lazyProvider: FfiConverterTypeLazyTimelineItemProvider.read(from: &buf)
         )
     }
 
     public static func write(_ value: EventTimelineItem, into buf: inout [UInt8]) {
-        FfiConverterBool.write(value.isLocal, into: &buf)
         FfiConverterBool.write(value.isRemote, into: &buf)
         FfiConverterTypeEventOrTransactionId.write(value.eventOrTransactionId, into: &buf)
         FfiConverterString.write(value.sender, into: &buf)
@@ -11737,12 +11672,11 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
         FfiConverterTypeTimelineItemContent.write(value.content, into: &buf)
         FfiConverterUInt64.write(value.timestamp, into: &buf)
         FfiConverterSequenceTypeReaction.write(value.reactions, into: &buf)
-        FfiConverterTypeEventTimelineItemDebugInfoProvider.write(value.debugInfoProvider, into: &buf)
         FfiConverterOptionTypeEventSendState.write(value.localSendState, into: &buf)
         FfiConverterDictionaryStringTypeReceipt.write(value.readReceipts, into: &buf)
         FfiConverterOptionTypeEventItemOrigin.write(value.origin, into: &buf)
         FfiConverterBool.write(value.canBeRepliedTo, into: &buf)
-        FfiConverterTypeEventShieldsProvider.write(value.shieldsProvider, into: &buf)
+        FfiConverterTypeLazyTimelineItemProvider.write(value.lazyProvider, into: &buf)
     }
 }
 
@@ -18420,6 +18354,7 @@ public enum Membership {
     case invited
     case joined
     case left
+    case knocked
 }
 
 
@@ -18435,6 +18370,8 @@ public struct FfiConverterTypeMembership: FfiConverterRustBuffer {
         case 2: return .joined
         
         case 3: return .left
+        
+        case 4: return .knocked
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -18454,6 +18391,10 @@ public struct FfiConverterTypeMembership: FfiConverterRustBuffer {
         
         case .left:
             writeInt(&buf, Int32(3))
+        
+        
+        case .knocked:
+            writeInt(&buf, Int32(4))
         
         }
     }
@@ -27982,7 +27923,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_content() != 40308) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_file() != 47034) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_file() != 52604) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_thumbnail() != 52601) {
@@ -28025,6 +27966,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_join_room_by_id_or_alias() != 18521) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_knock() != 8228) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_login() != 33276) {
@@ -28246,12 +28190,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_wait_for_e2ee_initialization_tasks() != 41585) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventshieldsprovider_get_shields() != 28772) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_eventtimelineitemdebuginfoprovider_get() != 57546) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_sliding_sync_version() != 36573) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -28277,6 +28215,12 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_inreplytodetails_event_id() != 5876) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_debug_info() != 55450) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_get_shields() != 12518) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediafilehandle_path() != 16357) {
