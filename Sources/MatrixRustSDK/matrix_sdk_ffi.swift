@@ -581,7 +581,7 @@ public protocol ClientProtocol : AnyObject {
      * Aborts an existing OIDC login operation that might have been cancelled,
      * failed etc.
      */
-    func abortOidcLogin(authorizationData: OidcAuthorizationData) async 
+    func abortOidcAuth(authorizationData: OidcAuthorizationData) async 
     
     /**
      * Get the content of the event of the given type out of the account data
@@ -866,12 +866,12 @@ public protocol ClientProtocol : AnyObject {
     func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWatcher?) async throws  -> String
     
     /**
-     * Requests the URL needed for login in a web view using OIDC. Once the web
+     * Requests the URL needed for opening a web view using OIDC. Once the web
      * view has succeeded, call `login_with_oidc_callback` with the callback it
      * returns. If a failure occurs and a callback isn't available, make sure
-     * to call `abort_oidc_login` to inform the client of this.
+     * to call `abort_oidc_auth` to inform the client of this.
      */
-    func urlForOidcLogin(oidcConfiguration: OidcConfiguration) async throws  -> OidcAuthorizationData
+    func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt) async throws  -> OidcAuthorizationData
     
     func userId() throws  -> String
     
@@ -927,11 +927,11 @@ open class Client:
      * Aborts an existing OIDC login operation that might have been cancelled,
      * failed etc.
      */
-open func abortOidcLogin(authorizationData: OidcAuthorizationData)async  {
+open func abortOidcAuth(authorizationData: OidcAuthorizationData)async  {
     return
         try!  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_abort_oidc_login(
+                uniffi_matrix_sdk_ffi_fn_method_client_abort_oidc_auth(
                     self.uniffiClonePointer(),
                     FfiConverterTypeOidcAuthorizationData_lower(authorizationData)
                 )
@@ -1975,18 +1975,18 @@ open func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWat
 }
     
     /**
-     * Requests the URL needed for login in a web view using OIDC. Once the web
+     * Requests the URL needed for opening a web view using OIDC. Once the web
      * view has succeeded, call `login_with_oidc_callback` with the callback it
      * returns. If a failure occurs and a callback isn't available, make sure
-     * to call `abort_oidc_login` to inform the client of this.
+     * to call `abort_oidc_auth` to inform the client of this.
      */
-open func urlForOidcLogin(oidcConfiguration: OidcConfiguration)async throws  -> OidcAuthorizationData {
+open func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt)async throws  -> OidcAuthorizationData {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_url_for_oidc_login(
+                uniffi_matrix_sdk_ffi_fn_method_client_url_for_oidc(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeOidcConfiguration.lower(oidcConfiguration)
+                    FfiConverterTypeOidcConfiguration.lower(oidcConfiguration),FfiConverterTypeOidcPrompt.lower(prompt)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
@@ -9127,19 +9127,17 @@ public protocol TimelineProtocol : AnyObject {
     /**
      * Toggle a reaction on an event.
      *
-     * The `unique_id` parameter is a string returned by
-     * the `TimelineItem::unique_id()` method. As such, this method works both
-     * on local echoes and remote items.
-     *
      * Adds or redacts a reaction based on the state of the reaction at the
      * time it is called.
+     *
+     * This method works both on local echoes and remote items.
      *
      * When redacting a previous reaction, the redaction reason is not set.
      *
      * Ensures that only one reaction is sent at a time to avoid race
      * conditions and spamming the homeserver with requests.
      */
-    func toggleReaction(uniqueId: String, key: String) async throws 
+    func toggleReaction(itemId: EventOrTransactionId, key: String) async throws 
     
     /**
      * Adds a new pinned event by sending an updated `m.room.pinned_events`
@@ -9684,25 +9682,23 @@ open func subscribeToBackPaginationStatus(listener: PaginationStatusListener)asy
     /**
      * Toggle a reaction on an event.
      *
-     * The `unique_id` parameter is a string returned by
-     * the `TimelineItem::unique_id()` method. As such, this method works both
-     * on local echoes and remote items.
-     *
      * Adds or redacts a reaction based on the state of the reaction at the
      * time it is called.
+     *
+     * This method works both on local echoes and remote items.
      *
      * When redacting a previous reaction, the redaction reason is not set.
      *
      * Ensures that only one reaction is sent at a time to avoid race
      * conditions and spamming the homeserver with requests.
      */
-open func toggleReaction(uniqueId: String, key: String)async throws  {
+open func toggleReaction(itemId: EventOrTransactionId, key: String)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_toggle_reaction(
                     self.uniffiClonePointer(),
-                    FfiConverterString.lower(uniqueId),FfiConverterString.lower(key)
+                    FfiConverterTypeEventOrTransactionId.lower(itemId),FfiConverterString.lower(key)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -10205,7 +10201,10 @@ public protocol TimelineItemProtocol : AnyObject {
     
     func fmtDebug()  -> String
     
-    func uniqueId()  -> String
+    /**
+     * An opaque unique identifier for this timeline item.
+     */
+    func uniqueId()  -> TimelineUniqueId
     
 }
 
@@ -10271,8 +10270,11 @@ open func fmtDebug() -> String {
 })
 }
     
-open func uniqueId() -> String {
-    return try!  FfiConverterString.lift(try! rustCall() {
+    /**
+     * An opaque unique identifier for this timeline item.
+     */
+open func uniqueId() -> TimelineUniqueId {
+    return try!  FfiConverterTypeTimelineUniqueId.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timelineitem_unique_id(self.uniffiClonePointer(),$0
     )
 })
@@ -15409,6 +15411,55 @@ public func FfiConverterTypeThumbnailInfo_lower(_ value: ThumbnailInfo) -> RustB
 }
 
 
+public struct TimelineUniqueId {
+    public var id: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String) {
+        self.id = id
+    }
+}
+
+
+
+extension TimelineUniqueId: Equatable, Hashable {
+    public static func ==(lhs: TimelineUniqueId, rhs: TimelineUniqueId) -> Bool {
+        if lhs.id != rhs.id {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}
+
+
+public struct FfiConverterTypeTimelineUniqueId: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineUniqueId {
+        return
+            try TimelineUniqueId(
+                id: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TimelineUniqueId, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeTimelineUniqueId_lift(_ buf: RustBuffer) throws -> TimelineUniqueId {
+    return try FfiConverterTypeTimelineUniqueId.lift(buf)
+}
+
+public func FfiConverterTypeTimelineUniqueId_lower(_ value: TimelineUniqueId) -> RustBuffer {
+    return FfiConverterTypeTimelineUniqueId.lower(value)
+}
+
+
 public struct TracingConfiguration {
     /**
      * A filter line following the [RUST_LOG format].
@@ -19622,6 +19673,121 @@ extension OidcError: Foundation.LocalizedError {
         String(reflecting: self)
     }
 }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum OidcPrompt {
+    
+    /**
+     * The Authorization Server must not display any authentication or consent
+     * user interface pages.
+     */
+    case none
+    /**
+     * The Authorization Server should prompt the End-User for
+     * reauthentication.
+     */
+    case login
+    /**
+     * The Authorization Server should prompt the End-User for consent before
+     * returning information to the Client.
+     */
+    case consent
+    /**
+     * The Authorization Server should prompt the End-User to select a user
+     * account.
+     *
+     * This enables an End-User who has multiple accounts at the Authorization
+     * Server to select amongst the multiple accounts that they might have
+     * current sessions for.
+     */
+    case selectAccount
+    /**
+     * The Authorization Server should prompt the End-User to create a user
+     * account.
+     *
+     * Defined in [Initiating User Registration via OpenID Connect](https://openid.net/specs/openid-connect-prompt-create-1_0.html).
+     */
+    case create
+    /**
+     * An unknown value.
+     */
+    case unknown(value: String
+    )
+}
+
+
+public struct FfiConverterTypeOidcPrompt: FfiConverterRustBuffer {
+    typealias SwiftType = OidcPrompt
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OidcPrompt {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .none
+        
+        case 2: return .login
+        
+        case 3: return .consent
+        
+        case 4: return .selectAccount
+        
+        case 5: return .create
+        
+        case 6: return .unknown(value: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: OidcPrompt, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .none:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .login:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .consent:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .selectAccount:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .create:
+            writeInt(&buf, Int32(5))
+        
+        
+        case let .unknown(value):
+            writeInt(&buf, Int32(6))
+            FfiConverterString.write(value, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeOidcPrompt_lift(_ buf: RustBuffer) throws -> OidcPrompt {
+    return try FfiConverterTypeOidcPrompt.lift(buf)
+}
+
+public func FfiConverterTypeOidcPrompt_lower(_ value: OidcPrompt) -> RustBuffer {
+    return FfiConverterTypeOidcPrompt.lower(value)
+}
+
+
+
+extension OidcPrompt: Equatable, Hashable {}
+
+
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -27869,7 +28035,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roommessageeventcontentwithoutrelation_with_mentions() != 8867) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_abort_oidc_login() != 22230) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_abort_oidc_auth() != 6754) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_account_data() != 50433) {
@@ -28052,7 +28218,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_upload_media() != 51195) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc_login() != 43171) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc() != 30079) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_user_id() != 40531) {
@@ -28787,7 +28953,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_back_pagination_status() != 46161) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_toggle_reaction() != 62959) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_toggle_reaction() != 29303) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_unpin_event() != 52414) {
@@ -28841,7 +29007,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timelineitem_fmt_debug() != 38094) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelineitem_unique_id() != 30409) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timelineitem_unique_id() != 39945) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_unreadnotificationscount_has_notifications() != 33024) {
