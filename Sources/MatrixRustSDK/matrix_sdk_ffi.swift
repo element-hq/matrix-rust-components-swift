@@ -2538,16 +2538,6 @@ public protocol EncryptionProtocol : AnyObject {
     
     func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, progressListener: EnableRecoveryProgressListener) async throws  -> String
     
-    /**
-     * Get the E2EE identity of a user.
-     *
-     * Returns Ok(None) if this user does not exist.
-     *
-     * Returns an error if there was a problem contacting the crypto store, or
-     * if our client is not logged in.
-     */
-    func getUserIdentity(userId: String) async throws  -> UserIdentity?
-    
     func isLastDevice() async throws  -> Bool
     
     func recover(recoveryKey: String) async throws 
@@ -2565,6 +2555,26 @@ public protocol EncryptionProtocol : AnyObject {
     func resetIdentity() async throws  -> IdentityResetHandle?
     
     func resetRecoveryKey() async throws  -> String
+    
+    /**
+     * Get the E2EE identity of a user.
+     *
+     * This method always tries to fetch the identity from the store, which we
+     * only have if the user is tracked, meaning that we are both members
+     * of the same encrypted room. If no user is found locally, a request will
+     * be made to the homeserver.
+     *
+     * # Arguments
+     *
+     * * `user_id` - The ID of the user that the identity belongs to.
+     *
+     * Returns a `UserIdentity` if one is found. Returns an error if there
+     * was an issue with the crypto store or with the request to the
+     * homeserver.
+     *
+     * This will always return `None` if the client hasn't been logged in.
+     */
+    func userIdentity(userId: String) async throws  -> UserIdentity?
     
     func verificationState()  -> VerificationState
     
@@ -2759,31 +2769,6 @@ open func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, prog
         )
 }
     
-    /**
-     * Get the E2EE identity of a user.
-     *
-     * Returns Ok(None) if this user does not exist.
-     *
-     * Returns an error if there was a problem contacting the crypto store, or
-     * if our client is not logged in.
-     */
-open func getUserIdentity(userId: String)async throws  -> UserIdentity? {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_encryption_get_user_identity(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(userId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterOptionTypeUserIdentity.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
 open func isLastDevice()async throws  -> Bool {
     return
         try  await uniffiRustCallAsync(
@@ -2885,6 +2870,41 @@ open func resetRecoveryKey()async throws  -> String {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeRecoveryError.lift
+        )
+}
+    
+    /**
+     * Get the E2EE identity of a user.
+     *
+     * This method always tries to fetch the identity from the store, which we
+     * only have if the user is tracked, meaning that we are both members
+     * of the same encrypted room. If no user is found locally, a request will
+     * be made to the homeserver.
+     *
+     * # Arguments
+     *
+     * * `user_id` - The ID of the user that the identity belongs to.
+     *
+     * Returns a `UserIdentity` if one is found. Returns an error if there
+     * was an issue with the crypto store or with the request to the
+     * homeserver.
+     *
+     * This will always return `None` if the client hasn't been logged in.
+     */
+open func userIdentity(userId: String)async throws  -> UserIdentity? {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_user_identity(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(userId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeUserIdentity.lift,
+            errorHandler: FfiConverterTypeClientError.lift
         )
 }
     
@@ -7686,8 +7706,18 @@ public func FfiConverterTypeRoomMessageEventContentWithoutRelation_lower(_ value
 
 public protocol SendAttachmentJoinHandleProtocol : AnyObject {
     
+    /**
+     * Cancel the current sending task.
+     *
+     * A subsequent call to [`Self::join`] will return immediately.
+     */
     func cancel() 
     
+    /**
+     * Wait until the attachment has been sent.
+     *
+     * If the sending had been cancelled, will return immediately.
+     */
     func join() async throws 
     
 }
@@ -7733,12 +7763,22 @@ open class SendAttachmentJoinHandle:
     
 
     
+    /**
+     * Cancel the current sending task.
+     *
+     * A subsequent call to [`Self::join`] will return immediately.
+     */
 open func cancel() {try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_sendattachmentjoinhandle_cancel(self.uniffiClonePointer(),$0
     )
 }
 }
     
+    /**
+     * Wait until the attachment has been sent.
+     *
+     * If the sending had been cancelled, will return immediately.
+     */
 open func join()async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -9008,7 +9048,7 @@ public protocol TimelineProtocol : AnyObject {
      * Returns whether the edit did happen. It can only return false for
      * local events that are being processed.
      */
-    func edit(eventOrTransactionId: EventOrTransactionId, newContent: EditedContent) async throws  -> Bool
+    func edit(eventOrTransactionId: EventOrTransactionId, newContent: EditedContent) async throws 
     
     func endPoll(pollStartEventId: String, text: String) throws 
     
@@ -9244,7 +9284,7 @@ open func createPoll(question: String, answers: [String], maxSelections: UInt8, 
      * Returns whether the edit did happen. It can only return false for
      * local events that are being processed.
      */
-open func edit(eventOrTransactionId: EventOrTransactionId, newContent: EditedContent)async throws  -> Bool {
+open func edit(eventOrTransactionId: EventOrTransactionId, newContent: EditedContent)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -9253,10 +9293,10 @@ open func edit(eventOrTransactionId: EventOrTransactionId, newContent: EditedCon
                     FfiConverterTypeEventOrTransactionId.lower(eventOrTransactionId),FfiConverterTypeEditedContent.lower(newContent)
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -10454,6 +10494,14 @@ public func FfiConverterTypeUnreadNotificationsCount_lower(_ value: UnreadNotifi
 public protocol UserIdentityProtocol : AnyObject {
     
     /**
+     * Is the user identity considered to be verified.
+     *
+     * If the identity belongs to another user, our own user identity needs to
+     * be verified as well for the identity to be considered to be verified.
+     */
+    func isVerified()  -> Bool
+    
+    /**
      * Get the public part of the Master key of this user identity.
      *
      * The public part of the Master key is usually used to uniquely identify
@@ -10526,6 +10574,19 @@ open class UserIdentity:
 
     
 
+    
+    /**
+     * Is the user identity considered to be verified.
+     *
+     * If the identity belongs to another user, our own user identity needs to
+     * be verified as well for the identity to be considered to be verified.
+     */
+open func isVerified() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_useridentity_is_verified(self.uniffiClonePointer(),$0
+    )
+})
+}
     
     /**
      * Get the public part of the Master key of this user identity.
@@ -11327,10 +11388,12 @@ public struct CreateRoomParameters {
     public var invite: [String]?
     public var avatar: String?
     public var powerLevelContentOverride: PowerLevels?
+    public var joinRuleOverride: JoinRule?
+    public var canonicalAlias: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(name: String?, topic: String? = nil, isEncrypted: Bool, isDirect: Bool = false, visibility: RoomVisibility, preset: RoomPreset, invite: [String]? = nil, avatar: String? = nil, powerLevelContentOverride: PowerLevels? = nil) {
+    public init(name: String?, topic: String? = nil, isEncrypted: Bool, isDirect: Bool = false, visibility: RoomVisibility, preset: RoomPreset, invite: [String]? = nil, avatar: String? = nil, powerLevelContentOverride: PowerLevels? = nil, joinRuleOverride: JoinRule? = nil, canonicalAlias: String? = nil) {
         self.name = name
         self.topic = topic
         self.isEncrypted = isEncrypted
@@ -11340,6 +11403,8 @@ public struct CreateRoomParameters {
         self.invite = invite
         self.avatar = avatar
         self.powerLevelContentOverride = powerLevelContentOverride
+        self.joinRuleOverride = joinRuleOverride
+        self.canonicalAlias = canonicalAlias
     }
 }
 
@@ -11374,6 +11439,12 @@ extension CreateRoomParameters: Equatable, Hashable {
         if lhs.powerLevelContentOverride != rhs.powerLevelContentOverride {
             return false
         }
+        if lhs.joinRuleOverride != rhs.joinRuleOverride {
+            return false
+        }
+        if lhs.canonicalAlias != rhs.canonicalAlias {
+            return false
+        }
         return true
     }
 
@@ -11387,6 +11458,8 @@ extension CreateRoomParameters: Equatable, Hashable {
         hasher.combine(invite)
         hasher.combine(avatar)
         hasher.combine(powerLevelContentOverride)
+        hasher.combine(joinRuleOverride)
+        hasher.combine(canonicalAlias)
     }
 }
 
@@ -11403,7 +11476,9 @@ public struct FfiConverterTypeCreateRoomParameters: FfiConverterRustBuffer {
                 preset: FfiConverterTypeRoomPreset.read(from: &buf), 
                 invite: FfiConverterOptionSequenceString.read(from: &buf), 
                 avatar: FfiConverterOptionString.read(from: &buf), 
-                powerLevelContentOverride: FfiConverterOptionTypePowerLevels.read(from: &buf)
+                powerLevelContentOverride: FfiConverterOptionTypePowerLevels.read(from: &buf), 
+                joinRuleOverride: FfiConverterOptionTypeJoinRule.read(from: &buf), 
+                canonicalAlias: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -11417,6 +11492,8 @@ public struct FfiConverterTypeCreateRoomParameters: FfiConverterRustBuffer {
         FfiConverterOptionSequenceString.write(value.invite, into: &buf)
         FfiConverterOptionString.write(value.avatar, into: &buf)
         FfiConverterOptionTypePowerLevels.write(value.powerLevelContentOverride, into: &buf)
+        FfiConverterOptionTypeJoinRule.write(value.joinRuleOverride, into: &buf)
+        FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
     }
 }
 
@@ -16824,6 +16901,64 @@ extension AccountManagementAction: Equatable, Hashable {}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * An allow rule which defines a condition that allows joining a room.
+ */
+
+public enum AllowRule {
+    
+    /**
+     * Only a member of the `room_id` Room can join the one this rule is used
+     * in.
+     */
+    case roomMembership(roomId: String
+    )
+}
+
+
+public struct FfiConverterTypeAllowRule: FfiConverterRustBuffer {
+    typealias SwiftType = AllowRule
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AllowRule {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .roomMembership(roomId: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: AllowRule, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .roomMembership(roomId):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(roomId, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeAllowRule_lift(_ buf: RustBuffer) throws -> AllowRule {
+    return try FfiConverterTypeAllowRule.lift(buf)
+}
+
+public func FfiConverterTypeAllowRule_lower(_ value: AllowRule) -> RustBuffer {
+    return FfiConverterTypeAllowRule.lower(value)
+}
+
+
+
+extension AllowRule: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum AssetType {
     
@@ -18167,6 +18302,123 @@ extension HumanQrLoginError: Foundation.LocalizedError {
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The rule used for users wishing to join this room.
+ */
+
+public enum JoinRule {
+    
+    /**
+     * Anyone can join the room without any prior action.
+     */
+    case `public`
+    /**
+     * A user who wishes to join the room must first receive an invite to the
+     * room from someone already inside of the room.
+     */
+    case invite
+    /**
+     * Users can join the room if they are invited, or they can request an
+     * invite to the room.
+     *
+     * They can be allowed (invited) or denied (kicked/banned) access.
+     */
+    case knock
+    /**
+     * Reserved but not yet implemented by the Matrix specification.
+     */
+    case `private`
+    /**
+     * Users can join the room if they are invited, or if they meet any of the
+     * conditions described in a set of [`AllowRule`]s.
+     */
+    case restricted(rules: [AllowRule]
+    )
+    /**
+     * Users can join the room if they are invited, or if they meet any of the
+     * conditions described in a set of [`AllowRule`]s, or they can request
+     * an invite to the room.
+     */
+    case knockRestricted(rules: [AllowRule]
+    )
+}
+
+
+public struct FfiConverterTypeJoinRule: FfiConverterRustBuffer {
+    typealias SwiftType = JoinRule
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> JoinRule {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .`public`
+        
+        case 2: return .invite
+        
+        case 3: return .knock
+        
+        case 4: return .`private`
+        
+        case 5: return .restricted(rules: try FfiConverterSequenceTypeAllowRule.read(from: &buf)
+        )
+        
+        case 6: return .knockRestricted(rules: try FfiConverterSequenceTypeAllowRule.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: JoinRule, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .`public`:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .invite:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .knock:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .`private`:
+            writeInt(&buf, Int32(4))
+        
+        
+        case let .restricted(rules):
+            writeInt(&buf, Int32(5))
+            FfiConverterSequenceTypeAllowRule.write(rules, into: &buf)
+            
+        
+        case let .knockRestricted(rules):
+            writeInt(&buf, Int32(6))
+            FfiConverterSequenceTypeAllowRule.write(rules, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeJoinRule_lift(_ buf: RustBuffer) throws -> JoinRule {
+    return try FfiConverterTypeJoinRule.lift(buf)
+}
+
+public func FfiConverterTypeJoinRule_lower(_ value: JoinRule) -> RustBuffer {
+    return FfiConverterTypeJoinRule.lower(value)
+}
+
+
+
+extension JoinRule: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum LogLevel {
     
@@ -18651,6 +18903,11 @@ public enum MembershipState {
      * The user has left.
      */
     case leave
+    /**
+     * A custom membership state value.
+     */
+    case custom(value: String
+    )
 }
 
 
@@ -18670,6 +18927,9 @@ public struct FfiConverterTypeMembershipState: FfiConverterRustBuffer {
         case 4: return .knock
         
         case 5: return .leave
+        
+        case 6: return .custom(value: try FfiConverterString.read(from: &buf)
+        )
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -18698,6 +18958,11 @@ public struct FfiConverterTypeMembershipState: FfiConverterRustBuffer {
         case .leave:
             writeInt(&buf, Int32(5))
         
+        
+        case let .custom(value):
+            writeInt(&buf, Int32(6))
+            FfiConverterString.write(value, into: &buf)
+            
         }
     }
 }
@@ -26651,6 +26916,27 @@ fileprivate struct FfiConverterOptionTypeEventSendState: FfiConverterRustBuffer 
     }
 }
 
+fileprivate struct FfiConverterOptionTypeJoinRule: FfiConverterRustBuffer {
+    typealias SwiftType = JoinRule?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeJoinRule.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeJoinRule.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeMembershipChange: FfiConverterRustBuffer {
     typealias SwiftType = MembershipChange?
 
@@ -27399,6 +27685,28 @@ fileprivate struct FfiConverterSequenceTypeUserProfile: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeUserProfile.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+fileprivate struct FfiConverterSequenceTypeAllowRule: FfiConverterRustBuffer {
+    typealias SwiftType = [AllowRule]
+
+    public static func write(_ value: [AllowRule], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeAllowRule.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [AllowRule] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [AllowRule]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeAllowRule.read(from: &buf))
         }
         return seq
     }
@@ -28320,9 +28628,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_recovery() != 64351) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_get_user_identity() != 40601) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_is_last_device() != 27955) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -28342,6 +28647,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_reset_recovery_key() != 20380) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_user_identity() != 20644) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_verification_state() != 29114) {
@@ -28794,10 +29102,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roommembersiterator_next_chunk() != 23186) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sendattachmentjoinhandle_cancel() != 19759) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sendattachmentjoinhandle_cancel() != 62384) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sendattachmentjoinhandle_join() != 49985) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sendattachmentjoinhandle_join() != 1903) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sendhandle_abort() != 11570) {
@@ -28881,7 +29189,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_create_poll() != 37925) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 27268) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 42189) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_end_poll() != 61329) {
@@ -29017,6 +29325,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_unreadnotificationscount_notification_count() != 35655) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_is_verified() != 61954) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_master_key() != 4041) {
