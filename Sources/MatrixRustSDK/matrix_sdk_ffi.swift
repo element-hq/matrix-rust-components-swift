@@ -7343,7 +7343,7 @@ public protocol RoomListServiceProtocol : AnyObject {
     
     func state(listener: RoomListServiceStateListener)  -> TaskHandle
     
-    func subscribeToRooms(roomIds: [String], settings: RoomSubscription?) throws 
+    func subscribeToRooms(roomIds: [String]) throws 
     
     func syncIndicator(delayBeforeShowingInMs: UInt32, delayBeforeHidingInMs: UInt32, listener: RoomListServiceSyncIndicatorListener)  -> TaskHandle
     
@@ -7423,10 +7423,9 @@ open func state(listener: RoomListServiceStateListener) -> TaskHandle {
 })
 }
     
-open func subscribeToRooms(roomIds: [String], settings: RoomSubscription?)throws  {try rustCallWithError(FfiConverterTypeRoomListError.lift) {
+open func subscribeToRooms(roomIds: [String])throws  {try rustCallWithError(FfiConverterTypeRoomListError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_roomlistservice_subscribe_to_rooms(self.uniffiClonePointer(),
-        FfiConverterSequenceString.lower(roomIds),
-        FfiConverterOptionTypeRoomSubscription.lower(settings),$0
+        FfiConverterSequenceString.lower(roomIds),$0
     )
 }
 }
@@ -9076,17 +9075,6 @@ public protocol TimelineProtocol : AnyObject {
     func getEventTimelineItemByEventId(eventId: String) async throws  -> EventTimelineItem
     
     /**
-     * Get the current timeline item for the given transaction ID, if any.
-     *
-     * This will always return a local echo, if found.
-     *
-     * It's preferable to store the timeline items in the model for your UI, if
-     * possible, instead of just storing IDs and coming back to the timeline
-     * object to look up items.
-     */
-    func getEventTimelineItemByTransactionId(transactionId: String) async throws  -> EventTimelineItem
-    
-    /**
      * Load the reply details for the given event id.
      *
      * This will return an `InReplyToDetails` object that contains the details
@@ -9144,11 +9132,11 @@ public protocol TimelineProtocol : AnyObject {
      */
     func send(msg: RoomMessageEventContentWithoutRelation) async throws  -> SendHandle
     
-    func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
+    func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
     
-    func sendFile(url: String, fileInfo: FileInfo, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
+    func sendFile(url: String, fileInfo: FileInfo, storeInCache: Bool, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
     
-    func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
+    func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
     
     func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?) async 
     
@@ -9158,9 +9146,9 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String) async throws 
     
-    func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
+    func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
     
-    func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16], caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
+    func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16], caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
     
     func subscribeToBackPaginationStatus(listener: PaginationStatusListener) async throws  -> TaskHandle
     
@@ -9394,32 +9382,6 @@ open func getEventTimelineItemByEventId(eventId: String)async throws  -> EventTi
 }
     
     /**
-     * Get the current timeline item for the given transaction ID, if any.
-     *
-     * This will always return a local echo, if found.
-     *
-     * It's preferable to store the timeline items in the model for your UI, if
-     * possible, instead of just storing IDs and coming back to the timeline
-     * object to look up items.
-     */
-open func getEventTimelineItemByTransactionId(transactionId: String)async throws  -> EventTimelineItem {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_timeline_get_event_timeline_item_by_transaction_id(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(transactionId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterTypeEventTimelineItem.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-    /**
      * Load the reply details for the given event id.
      *
      * This will return an `InReplyToDetails` object that contains the details
@@ -9572,29 +9534,31 @@ open func send(msg: RoomMessageEventContentWithoutRelation)async throws  -> Send
         )
 }
     
-open func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
+open func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
     return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_audio(self.uniffiClonePointer(),
         FfiConverterString.lower(url),
         FfiConverterTypeAudioInfo.lower(audioInfo),
         FfiConverterOptionString.lower(caption),
         FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
+        FfiConverterBool.lower(storeInCache),
         FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
     )
 })
 }
     
-open func sendFile(url: String, fileInfo: FileInfo, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
+open func sendFile(url: String, fileInfo: FileInfo, storeInCache: Bool, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
     return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_file(self.uniffiClonePointer(),
         FfiConverterString.lower(url),
         FfiConverterTypeFileInfo.lower(fileInfo),
+        FfiConverterBool.lower(storeInCache),
         FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
     )
 })
 }
     
-open func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
+open func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
     return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_image(self.uniffiClonePointer(),
         FfiConverterString.lower(url),
@@ -9602,6 +9566,7 @@ open func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, ca
         FfiConverterTypeImageInfo.lower(imageInfo),
         FfiConverterOptionString.lower(caption),
         FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
+        FfiConverterBool.lower(storeInCache),
         FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
     )
 })
@@ -9676,7 +9641,7 @@ open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String
         )
 }
     
-open func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
+open func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
     return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_video(self.uniffiClonePointer(),
         FfiConverterString.lower(url),
@@ -9684,12 +9649,13 @@ open func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, ca
         FfiConverterTypeVideoInfo.lower(videoInfo),
         FfiConverterOptionString.lower(caption),
         FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
+        FfiConverterBool.lower(storeInCache),
         FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
     )
 })
 }
     
-open func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16], caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
+open func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16], caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
     return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_voice_message(self.uniffiClonePointer(),
         FfiConverterString.lower(url),
@@ -9697,6 +9663,7 @@ open func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16]
         FfiConverterSequenceUInt16.lower(waveform),
         FfiConverterOptionString.lower(caption),
         FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
+        FfiConverterBool.lower(storeInCache),
         FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
     )
 })
@@ -13735,63 +13702,6 @@ public func FfiConverterTypeRequestConfig_lower(_ value: RequestConfig) -> RustB
 }
 
 
-public struct RequiredState {
-    public var key: String
-    public var value: String
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(key: String, value: String) {
-        self.key = key
-        self.value = value
-    }
-}
-
-
-
-extension RequiredState: Equatable, Hashable {
-    public static func ==(lhs: RequiredState, rhs: RequiredState) -> Bool {
-        if lhs.key != rhs.key {
-            return false
-        }
-        if lhs.value != rhs.value {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(key)
-        hasher.combine(value)
-    }
-}
-
-
-public struct FfiConverterTypeRequiredState: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RequiredState {
-        return
-            try RequiredState(
-                key: FfiConverterString.read(from: &buf), 
-                value: FfiConverterString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: RequiredState, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.key, into: &buf)
-        FfiConverterString.write(value.value, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeRequiredState_lift(_ buf: RustBuffer) throws -> RequiredState {
-    return try FfiConverterTypeRequiredState.lift(buf)
-}
-
-public func FfiConverterTypeRequiredState_lower(_ value: RequiredState) -> RustBuffer {
-    return FfiConverterTypeRequiredState.lower(value)
-}
-
-
 /**
  * Information about a room, that was resolved from a room alias.
  */
@@ -15049,71 +14959,6 @@ public func FfiConverterTypeRoomPreview_lift(_ buf: RustBuffer) throws -> RoomPr
 
 public func FfiConverterTypeRoomPreview_lower(_ value: RoomPreview) -> RustBuffer {
     return FfiConverterTypeRoomPreview.lower(value)
-}
-
-
-public struct RoomSubscription {
-    public var requiredState: [RequiredState]?
-    public var timelineLimit: UInt32
-    public var includeHeroes: Bool?
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(requiredState: [RequiredState]?, timelineLimit: UInt32, includeHeroes: Bool?) {
-        self.requiredState = requiredState
-        self.timelineLimit = timelineLimit
-        self.includeHeroes = includeHeroes
-    }
-}
-
-
-
-extension RoomSubscription: Equatable, Hashable {
-    public static func ==(lhs: RoomSubscription, rhs: RoomSubscription) -> Bool {
-        if lhs.requiredState != rhs.requiredState {
-            return false
-        }
-        if lhs.timelineLimit != rhs.timelineLimit {
-            return false
-        }
-        if lhs.includeHeroes != rhs.includeHeroes {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(requiredState)
-        hasher.combine(timelineLimit)
-        hasher.combine(includeHeroes)
-    }
-}
-
-
-public struct FfiConverterTypeRoomSubscription: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomSubscription {
-        return
-            try RoomSubscription(
-                requiredState: FfiConverterOptionSequenceTypeRequiredState.read(from: &buf), 
-                timelineLimit: FfiConverterUInt32.read(from: &buf), 
-                includeHeroes: FfiConverterOptionBool.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: RoomSubscription, into buf: inout [UInt8]) {
-        FfiConverterOptionSequenceTypeRequiredState.write(value.requiredState, into: &buf)
-        FfiConverterUInt32.write(value.timelineLimit, into: &buf)
-        FfiConverterOptionBool.write(value.includeHeroes, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeRoomSubscription_lift(_ buf: RustBuffer) throws -> RoomSubscription {
-    return try FfiConverterTypeRoomSubscription.lift(buf)
-}
-
-public func FfiConverterTypeRoomSubscription_lower(_ value: RoomSubscription) -> RustBuffer {
-    return FfiConverterTypeRoomSubscription.lower(value)
 }
 
 
@@ -26685,27 +26530,6 @@ fileprivate struct FfiConverterOptionTypeRoomMember: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionTypeRoomSubscription: FfiConverterRustBuffer {
-    typealias SwiftType = RoomSubscription?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeRoomSubscription.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeRoomSubscription.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeSetData: FfiConverterRustBuffer {
     typealias SwiftType = SetData?
 
@@ -27210,27 +27034,6 @@ fileprivate struct FfiConverterOptionSequenceTypeTimelineItem: FfiConverterRustB
     }
 }
 
-fileprivate struct FfiConverterOptionSequenceTypeRequiredState: FfiConverterRustBuffer {
-    typealias SwiftType = [RequiredState]?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterSequenceTypeRequiredState.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterSequenceTypeRequiredState.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionSequenceTypeRoomMember: FfiConverterRustBuffer {
     typealias SwiftType = [RoomMember]?
 
@@ -27553,28 +27356,6 @@ fileprivate struct FfiConverterSequenceTypeReactionSenderData: FfiConverterRustB
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeReactionSenderData.read(from: &buf))
-        }
-        return seq
-    }
-}
-
-fileprivate struct FfiConverterSequenceTypeRequiredState: FfiConverterRustBuffer {
-    typealias SwiftType = [RequiredState]
-
-    public static func write(_ value: [RequiredState], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for item in value {
-            FfiConverterTypeRequiredState.write(item, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RequiredState] {
-        let len: Int32 = try readInt(&buf)
-        var seq = [RequiredState]()
-        seq.reserveCapacity(Int(len))
-        for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeRequiredState.read(from: &buf))
         }
         return seq
     }
@@ -29090,7 +28871,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_state() != 64650) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_subscribe_to_rooms() != 21360) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_subscribe_to_rooms() != 59765) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_sync_indicator() != 16821) {
@@ -29207,9 +28988,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_event_id() != 33999) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_transaction_id() != 54739) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_load_reply_details() != 54225) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -29231,13 +29009,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send() != 9553) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 47157) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 57949) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_file() != 9210) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_file() != 37971) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 30540) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 27985) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_location() != 47400) {
@@ -29252,10 +29030,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 64747) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 34287) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 59961) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_voice_message() != 49989) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_voice_message() != 1195) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_back_pagination_status() != 46161) {
