@@ -747,7 +747,7 @@ public protocol ClientProtocol : AnyObject {
     /**
      * Knock on a room to join it using its ID or alias.
      */
-    func knock(roomIdOrAlias: String) async throws  -> Room
+    func knock(roomIdOrAlias: String, reason: String?, serverNames: [String]) async throws  -> Room
     
     /**
      * Login using a username and password.
@@ -1523,13 +1523,13 @@ open func joinRoomByIdOrAlias(roomIdOrAlias: String, serverNames: [String])async
     /**
      * Knock on a room to join it using its ID or alias.
      */
-open func knock(roomIdOrAlias: String)async throws  -> Room {
+open func knock(roomIdOrAlias: String, reason: String?, serverNames: [String])async throws  -> Room {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_knock(
                     self.uniffiClonePointer(),
-                    FfiConverterString.lower(roomIdOrAlias)
+                    FfiConverterString.lower(roomIdOrAlias),FfiConverterOptionString.lower(reason),FfiConverterSequenceString.lower(serverNames)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
@@ -17770,50 +17770,13 @@ public enum EventSendState {
      */
     case notSentYet
     /**
-     * One or more verified users in the room has an unsigned device.
-     *
-     * Happens only when the room key recipient strategy (as set by
-     * [`ClientBuilder::room_key_recipient_strategy`]) has
-     * [`error_on_verified_user_problem`](CollectStrategy::DeviceBasedStrategy::error_on_verified_user_problem) set.
-     */
-    case verifiedUserHasUnsignedDevice(
-        /**
-         * The unsigned devices belonging to verified users. A map from user ID
-         * to a list of device IDs.
-         */devices: [String: [String]]
-    )
-    /**
-     * One or more verified users in the room has changed identity since they
-     * were verified.
-     *
-     * Happens only when the room key recipient strategy (as set by
-     * [`ClientBuilder::room_key_recipient_strategy`]) has
-     * [`error_on_verified_user_problem`](CollectStrategy::DeviceBasedStrategy::error_on_verified_user_problem)
-     * set, or when using [`CollectStrategy::IdentityBasedStrategy`].
-     */
-    case verifiedUserChangedIdentity(
-        /**
-         * The users that were previously verified, but are no longer
-         */users: [String]
-    )
-    /**
-     * The user does not have cross-signing set up, but
-     * [`CollectStrategy::IdentityBasedStrategy`] was used.
-     */
-    case crossSigningNotSetup
-    /**
-     * The current device is not verified, but
-     * [`CollectStrategy::IdentityBasedStrategy`] was used.
-     */
-    case sendingFromUnverifiedDevice
-    /**
      * The local event has been sent to the server, but unsuccessfully: The
      * sending has failed.
      */
     case sendingFailed(
         /**
-         * Stringified error message.
-         */error: String, 
+         * The error reason, with information for the user.
+         */error: QueueWedgeError, 
         /**
          * Whether the error is considered recoverable or not.
          *
@@ -17839,20 +17802,10 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
         
         case 1: return .notSentYet
         
-        case 2: return .verifiedUserHasUnsignedDevice(devices: try FfiConverterDictionaryStringSequenceString.read(from: &buf)
+        case 2: return .sendingFailed(error: try FfiConverterTypeQueueWedgeError.read(from: &buf), isRecoverable: try FfiConverterBool.read(from: &buf)
         )
         
-        case 3: return .verifiedUserChangedIdentity(users: try FfiConverterSequenceString.read(from: &buf)
-        )
-        
-        case 4: return .crossSigningNotSetup
-        
-        case 5: return .sendingFromUnverifiedDevice
-        
-        case 6: return .sendingFailed(error: try FfiConverterString.read(from: &buf), isRecoverable: try FfiConverterBool.read(from: &buf)
-        )
-        
-        case 7: return .sent(eventId: try FfiConverterString.read(from: &buf)
+        case 3: return .sent(eventId: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -17867,32 +17820,14 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
             writeInt(&buf, Int32(1))
         
         
-        case let .verifiedUserHasUnsignedDevice(devices):
-            writeInt(&buf, Int32(2))
-            FfiConverterDictionaryStringSequenceString.write(devices, into: &buf)
-            
-        
-        case let .verifiedUserChangedIdentity(users):
-            writeInt(&buf, Int32(3))
-            FfiConverterSequenceString.write(users, into: &buf)
-            
-        
-        case .crossSigningNotSetup:
-            writeInt(&buf, Int32(4))
-        
-        
-        case .sendingFromUnverifiedDevice:
-            writeInt(&buf, Int32(5))
-        
-        
         case let .sendingFailed(error,isRecoverable):
-            writeInt(&buf, Int32(6))
-            FfiConverterString.write(error, into: &buf)
+            writeInt(&buf, Int32(2))
+            FfiConverterTypeQueueWedgeError.write(error, into: &buf)
             FfiConverterBool.write(isRecoverable, into: &buf)
             
         
         case let .sent(eventId):
-            writeInt(&buf, Int32(7))
+            writeInt(&buf, Int32(3))
             FfiConverterString.write(eventId, into: &buf)
             
         }
@@ -20687,6 +20622,115 @@ public func FfiConverterTypeQrLoginProgress_lower(_ value: QrLoginProgress) -> R
 
 
 extension QrLoginProgress: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Bindings version of the sdk type replacing OwnedUserId/DeviceIds with simple
+ * String.
+ *
+ * Represent a failed to send unrecoverable error of an event sent via the
+ * send_queue. It is a serializable representation of a client error, see
+ * `From` implementation for more details. These errors can not be
+ * automatically retried, but yet some manual action can be taken before retry
+ * sending. If not the only solution is to delete the local event.
+ */
+
+public enum QueueWedgeError {
+    
+    /**
+     * This error occurs when there are some insecure devices in the room, and
+     * the current encryption setting prohibit sharing with them.
+     */
+    case insecureDevices(
+        /**
+         * The insecure devices as a Map of userID to deviceID.
+         */userDeviceMap: [String: [String]]
+    )
+    /**
+     * This error occurs when a previously verified user is not anymore, and
+     * the current encryption setting prohibit sharing when it happens.
+     */
+    case identityViolations(
+        /**
+         * The users that are expected to be verified but are not.
+         */users: [String]
+    )
+    /**
+     * It is required to set up cross-signing and properly erify the current
+     * session before sending.
+     */
+    case crossVerificationRequired
+    /**
+     * Other errors.
+     */
+    case genericApiError(msg: String
+    )
+}
+
+
+public struct FfiConverterTypeQueueWedgeError: FfiConverterRustBuffer {
+    typealias SwiftType = QueueWedgeError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> QueueWedgeError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .insecureDevices(userDeviceMap: try FfiConverterDictionaryStringSequenceString.read(from: &buf)
+        )
+        
+        case 2: return .identityViolations(users: try FfiConverterSequenceString.read(from: &buf)
+        )
+        
+        case 3: return .crossVerificationRequired
+        
+        case 4: return .genericApiError(msg: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: QueueWedgeError, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .insecureDevices(userDeviceMap):
+            writeInt(&buf, Int32(1))
+            FfiConverterDictionaryStringSequenceString.write(userDeviceMap, into: &buf)
+            
+        
+        case let .identityViolations(users):
+            writeInt(&buf, Int32(2))
+            FfiConverterSequenceString.write(users, into: &buf)
+            
+        
+        case .crossVerificationRequired:
+            writeInt(&buf, Int32(3))
+        
+        
+        case let .genericApiError(msg):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(msg, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeQueueWedgeError_lift(_ buf: RustBuffer) throws -> QueueWedgeError {
+    return try FfiConverterTypeQueueWedgeError.lift(buf)
+}
+
+public func FfiConverterTypeQueueWedgeError_lower(_ value: QueueWedgeError) -> RustBuffer {
+    return FfiConverterTypeQueueWedgeError.lower(value)
+}
+
+
+
+extension QueueWedgeError: Equatable, Hashable {}
 
 
 
@@ -28223,7 +28267,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_join_room_by_id_or_alias() != 18521) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_knock() != 8228) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_knock() != 48652) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_login() != 33276) {

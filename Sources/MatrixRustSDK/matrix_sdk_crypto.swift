@@ -1076,10 +1076,30 @@ public enum UtdCause {
      */
     case unknown
     /**
-     * This event was sent when we were not a member of the room (or invited),
-     * so it is impossible to decrypt (without MSC3061).
+     * We are missing the keys for this event, and the event was sent when we
+     * were not a member of the room (or invited).
      */
-    case membership
+    case sentBeforeWeJoined
+    /**
+     * The message was sent by a user identity we have not verified, but the
+     * user was previously verified.
+     */
+    case verificationViolation
+    /**
+     * The [`crate::TrustRequirement`] requires that the sending device be
+     * signed by its owner, and it was not.
+     */
+    case unsignedDevice
+    /**
+     * The [`crate::TrustRequirement`] requires that the sending device be
+     * signed by its owner, and we were unable to securely find the device.
+     *
+     * This could be because the device has since been deleted, because we
+     * haven't yet downloaded it from the server, or because the session
+     * data was obtained from an insecure source (imported from a file,
+     * obtained from a legacy (asymmetric) backup, unsafe key forward, etc.)
+     */
+    case unknownDevice
 }
 
 
@@ -1092,7 +1112,13 @@ public struct FfiConverterTypeUtdCause: FfiConverterRustBuffer {
         
         case 1: return .unknown
         
-        case 2: return .membership
+        case 2: return .sentBeforeWeJoined
+        
+        case 3: return .verificationViolation
+        
+        case 4: return .unsignedDevice
+        
+        case 5: return .unknownDevice
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -1106,8 +1132,20 @@ public struct FfiConverterTypeUtdCause: FfiConverterRustBuffer {
             writeInt(&buf, Int32(1))
         
         
-        case .membership:
+        case .sentBeforeWeJoined:
             writeInt(&buf, Int32(2))
+        
+        
+        case .verificationViolation:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .unsignedDevice:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .unknownDevice:
+            writeInt(&buf, Int32(5))
         
         }
     }
