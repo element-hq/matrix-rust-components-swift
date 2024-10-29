@@ -1336,9 +1336,9 @@ open func getRoomPreviewFromRoomAlias(roomAlias: String)async throws  -> RoomPre
                     FfiConverterString.lower(roomAlias)
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
             liftFunc: FfiConverterTypeRoomPreview.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
@@ -1360,9 +1360,9 @@ open func getRoomPreviewFromRoomId(roomId: String, viaServers: [String])async th
                     FfiConverterString.lower(roomId),FfiConverterSequenceString.lower(viaServers)
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
             liftFunc: FfiConverterTypeRoomPreview.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
@@ -3018,6 +3018,12 @@ public protocol HomeserverLoginDetailsProtocol : AnyObject {
     func slidingSyncVersion()  -> SlidingSyncVersion
     
     /**
+     * The prompts advertised by the authentication issuer for use in the login
+     * URL.
+     */
+    func supportedOidcPrompts()  -> [OidcPrompt]
+    
+    /**
      * Whether the current homeserver supports login using OIDC.
      */
     func supportsOidcLogin()  -> Bool
@@ -3081,6 +3087,17 @@ open class HomeserverLoginDetails:
 open func slidingSyncVersion() -> SlidingSyncVersion {
     return try!  FfiConverterTypeSlidingSyncVersion.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_homeserverlogindetails_sliding_sync_version(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * The prompts advertised by the authentication issuer for use in the login
+     * URL.
+     */
+open func supportedOidcPrompts() -> [OidcPrompt] {
+    return try!  FfiConverterSequenceTypeOidcPrompt.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_homeserverlogindetails_supported_oidc_prompts(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -7036,12 +7053,12 @@ public protocol RoomListItemProtocol : AnyObject {
     
     /**
      * Builds a `Room` FFI from an invited room without initializing its
-     * internal timeline
+     * internal timeline.
      *
-     * An error will be returned if the room is a state different than invited
+     * An error will be returned if the room is a state different than invited.
      *
      * ⚠️ Holding on to this room instance after it has been joined is not
-     * safe. Use `full_room` instead
+     * safe. Use `full_room` instead.
      */
     func invitedRoom() throws  -> Room
     
@@ -7066,6 +7083,15 @@ public protocol RoomListItemProtocol : AnyObject {
      * The room's current membership state.
      */
     func membership()  -> Membership
+    
+    /**
+     * Builds a `RoomPreview` from a room list item. This is intended for
+     * invited or knocked rooms.
+     *
+     * An error will be returned if the room is in a state other than invited
+     * or knocked.
+     */
+    func previewRoom(via: [String]) async throws  -> RoomPreview
     
     func roomInfo() async throws  -> RoomInfo
     
@@ -7187,12 +7213,12 @@ open func initTimeline(eventTypeFilter: TimelineEventTypeFilter?, internalIdPref
     
     /**
      * Builds a `Room` FFI from an invited room without initializing its
-     * internal timeline
+     * internal timeline.
      *
-     * An error will be returned if the room is a state different than invited
+     * An error will be returned if the room is a state different than invited.
      *
      * ⚠️ Holding on to this room instance after it has been joined is not
-     * safe. Use `full_room` instead
+     * safe. Use `full_room` instead.
      */
 open func invitedRoom()throws  -> Room {
     return try  FfiConverterTypeRoom.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
@@ -7268,6 +7294,30 @@ open func membership() -> Membership {
     uniffi_matrix_sdk_ffi_fn_method_roomlistitem_membership(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+    /**
+     * Builds a `RoomPreview` from a room list item. This is intended for
+     * invited or knocked rooms.
+     *
+     * An error will be returned if the room is in a state other than invited
+     * or knocked.
+     */
+open func previewRoom(via: [String])async throws  -> RoomPreview {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_roomlistitem_preview_room(
+                    self.uniffiClonePointer(),
+                    FfiConverterSequenceString.lower(via)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeRoomPreview.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func roomInfo()async throws  -> RoomInfo {
@@ -7703,6 +7753,153 @@ public func FfiConverterTypeRoomMessageEventContentWithoutRelation_lower(_ value
 
 
 
+/**
+ * A room preview for a room. It's intended to be used to represent rooms that
+ * aren't joined yet.
+ */
+public protocol RoomPreviewProtocol : AnyObject {
+    
+    /**
+     * Returns the room info the preview contains.
+     */
+    func info() throws  -> RoomPreviewInfo
+    
+    /**
+     * Leave the room if the room preview state is either joined, invited or
+     * knocked.
+     *
+     * Will return an error otherwise.
+     */
+    func leave() async throws 
+    
+}
+
+/**
+ * A room preview for a room. It's intended to be used to represent rooms that
+ * aren't joined yet.
+ */
+open class RoomPreview:
+    RoomPreviewProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_roompreview(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roompreview(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Returns the room info the preview contains.
+     */
+open func info()throws  -> RoomPreviewInfo {
+    return try  FfiConverterTypeRoomPreviewInfo.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roompreview_info(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Leave the room if the room preview state is either joined, invited or
+     * knocked.
+     *
+     * Will return an error otherwise.
+     */
+open func leave()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_roompreview_leave(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+
+}
+
+public struct FfiConverterTypeRoomPreview: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = RoomPreview
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> RoomPreview {
+        return RoomPreview(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: RoomPreview) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomPreview {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: RoomPreview, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeRoomPreview_lift(_ pointer: UnsafeMutableRawPointer) throws -> RoomPreview {
+    return try FfiConverterTypeRoomPreview.lift(pointer)
+}
+
+public func FfiConverterTypeRoomPreview_lower(_ value: RoomPreview) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeRoomPreview.lower(value)
+}
+
+
+
+
 public protocol SendAttachmentJoinHandleProtocol : AnyObject {
     
     /**
@@ -7977,18 +8174,45 @@ public func FfiConverterTypeSendHandle_lower(_ value: SendHandle) -> UnsafeMutab
 
 public protocol SessionVerificationControllerProtocol : AnyObject {
     
+    /**
+     * Accept the previously acknowledged verification request
+     */
+    func acceptVerificationRequest() async throws 
+    
+    /**
+     * Set this particular request as the currently active one and register for
+     * events pertaining it.
+     * * `sender_id` - The user requesting verification.
+     * * `flow_id` - - The ID that uniquely identifies the verification flow.
+     */
+    func acknowledgeVerificationRequest(senderId: String, flowId: String) async throws 
+    
+    /**
+     * Confirm that the short auth strings match on both sides.
+     */
     func approveVerification() async throws 
     
+    /**
+     * Cancel the current verification request
+     */
     func cancelVerification() async throws 
     
+    /**
+     * Reject the short auth string
+     */
     func declineVerification() async throws 
     
-    func isVerified() async throws  -> Bool
-    
+    /**
+     * Request verification for the current device
+     */
     func requestVerification() async throws 
     
     func setDelegate(delegate: SessionVerificationControllerDelegate?) 
     
+    /**
+     * Transition the current verification request into a SAS verification
+     * flow.
+     */
     func startSasVerification() async throws 
     
 }
@@ -8034,6 +8258,52 @@ open class SessionVerificationController:
     
 
     
+    /**
+     * Accept the previously acknowledged verification request
+     */
+open func acceptVerificationRequest()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_sessionverificationcontroller_accept_verification_request(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Set this particular request as the currently active one and register for
+     * events pertaining it.
+     * * `sender_id` - The user requesting verification.
+     * * `flow_id` - - The ID that uniquely identifies the verification flow.
+     */
+open func acknowledgeVerificationRequest(senderId: String, flowId: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_sessionverificationcontroller_acknowledge_verification_request(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(senderId),FfiConverterString.lower(flowId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Confirm that the short auth strings match on both sides.
+     */
 open func approveVerification()async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -8051,6 +8321,9 @@ open func approveVerification()async throws  {
         )
 }
     
+    /**
+     * Cancel the current verification request
+     */
 open func cancelVerification()async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -8068,6 +8341,9 @@ open func cancelVerification()async throws  {
         )
 }
     
+    /**
+     * Reject the short auth string
+     */
 open func declineVerification()async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -8085,23 +8361,9 @@ open func declineVerification()async throws  {
         )
 }
     
-open func isVerified()async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_sessionverificationcontroller_is_verified(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
+    /**
+     * Request verification for the current device
+     */
 open func requestVerification()async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -8126,6 +8388,10 @@ open func setDelegate(delegate: SessionVerificationControllerDelegate?) {try! ru
 }
 }
     
+    /**
+     * Transition the current verification request into a SAS verification
+     * flow.
+     */
 open func startSasVerification()async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -14753,7 +15019,7 @@ public func FfiConverterTypeRoomPowerLevels_lower(_ value: RoomPowerLevels) -> R
 /**
  * The preview of a room, be it invited/joined/left, or not.
  */
-public struct RoomPreview {
+public struct RoomPreviewInfo {
     /**
      * The room id for this room.
      */
@@ -14787,21 +15053,13 @@ public struct RoomPreview {
      */
     public var isHistoryWorldReadable: Bool
     /**
-     * Is the room joined by the current user?
+     * The membership state for the current user, if known.
      */
-    public var isJoined: Bool
+    public var membership: Membership?
     /**
-     * Is the current user invited to this room?
+     * The join rule for this room (private, public, knock, etc.).
      */
-    public var isInvited: Bool
-    /**
-     * is the join rule public for this room?
-     */
-    public var isPublic: Bool
-    /**
-     * Can we knock (or restricted-knock) to this room?
-     */
-    public var canKnock: Bool
+    public var joinRule: JoinRule
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -14831,17 +15089,11 @@ public struct RoomPreview {
          * Is the history world-readable for this room?
          */isHistoryWorldReadable: Bool, 
         /**
-         * Is the room joined by the current user?
-         */isJoined: Bool, 
+         * The membership state for the current user, if known.
+         */membership: Membership?, 
         /**
-         * Is the current user invited to this room?
-         */isInvited: Bool, 
-        /**
-         * is the join rule public for this room?
-         */isPublic: Bool, 
-        /**
-         * Can we knock (or restricted-knock) to this room?
-         */canKnock: Bool) {
+         * The join rule for this room (private, public, knock, etc.).
+         */joinRule: JoinRule) {
         self.roomId = roomId
         self.canonicalAlias = canonicalAlias
         self.name = name
@@ -14850,17 +15102,15 @@ public struct RoomPreview {
         self.numJoinedMembers = numJoinedMembers
         self.roomType = roomType
         self.isHistoryWorldReadable = isHistoryWorldReadable
-        self.isJoined = isJoined
-        self.isInvited = isInvited
-        self.isPublic = isPublic
-        self.canKnock = canKnock
+        self.membership = membership
+        self.joinRule = joinRule
     }
 }
 
 
 
-extension RoomPreview: Equatable, Hashable {
-    public static func ==(lhs: RoomPreview, rhs: RoomPreview) -> Bool {
+extension RoomPreviewInfo: Equatable, Hashable {
+    public static func ==(lhs: RoomPreviewInfo, rhs: RoomPreviewInfo) -> Bool {
         if lhs.roomId != rhs.roomId {
             return false
         }
@@ -14885,16 +15135,10 @@ extension RoomPreview: Equatable, Hashable {
         if lhs.isHistoryWorldReadable != rhs.isHistoryWorldReadable {
             return false
         }
-        if lhs.isJoined != rhs.isJoined {
+        if lhs.membership != rhs.membership {
             return false
         }
-        if lhs.isInvited != rhs.isInvited {
-            return false
-        }
-        if lhs.isPublic != rhs.isPublic {
-            return false
-        }
-        if lhs.canKnock != rhs.canKnock {
+        if lhs.joinRule != rhs.joinRule {
             return false
         }
         return true
@@ -14909,18 +15153,16 @@ extension RoomPreview: Equatable, Hashable {
         hasher.combine(numJoinedMembers)
         hasher.combine(roomType)
         hasher.combine(isHistoryWorldReadable)
-        hasher.combine(isJoined)
-        hasher.combine(isInvited)
-        hasher.combine(isPublic)
-        hasher.combine(canKnock)
+        hasher.combine(membership)
+        hasher.combine(joinRule)
     }
 }
 
 
-public struct FfiConverterTypeRoomPreview: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomPreview {
+public struct FfiConverterTypeRoomPreviewInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomPreviewInfo {
         return
-            try RoomPreview(
+            try RoomPreviewInfo(
                 roomId: FfiConverterString.read(from: &buf), 
                 canonicalAlias: FfiConverterOptionString.read(from: &buf), 
                 name: FfiConverterOptionString.read(from: &buf), 
@@ -14929,14 +15171,12 @@ public struct FfiConverterTypeRoomPreview: FfiConverterRustBuffer {
                 numJoinedMembers: FfiConverterUInt64.read(from: &buf), 
                 roomType: FfiConverterOptionString.read(from: &buf), 
                 isHistoryWorldReadable: FfiConverterBool.read(from: &buf), 
-                isJoined: FfiConverterBool.read(from: &buf), 
-                isInvited: FfiConverterBool.read(from: &buf), 
-                isPublic: FfiConverterBool.read(from: &buf), 
-                canKnock: FfiConverterBool.read(from: &buf)
+                membership: FfiConverterOptionTypeMembership.read(from: &buf), 
+                joinRule: FfiConverterTypeJoinRule.read(from: &buf)
         )
     }
 
-    public static func write(_ value: RoomPreview, into buf: inout [UInt8]) {
+    public static func write(_ value: RoomPreviewInfo, into buf: inout [UInt8]) {
         FfiConverterString.write(value.roomId, into: &buf)
         FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
         FfiConverterOptionString.write(value.name, into: &buf)
@@ -14945,20 +15185,18 @@ public struct FfiConverterTypeRoomPreview: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.numJoinedMembers, into: &buf)
         FfiConverterOptionString.write(value.roomType, into: &buf)
         FfiConverterBool.write(value.isHistoryWorldReadable, into: &buf)
-        FfiConverterBool.write(value.isJoined, into: &buf)
-        FfiConverterBool.write(value.isInvited, into: &buf)
-        FfiConverterBool.write(value.isPublic, into: &buf)
-        FfiConverterBool.write(value.canKnock, into: &buf)
+        FfiConverterOptionTypeMembership.write(value.membership, into: &buf)
+        FfiConverterTypeJoinRule.write(value.joinRule, into: &buf)
     }
 }
 
 
-public func FfiConverterTypeRoomPreview_lift(_ buf: RustBuffer) throws -> RoomPreview {
-    return try FfiConverterTypeRoomPreview.lift(buf)
+public func FfiConverterTypeRoomPreviewInfo_lift(_ buf: RustBuffer) throws -> RoomPreviewInfo {
+    return try FfiConverterTypeRoomPreviewInfo.lift(buf)
 }
 
-public func FfiConverterTypeRoomPreview_lower(_ value: RoomPreview) -> RustBuffer {
-    return FfiConverterTypeRoomPreview.lower(value)
+public func FfiConverterTypeRoomPreviewInfo_lower(_ value: RoomPreviewInfo) -> RustBuffer {
+    return FfiConverterTypeRoomPreviewInfo.lower(value)
 }
 
 
@@ -15161,6 +15399,96 @@ public func FfiConverterTypeSession_lift(_ buf: RustBuffer) throws -> Session {
 
 public func FfiConverterTypeSession_lower(_ value: Session) -> RustBuffer {
     return FfiConverterTypeSession.lower(value)
+}
+
+
+/**
+ * Details about the incoming verification request
+ */
+public struct SessionVerificationRequestDetails {
+    public var senderId: String
+    public var flowId: String
+    public var deviceId: String
+    public var displayName: String?
+    /**
+     * First time this device was seen in milliseconds since epoch.
+     */
+    public var firstSeenTimestamp: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(senderId: String, flowId: String, deviceId: String, displayName: String?, 
+        /**
+         * First time this device was seen in milliseconds since epoch.
+         */firstSeenTimestamp: UInt64) {
+        self.senderId = senderId
+        self.flowId = flowId
+        self.deviceId = deviceId
+        self.displayName = displayName
+        self.firstSeenTimestamp = firstSeenTimestamp
+    }
+}
+
+
+
+extension SessionVerificationRequestDetails: Equatable, Hashable {
+    public static func ==(lhs: SessionVerificationRequestDetails, rhs: SessionVerificationRequestDetails) -> Bool {
+        if lhs.senderId != rhs.senderId {
+            return false
+        }
+        if lhs.flowId != rhs.flowId {
+            return false
+        }
+        if lhs.deviceId != rhs.deviceId {
+            return false
+        }
+        if lhs.displayName != rhs.displayName {
+            return false
+        }
+        if lhs.firstSeenTimestamp != rhs.firstSeenTimestamp {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(senderId)
+        hasher.combine(flowId)
+        hasher.combine(deviceId)
+        hasher.combine(displayName)
+        hasher.combine(firstSeenTimestamp)
+    }
+}
+
+
+public struct FfiConverterTypeSessionVerificationRequestDetails: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SessionVerificationRequestDetails {
+        return
+            try SessionVerificationRequestDetails(
+                senderId: FfiConverterString.read(from: &buf), 
+                flowId: FfiConverterString.read(from: &buf), 
+                deviceId: FfiConverterString.read(from: &buf), 
+                displayName: FfiConverterOptionString.read(from: &buf), 
+                firstSeenTimestamp: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SessionVerificationRequestDetails, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.senderId, into: &buf)
+        FfiConverterString.write(value.flowId, into: &buf)
+        FfiConverterString.write(value.deviceId, into: &buf)
+        FfiConverterOptionString.write(value.displayName, into: &buf)
+        FfiConverterUInt64.write(value.firstSeenTimestamp, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeSessionVerificationRequestDetails_lift(_ buf: RustBuffer) throws -> SessionVerificationRequestDetails {
+    return try FfiConverterTypeSessionVerificationRequestDetails.lift(buf)
+}
+
+public func FfiConverterTypeSessionVerificationRequestDetails_lower(_ value: SessionVerificationRequestDetails) -> RustBuffer {
+    return FfiConverterTypeSessionVerificationRequestDetails.lower(value)
 }
 
 
@@ -18121,6 +18449,14 @@ public enum JoinRule {
      */
     case knockRestricted(rules: [AllowRule]
     )
+    /**
+     * A custom join rule, up for interpretation by the consumer.
+     */
+    case custom(
+        /**
+         * The string representation for this custom rule.
+         */repr: String
+    )
 }
 
 
@@ -18143,6 +18479,9 @@ public struct FfiConverterTypeJoinRule: FfiConverterRustBuffer {
         )
         
         case 6: return .knockRestricted(rules: try FfiConverterSequenceTypeAllowRule.read(from: &buf)
+        )
+        
+        case 7: return .custom(repr: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -18177,6 +18516,11 @@ public struct FfiConverterTypeJoinRule: FfiConverterRustBuffer {
         case let .knockRestricted(rules):
             writeInt(&buf, Int32(6))
             FfiConverterSequenceTypeAllowRule.write(rules, into: &buf)
+            
+        
+        case let .custom(repr):
+            writeInt(&buf, Int32(7))
+            FfiConverterString.write(repr, into: &buf)
             
         }
     }
@@ -21552,7 +21896,7 @@ public enum RoomListError {
     )
     case EventCache(error: String
     )
-    case IncorrectRoomMembership(expected: Membership, actual: Membership
+    case IncorrectRoomMembership(expected: [Membership], actual: Membership
     )
 }
 
@@ -21593,7 +21937,7 @@ public struct FfiConverterTypeRoomListError: FfiConverterRustBuffer {
             error: try FfiConverterString.read(from: &buf)
             )
         case 10: return .IncorrectRoomMembership(
-            expected: try FfiConverterTypeMembership.read(from: &buf), 
+            expected: try FfiConverterSequenceTypeMembership.read(from: &buf), 
             actual: try FfiConverterTypeMembership.read(from: &buf)
             )
 
@@ -21654,7 +21998,7 @@ public struct FfiConverterTypeRoomListError: FfiConverterRustBuffer {
         
         case let .IncorrectRoomMembership(expected,actual):
             writeInt(&buf, Int32(10))
-            FfiConverterTypeMembership.write(expected, into: &buf)
+            FfiConverterSequenceTypeMembership.write(expected, into: &buf)
             FfiConverterTypeMembership.write(actual, into: &buf)
             
         }
@@ -25241,6 +25585,8 @@ extension FfiConverterCallbackInterfaceSendQueueRoomErrorListener : FfiConverter
 
 public protocol SessionVerificationControllerDelegate : AnyObject {
     
+    func didReceiveVerificationRequest(details: SessionVerificationRequestDetails) 
+    
     func didAcceptVerificationRequest() 
     
     func didStartSasVerification() 
@@ -25263,6 +25609,30 @@ fileprivate struct UniffiCallbackInterfaceSessionVerificationControllerDelegate 
     // Create the VTable using a series of closures.
     // Swift automatically converts these into C callback functions.
     static var vtable: UniffiVTableCallbackInterfaceSessionVerificationControllerDelegate = UniffiVTableCallbackInterfaceSessionVerificationControllerDelegate(
+        didReceiveVerificationRequest: { (
+            uniffiHandle: UInt64,
+            details: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSessionVerificationControllerDelegate.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.didReceiveVerificationRequest(
+                     details: try FfiConverterTypeSessionVerificationRequestDetails.lift(details)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
         didAcceptVerificationRequest: { (
             uniffiHandle: UInt64,
             uniffiOutReturn: UnsafeMutableRawPointer,
@@ -26805,6 +27175,27 @@ fileprivate struct FfiConverterOptionTypeJoinRule: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeMembership: FfiConverterRustBuffer {
+    typealias SwiftType = Membership?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeMembership.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeMembership.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeMembershipChange: FfiConverterRustBuffer {
     typealias SwiftType = MembershipChange?
 
@@ -27559,6 +27950,50 @@ fileprivate struct FfiConverterSequenceTypeFilterTimelineEventType: FfiConverter
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeMembership: FfiConverterRustBuffer {
+    typealias SwiftType = [Membership]
+
+    public static func write(_ value: [Membership], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeMembership.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Membership] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Membership]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeMembership.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+fileprivate struct FfiConverterSequenceTypeOidcPrompt: FfiConverterRustBuffer {
+    typealias SwiftType = [OidcPrompt]
+
+    public static func write(_ value: [OidcPrompt], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeOidcPrompt.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [OidcPrompt] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [OidcPrompt]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeOidcPrompt.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypeRoomDirectorySearchEntryUpdate: FfiConverterRustBuffer {
     typealias SwiftType = [RoomDirectorySearchEntryUpdate]
 
@@ -28237,10 +28672,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recently_visited_rooms() != 22399) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_room_preview_from_room_alias() != 10849) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_room_preview_from_room_alias() != 7674) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_room_preview_from_room_id() != 6925) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_room_preview_from_room_id() != 36348) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_session_verification_controller() != 55934) {
@@ -28490,6 +28925,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_sliding_sync_version() != 36573) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_supported_oidc_prompts() != 63396) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_supports_oidc_login() != 46090) {
@@ -28885,7 +29323,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_init_timeline() != 61817) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_invited_room() != 34665) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_invited_room() != 44344) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_direct() != 46873) {
@@ -28901,6 +29339,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_membership() != 1596) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_preview_room() != 32277) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_room_info() != 32985) {
@@ -28927,6 +29368,12 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roommembersiterator_next_chunk() != 23186) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_info() != 9145) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_leave() != 5096) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_sendattachmentjoinhandle_cancel() != 62384) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -28936,25 +29383,28 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_sendhandle_abort() != 11570) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_approve_verification() != 12154) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_accept_verification_request() != 53466) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_cancel_verification() != 42503) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_acknowledge_verification_request() != 37982) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_decline_verification() != 51976) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_approve_verification() != 27140) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_is_verified() != 60081) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_cancel_verification() != 32994) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_request_verification() != 22948) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_decline_verification() != 64345) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_request_verification() != 17229) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_set_delegate() != 42324) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_start_sas_verification() != 17409) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_start_sas_verification() != 16328) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationemoji_description() != 21346) {
@@ -29251,22 +29701,25 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_sendqueueroomerrorlistener_on_error() != 38224) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_accept_verification_request() != 22759) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_receive_verification_request() != 3417) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_start_sas_verification() != 54982) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_accept_verification_request() != 3733) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_receive_verification_data() != 19380) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_start_sas_verification() != 56833) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_fail() != 56823) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_receive_verification_data() != 30840) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_cancel() != 29888) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_fail() != 32164) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_finish() != 54532) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_cancel() != 3367) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_finish() != 37905) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicestateobserver_on_update() != 62231) {
