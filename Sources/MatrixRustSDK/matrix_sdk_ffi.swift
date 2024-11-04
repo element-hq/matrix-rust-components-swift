@@ -6473,20 +6473,61 @@ public func FfiConverterTypeRoom_lower(_ value: Room) -> UnsafeMutableRawPointer
 
 
 
+/**
+ * A helper for performing room searches in the room directory.
+ * The way this is intended to be used is:
+ *
+ * 1. Register a callback using [`RoomDirectorySearch::results`].
+ * 2. Start the room search with [`RoomDirectorySearch::search`].
+ * 3. To get more results, use [`RoomDirectorySearch::next_page`].
+ */
 public protocol RoomDirectorySearchProtocol : AnyObject {
     
+    /**
+     * Get whether the search is at the last page.
+     */
     func isAtLastPage() async throws  -> Bool
     
+    /**
+     * Get the number of pages that have been loaded so far.
+     */
     func loadedPages() async throws  -> UInt32
     
+    /**
+     * Asks the server for the next page of the current search.
+     */
     func nextPage() async throws 
     
+    /**
+     * Registers a callback to receive new search results when starting a
+     * search or getting new paginated results.
+     */
     func results(listener: RoomDirectorySearchEntriesListener) async  -> TaskHandle
     
-    func search(filter: String?, batchSize: UInt32) async throws 
+    /**
+     * Starts a filtered search for the server.
+     *
+     * If the `filter` is not provided it will search for all the rooms.
+     * You can specify a `batch_size` to control the number of rooms to fetch
+     * per request.
+     *
+     * If the `via_server` is not provided it will search in the current
+     * homeserver by default.
+     *
+     * This method will clear the current search results and start a new one.
+     */
+    func search(filter: String?, batchSize: UInt32, viaServerName: String?) async throws 
     
 }
 
+/**
+ * A helper for performing room searches in the room directory.
+ * The way this is intended to be used is:
+ *
+ * 1. Register a callback using [`RoomDirectorySearch::results`].
+ * 2. Start the room search with [`RoomDirectorySearch::search`].
+ * 3. To get more results, use [`RoomDirectorySearch::next_page`].
+ */
 open class RoomDirectorySearch:
     RoomDirectorySearchProtocol {
     fileprivate let pointer: UnsafeMutableRawPointer!
@@ -6528,6 +6569,9 @@ open class RoomDirectorySearch:
     
 
     
+    /**
+     * Get whether the search is at the last page.
+     */
 open func isAtLastPage()async throws  -> Bool {
     return
         try  await uniffiRustCallAsync(
@@ -6545,6 +6589,9 @@ open func isAtLastPage()async throws  -> Bool {
         )
 }
     
+    /**
+     * Get the number of pages that have been loaded so far.
+     */
 open func loadedPages()async throws  -> UInt32 {
     return
         try  await uniffiRustCallAsync(
@@ -6562,6 +6609,9 @@ open func loadedPages()async throws  -> UInt32 {
         )
 }
     
+    /**
+     * Asks the server for the next page of the current search.
+     */
 open func nextPage()async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -6579,6 +6629,10 @@ open func nextPage()async throws  {
         )
 }
     
+    /**
+     * Registers a callback to receive new search results when starting a
+     * search or getting new paginated results.
+     */
 open func results(listener: RoomDirectorySearchEntriesListener)async  -> TaskHandle {
     return
         try!  await uniffiRustCallAsync(
@@ -6597,13 +6651,25 @@ open func results(listener: RoomDirectorySearchEntriesListener)async  -> TaskHan
         )
 }
     
-open func search(filter: String?, batchSize: UInt32)async throws  {
+    /**
+     * Starts a filtered search for the server.
+     *
+     * If the `filter` is not provided it will search for all the rooms.
+     * You can specify a `batch_size` to control the number of rooms to fetch
+     * per request.
+     *
+     * If the `via_server` is not provided it will search in the current
+     * homeserver by default.
+     *
+     * This method will clear the current search results and start a new one.
+     */
+open func search(filter: String?, batchSize: UInt32, viaServerName: String?)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_roomdirectorysearch_search(
                     self.uniffiClonePointer(),
-                    FfiConverterOptionString.lower(filter),FfiConverterUInt32.lower(batchSize)
+                    FfiConverterOptionString.lower(filter),FfiConverterUInt32.lower(batchSize),FfiConverterOptionString.lower(viaServerName)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -29266,19 +29332,19 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_withdraw_verification_and_resend() != 48968) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_is_at_last_page() != 22509) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_is_at_last_page() != 34221) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_loaded_pages() != 7109) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_loaded_pages() != 2923) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_next_page() != 14603) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_next_page() != 29305) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_results() != 40665) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_results() != 30207) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_search() != 26558) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_search() != 24438) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_entries_with_dynamic_adapters() != 36097) {
