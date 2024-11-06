@@ -726,6 +726,11 @@ public protocol ClientProtocol : AnyObject {
     func ignoredUsers() async throws  -> [String]
     
     /**
+     * Checks if a room alias is available in the current homeserver.
+     */
+    func isRoomAliasAvailable(alias: String) async throws  -> Bool
+    
+    /**
      * Join a room by its ID.
      *
      * Use this method when the homeserver already knows of the given room ID.
@@ -788,12 +793,17 @@ public protocol ClientProtocol : AnyObject {
      * Resolves the given room alias to a room ID (and a list of servers), if
      * possible.
      */
-    func resolveRoomAlias(roomAlias: String) async throws  -> ResolvedRoomAlias
+    func resolveRoomAlias(roomAlias: String) async throws  -> ResolvedRoomAlias?
     
     /**
      * Restores the client from a `Session`.
      */
     func restoreSession(session: Session) async throws 
+    
+    /**
+     * Checks if a room alias exists in the current homeserver.
+     */
+    func roomAliasExists(roomAlias: String) async throws  -> Bool
     
     func roomDirectorySearch()  -> RoomDirectorySearch
     
@@ -1472,6 +1482,26 @@ open func ignoredUsers()async throws  -> [String] {
 }
     
     /**
+     * Checks if a room alias is available in the current homeserver.
+     */
+open func isRoomAliasAvailable(alias: String)async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_is_room_alias_available(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(alias)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
      * Join a room by its ID.
      *
      * Use this method when the homeserver already knows of the given room ID.
@@ -1684,7 +1714,7 @@ open func resetServerCapabilities()async throws  {
      * Resolves the given room alias to a room ID (and a list of servers), if
      * possible.
      */
-open func resolveRoomAlias(roomAlias: String)async throws  -> ResolvedRoomAlias {
+open func resolveRoomAlias(roomAlias: String)async throws  -> ResolvedRoomAlias? {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -1696,7 +1726,7 @@ open func resolveRoomAlias(roomAlias: String)async throws  -> ResolvedRoomAlias 
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterTypeResolvedRoomAlias.lift,
+            liftFunc: FfiConverterOptionTypeResolvedRoomAlias.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -1717,6 +1747,26 @@ open func restoreSession(session: Session)async throws  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Checks if a room alias exists in the current homeserver.
+     */
+open func roomAliasExists(roomAlias: String)async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_room_alias_exists(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(roomAlias)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -26989,6 +27039,27 @@ fileprivate struct FfiConverterOptionTypePowerLevels: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeResolvedRoomAlias: FfiConverterRustBuffer {
+    typealias SwiftType = ResolvedRoomAlias?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeResolvedRoomAlias.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeResolvedRoomAlias.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeRoomMember: FfiConverterRustBuffer {
     typealias SwiftType = RoomMember?
 
@@ -28418,6 +28489,16 @@ public func getElementCallRequiredPermissions(ownUserId: String, ownDeviceId: St
 })
 }
 /**
+ * Verifies the passed `String` matches the expected room alias format.
+ */
+public func isRoomAliasFormatValid(alias: String) -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_func_is_room_alias_format_valid(
+        FfiConverterString.lower(alias),$0
+    )
+})
+}
+/**
  * Log an event.
  *
  * The target should be something like a module path, and can be referenced in
@@ -28555,6 +28636,16 @@ public func parseMatrixEntityFrom(uri: String) -> MatrixEntity? {
     )
 })
 }
+/**
+ * Transforms a Room's display name into a valid room alias name.
+ */
+public func roomAliasNameFromRoomDisplayName(roomName: String) -> String {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_func_room_alias_name_from_room_display_name(
+        FfiConverterString.lower(roomName),$0
+    )
+})
+}
 public func sdkGitSha() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_func_sdk_git_sha($0
@@ -28609,6 +28700,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_get_element_call_required_permissions() != 30181) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_func_is_room_alias_format_valid() != 23063) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_func_log_event() != 62286) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -28646,6 +28740,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_parse_matrix_entity_from() != 49710) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_func_room_alias_name_from_room_display_name() != 65010) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_sdk_git_sha() != 4038) {
@@ -28762,6 +28859,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_ignored_users() != 49620) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_room_alias_available() != 25471) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_join_room_by_id() != 64032) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -28792,10 +28892,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_reset_server_capabilities() != 39651) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_resolve_room_alias() != 14306) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_resolve_room_alias() != 3551) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_restore_session() != 40455) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_room_alias_exists() != 20359) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_room_directory_search() != 39855) {
