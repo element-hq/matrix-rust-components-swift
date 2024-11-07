@@ -9514,11 +9514,11 @@ public protocol TimelineProtocol : AnyObject {
      */
     func send(msg: RoomMessageEventContentWithoutRelation) async throws  -> SendHandle
     
-    func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
+    func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
     
-    func sendFile(url: String, fileInfo: FileInfo, storeInCache: Bool, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
+    func sendFile(url: String, fileInfo: FileInfo, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
     
-    func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
+    func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
     
     func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?) async 
     
@@ -9528,9 +9528,9 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String) async throws 
     
-    func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
+    func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
     
-    func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16], caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?)  -> SendAttachmentJoinHandle
+    func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16], caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
     
     func subscribeToBackPaginationStatus(listener: PaginationStatusListener) async throws  -> TaskHandle
     
@@ -9916,31 +9916,31 @@ open func send(msg: RoomMessageEventContentWithoutRelation)async throws  -> Send
         )
 }
     
-open func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
+open func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
     return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_audio(self.uniffiClonePointer(),
         FfiConverterString.lower(url),
         FfiConverterTypeAudioInfo.lower(audioInfo),
         FfiConverterOptionString.lower(caption),
         FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
-        FfiConverterBool.lower(storeInCache),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
+        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),
+        FfiConverterBool.lower(useSendQueue),$0
     )
 })
 }
     
-open func sendFile(url: String, fileInfo: FileInfo, storeInCache: Bool, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
+open func sendFile(url: String, fileInfo: FileInfo, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
     return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_file(self.uniffiClonePointer(),
         FfiConverterString.lower(url),
         FfiConverterTypeFileInfo.lower(fileInfo),
-        FfiConverterBool.lower(storeInCache),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
+        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),
+        FfiConverterBool.lower(useSendQueue),$0
     )
 })
 }
     
-open func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
+open func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
     return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_image(self.uniffiClonePointer(),
         FfiConverterString.lower(url),
@@ -9948,8 +9948,8 @@ open func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, ca
         FfiConverterTypeImageInfo.lower(imageInfo),
         FfiConverterOptionString.lower(caption),
         FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
-        FfiConverterBool.lower(storeInCache),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
+        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),
+        FfiConverterBool.lower(useSendQueue),$0
     )
 })
 }
@@ -10023,7 +10023,7 @@ open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String
         )
 }
     
-open func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
+open func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
     return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_video(self.uniffiClonePointer(),
         FfiConverterString.lower(url),
@@ -10031,13 +10031,13 @@ open func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, ca
         FfiConverterTypeVideoInfo.lower(videoInfo),
         FfiConverterOptionString.lower(caption),
         FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
-        FfiConverterBool.lower(storeInCache),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
+        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),
+        FfiConverterBool.lower(useSendQueue),$0
     )
 })
 }
     
-open func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16], caption: String?, formattedCaption: FormattedBody?, storeInCache: Bool, progressWatcher: ProgressWatcher?) -> SendAttachmentJoinHandle {
+open func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16], caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
     return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_voice_message(self.uniffiClonePointer(),
         FfiConverterString.lower(url),
@@ -10045,8 +10045,8 @@ open func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16]
         FfiConverterSequenceUInt16.lower(waveform),
         FfiConverterOptionString.lower(caption),
         FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
-        FfiConverterBool.lower(storeInCache),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
+        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),
+        FfiConverterBool.lower(useSendQueue),$0
     )
 })
 }
@@ -21124,6 +21124,15 @@ public enum QueueWedgeError {
      */
     case crossVerificationRequired
     /**
+     * Some media content to be sent has disappeared from the cache.
+     */
+    case missingMediaContent
+    /**
+     * Some mime type couldn't be parsed.
+     */
+    case invalidMimeType(mimeType: String
+    )
+    /**
      * Other errors.
      */
     case genericApiError(msg: String
@@ -21146,7 +21155,12 @@ public struct FfiConverterTypeQueueWedgeError: FfiConverterRustBuffer {
         
         case 3: return .crossVerificationRequired
         
-        case 4: return .genericApiError(msg: try FfiConverterString.read(from: &buf)
+        case 4: return .missingMediaContent
+        
+        case 5: return .invalidMimeType(mimeType: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 6: return .genericApiError(msg: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -21171,8 +21185,17 @@ public struct FfiConverterTypeQueueWedgeError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(3))
         
         
-        case let .genericApiError(msg):
+        case .missingMediaContent:
             writeInt(&buf, Int32(4))
+        
+        
+        case let .invalidMimeType(mimeType):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(mimeType, into: &buf)
+            
+        
+        case let .genericApiError(msg):
+            writeInt(&buf, Int32(6))
             FfiConverterString.write(msg, into: &buf)
             
         }
@@ -29672,13 +29695,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send() != 9553) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 57949) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 43163) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_file() != 37971) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_file() != 35408) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 27985) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 45681) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_location() != 47400) {
@@ -29693,10 +29716,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 64747) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 59961) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 22670) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_voice_message() != 1195) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_voice_message() != 58509) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_back_pagination_status() != 46161) {
