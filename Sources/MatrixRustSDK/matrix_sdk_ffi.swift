@@ -726,7 +726,13 @@ public protocol ClientProtocol : AnyObject {
     func ignoredUsers() async throws  -> [String]
     
     /**
-     * Checks if a room alias is available in the current homeserver.
+     * Checks if a room alias is not in use yet.
+     *
+     * Returns:
+     * - `Ok(true)` if the room alias is available.
+     * - `Ok(false)` if it's not (the resolve alias request returned a `404`
+     * status code).
+     * - An `Err` otherwise.
      */
     func isRoomAliasAvailable(alias: String) async throws  -> Bool
     
@@ -1482,7 +1488,13 @@ open func ignoredUsers()async throws  -> [String] {
 }
     
     /**
-     * Checks if a room alias is available in the current homeserver.
+     * Checks if a room alias is not in use yet.
+     *
+     * Returns:
+     * - `Ok(true)` if the room alias is available.
+     * - `Ok(false)` if it's not (the resolve alias request returned a `404`
+     * status code).
+     * - An `Err` otherwise.
      */
 open func isRoomAliasAvailable(alias: String)async throws  -> Bool {
     return
@@ -28512,7 +28524,11 @@ public func getElementCallRequiredPermissions(ownUserId: String, ownDeviceId: St
 })
 }
 /**
- * Verifies the passed `String` matches the expected room alias format.
+ * Verifies the passed `String` matches the expected room alias format:
+ *
+ * This means it's lowercase, with no whitespace chars, has a single leading
+ * `#` char and a single `:` separator between the local and domain parts, and
+ * the local part only contains characters that can't be percent encoded.
  */
 public func isRoomAliasFormatValid(alias: String) -> Bool {
     return try!  FfiConverterBool.lift(try! rustCall() {
@@ -28723,7 +28739,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_get_element_call_required_permissions() != 30181) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_func_is_room_alias_format_valid() != 23063) {
+    if (uniffi_matrix_sdk_ffi_checksum_func_is_room_alias_format_valid() != 54845) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_log_event() != 62286) {
@@ -28882,7 +28898,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_ignored_users() != 49620) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_room_alias_available() != 25471) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_room_alias_available() != 23322) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_join_room_by_id() != 64032) {
