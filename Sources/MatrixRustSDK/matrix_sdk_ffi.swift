@@ -633,6 +633,11 @@ public protocol ClientProtocol : AnyObject {
     func createRoom(request: CreateRoomParameters) async throws  -> String
     
     /**
+     * Creates a new room alias associated with the provided room id.
+     */
+    func createRoomAlias(roomAlias: String, roomId: String) async throws 
+    
+    /**
      * Login using JWT
      * This is an implementation of the custom_login https://docs.rs/matrix-sdk/latest/matrix_sdk/matrix_auth/struct.MatrixAuth.html#method.login_custom
      * For more information on logging in with JWT: https://element-hq.github.io/synapse/latest/jwt.html
@@ -1107,6 +1112,26 @@ open func createRoom(request: CreateRoomParameters)async throws  -> String {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Creates a new room alias associated with the provided room id.
+     */
+open func createRoomAlias(roomAlias: String, roomId: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_create_room_alias(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(roomAlias),FfiConverterString.lower(roomId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -2161,6 +2186,8 @@ public protocol ClientBuilderProtocol : AnyObject {
      */
     func buildWithQrCode(qrCodeData: QrCodeData, oidcConfiguration: OidcConfiguration, progressListener: QrLoginProgressListener) async throws  -> Client
     
+    func crossProcessStoreLocksHolderName(holderName: String)  -> ClientBuilder
+    
     func disableAutomaticTokenRefresh()  -> ClientBuilder
     
     /**
@@ -2172,7 +2199,7 @@ public protocol ClientBuilderProtocol : AnyObject {
     
     func disableSslVerification()  -> ClientBuilder
     
-    func enableCrossProcessRefreshLock(processId: String, sessionDelegate: ClientSessionDelegate)  -> ClientBuilder
+    func enableOidcRefreshLock()  -> ClientBuilder
     
     func homeserverUrl(url: String)  -> ClientBuilder
     
@@ -2357,6 +2384,14 @@ open func buildWithQrCode(qrCodeData: QrCodeData, oidcConfiguration: OidcConfigu
         )
 }
     
+open func crossProcessStoreLocksHolderName(holderName: String) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_cross_process_store_locks_holder_name(self.uniffiClonePointer(),
+        FfiConverterString.lower(holderName),$0
+    )
+})
+}
+    
 open func disableAutomaticTokenRefresh() -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_disable_automatic_token_refresh(self.uniffiClonePointer(),$0
@@ -2383,11 +2418,9 @@ open func disableSslVerification() -> ClientBuilder {
 })
 }
     
-open func enableCrossProcessRefreshLock(processId: String, sessionDelegate: ClientSessionDelegate) -> ClientBuilder {
+open func enableOidcRefreshLock() -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_enable_cross_process_refresh_lock(self.uniffiClonePointer(),
-        FfiConverterString.lower(processId),
-        FfiConverterCallbackInterfaceClientSessionDelegate.lower(sessionDelegate),$0
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_enable_oidc_refresh_lock(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -3531,6 +3564,12 @@ public protocol LazyTimelineItemProviderProtocol : AnyObject {
     func debugInfo()  -> EventTimelineItemDebugInfo
     
     /**
+     * For local echoes, return the associated send handle; returns `None` for
+     * remote echoes.
+     */
+    func getSendHandle()  -> SendHandle?
+    
+    /**
      * Returns the shields for this event timeline item.
      */
     func getShields(strict: Bool)  -> ShieldState?
@@ -3587,6 +3626,17 @@ open class LazyTimelineItemProvider:
 open func debugInfo() -> EventTimelineItemDebugInfo {
     return try!  FfiConverterTypeEventTimelineItemDebugInfo.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_lazytimelineitemprovider_debug_info(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * For local echoes, return the associated send handle; returns `None` for
+     * remote echoes.
+     */
+open func getSendHandle() -> SendHandle? {
+    return try!  FfiConverterOptionTypeSendHandle.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_lazytimelineitemprovider_get_send_handle(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -4890,7 +4940,7 @@ public protocol RoomProtocol : AnyObject {
      * * `transaction_id` - The send queue transaction identifier of the local
      * echo the send error applies to
      */
-    func ignoreDeviceTrustAndResend(devices: [String: [String]], transactionId: String) async throws 
+    func ignoreDeviceTrustAndResend(devices: [String: [String]], sendHandle: SendHandle) async throws 
     
     /**
      * Ignores a user.
@@ -5092,22 +5142,6 @@ public protocol RoomProtocol : AnyObject {
     
     func topic()  -> String?
     
-    /**
-     * Attempt to manually resend messages that failed to send due to issues
-     * that should now have been fixed.
-     *
-     * This is useful for example, when there's a
-     * `SessionRecipientCollectionError::VerifiedUserChangedIdentity` error;
-     * the user may have re-verified on a different device and would now
-     * like to send the failed message that's waiting on this device.
-     *
-     * # Arguments
-     *
-     * * `transaction_id` - The send queue transaction identifier of the local
-     * echo that should be unwedged.
-     */
-    func tryResend(transactionId: String) async throws 
-    
     func typingNotice(isTyping: Bool) async throws 
     
     func unbanUser(userId: String, reason: String?) async throws 
@@ -5143,7 +5177,7 @@ public protocol RoomProtocol : AnyObject {
      * * `transaction_id` - The send queue transaction identifier of the local
      * echo the send error applies to
      */
-    func withdrawVerificationAndResend(userIds: [String], transactionId: String) async throws 
+    func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandle) async throws 
     
 }
 
@@ -5568,13 +5602,13 @@ open func id() -> String {
      * * `transaction_id` - The send queue transaction identifier of the local
      * echo the send error applies to
      */
-open func ignoreDeviceTrustAndResend(devices: [String: [String]], transactionId: String)async throws  {
+open func ignoreDeviceTrustAndResend(devices: [String: [String]], sendHandle: SendHandle)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_ignore_device_trust_and_resend(
                     self.uniffiClonePointer(),
-                    FfiConverterDictionaryStringSequenceString.lower(devices),FfiConverterString.lower(transactionId)
+                    FfiConverterDictionaryStringSequenceString.lower(devices),FfiConverterTypeSendHandle.lower(sendHandle)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -6344,37 +6378,6 @@ open func topic() -> String? {
 })
 }
     
-    /**
-     * Attempt to manually resend messages that failed to send due to issues
-     * that should now have been fixed.
-     *
-     * This is useful for example, when there's a
-     * `SessionRecipientCollectionError::VerifiedUserChangedIdentity` error;
-     * the user may have re-verified on a different device and would now
-     * like to send the failed message that's waiting on this device.
-     *
-     * # Arguments
-     *
-     * * `transaction_id` - The send queue transaction identifier of the local
-     * echo that should be unwedged.
-     */
-open func tryResend(transactionId: String)async throws  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_try_resend(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(transactionId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
 open func typingNotice(isTyping: Bool)async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -6470,13 +6473,13 @@ open func uploadAvatar(mimeType: String, data: Data, mediaInfo: ImageInfo?)async
      * * `transaction_id` - The send queue transaction identifier of the local
      * echo the send error applies to
      */
-open func withdrawVerificationAndResend(userIds: [String], transactionId: String)async throws  {
+open func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandle)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_withdraw_verification_and_resend(
                     self.uniffiClonePointer(),
-                    FfiConverterSequenceString.lower(userIds),FfiConverterString.lower(transactionId)
+                    FfiConverterSequenceString.lower(userIds),FfiConverterTypeSendHandle.lower(sendHandle)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -8168,6 +8171,9 @@ public func FfiConverterTypeSendAttachmentJoinHandle_lower(_ value: SendAttachme
 
 
 
+/**
+ * A handle to perform actions onto a local echo.
+ */
 public protocol SendHandleProtocol : AnyObject {
     
     /**
@@ -8182,8 +8188,27 @@ public protocol SendHandleProtocol : AnyObject {
      */
     func abort() async throws  -> Bool
     
+    /**
+     * Attempt to manually resend messages that failed to send due to issues
+     * that should now have been fixed.
+     *
+     * This is useful for example, when there's a
+     * `SessionRecipientCollectionError::VerifiedUserChangedIdentity` error;
+     * the user may have re-verified on a different device and would now
+     * like to send the failed message that's waiting on this device.
+     *
+     * # Arguments
+     *
+     * * `transaction_id` - The send queue transaction identifier of the local
+     * echo that should be unwedged.
+     */
+    func tryResend() async throws 
+    
 }
 
+/**
+ * A handle to perform actions onto a local echo.
+ */
 open class SendHandle:
     SendHandleProtocol {
     fileprivate let pointer: UnsafeMutableRawPointer!
@@ -8248,6 +8273,37 @@ open func abort()async throws  -> Bool {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
             liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Attempt to manually resend messages that failed to send due to issues
+     * that should now have been fixed.
+     *
+     * This is useful for example, when there's a
+     * `SessionRecipientCollectionError::VerifiedUserChangedIdentity` error;
+     * the user may have re-verified on a different device and would now
+     * like to send the failed message that's waiting on this device.
+     *
+     * # Arguments
+     *
+     * * `transaction_id` - The send queue transaction identifier of the local
+     * echo that should be unwedged.
+     */
+open func tryResend()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_sendhandle_try_resend(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -9157,7 +9213,7 @@ public protocol SyncServiceBuilderProtocol : AnyObject {
     
     func finish() async throws  -> SyncService
     
-    func withCrossProcessLock(appIdentifier: String?)  -> SyncServiceBuilder
+    func withCrossProcessLock()  -> SyncServiceBuilder
     
     func withUtdHook(delegate: UnableToDecryptDelegate) async  -> SyncServiceBuilder
     
@@ -9221,10 +9277,9 @@ open func finish()async throws  -> SyncService {
         )
 }
     
-open func withCrossProcessLock(appIdentifier: String?) -> SyncServiceBuilder {
+open func withCrossProcessLock() -> SyncServiceBuilder {
     return try!  FfiConverterTypeSyncServiceBuilder.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_cross_process_lock(self.uniffiClonePointer(),
-        FfiConverterOptionString.lower(appIdentifier),$0
+    uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_cross_process_lock(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -11394,21 +11449,6 @@ public func FfiConverterTypeAudioInfo_lower(_ value: AudioInfo) -> RustBuffer {
 
 public struct AudioMessageContent {
     /**
-     * The original body field, deserialized from the event. Prefer the use of
-     * `filename` and `caption` over this.
-     */
-    public var body: String
-    /**
-     * The original formatted body field, deserialized from the event. Prefer
-     * the use of `filename` and `formatted_caption` over this.
-     */
-    public var formatted: FormattedBody?
-    /**
-     * The original filename field, deserialized from the event. Prefer the use
-     * of `filename` over this.
-     */
-    public var rawFilename: String?
-    /**
      * The computed filename, for use in a client.
      */
     public var filename: String
@@ -11423,23 +11463,8 @@ public struct AudioMessageContent {
     // declare one manually.
     public init(
         /**
-         * The original body field, deserialized from the event. Prefer the use of
-         * `filename` and `caption` over this.
-         */body: String, 
-        /**
-         * The original formatted body field, deserialized from the event. Prefer
-         * the use of `filename` and `formatted_caption` over this.
-         */formatted: FormattedBody?, 
-        /**
-         * The original filename field, deserialized from the event. Prefer the use
-         * of `filename` over this.
-         */rawFilename: String?, 
-        /**
          * The computed filename, for use in a client.
          */filename: String, caption: String?, formattedCaption: FormattedBody?, source: MediaSource, info: AudioInfo?, audio: UnstableAudioDetailsContent?, voice: UnstableVoiceContent?) {
-        self.body = body
-        self.formatted = formatted
-        self.rawFilename = rawFilename
         self.filename = filename
         self.caption = caption
         self.formattedCaption = formattedCaption
@@ -11456,9 +11481,6 @@ public struct FfiConverterTypeAudioMessageContent: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AudioMessageContent {
         return
             try AudioMessageContent(
-                body: FfiConverterString.read(from: &buf), 
-                formatted: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
-                rawFilename: FfiConverterOptionString.read(from: &buf), 
                 filename: FfiConverterString.read(from: &buf), 
                 caption: FfiConverterOptionString.read(from: &buf), 
                 formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
@@ -11470,9 +11492,6 @@ public struct FfiConverterTypeAudioMessageContent: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: AudioMessageContent, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.body, into: &buf)
-        FfiConverterOptionTypeFormattedBody.write(value.formatted, into: &buf)
-        FfiConverterOptionString.write(value.rawFilename, into: &buf)
         FfiConverterString.write(value.filename, into: &buf)
         FfiConverterOptionString.write(value.caption, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
@@ -12244,21 +12263,6 @@ public func FfiConverterTypeFileInfo_lower(_ value: FileInfo) -> RustBuffer {
 
 public struct FileMessageContent {
     /**
-     * The original body field, deserialized from the event. Prefer the use of
-     * `filename` and `caption` over this.
-     */
-    public var body: String
-    /**
-     * The original formatted body field, deserialized from the event. Prefer
-     * the use of `filename` and `formatted_caption` over this.
-     */
-    public var formatted: FormattedBody?
-    /**
-     * The original filename field, deserialized from the event. Prefer the use
-     * of `filename` over this.
-     */
-    public var rawFilename: String?
-    /**
      * The computed filename, for use in a client.
      */
     public var filename: String
@@ -12271,23 +12275,8 @@ public struct FileMessageContent {
     // declare one manually.
     public init(
         /**
-         * The original body field, deserialized from the event. Prefer the use of
-         * `filename` and `caption` over this.
-         */body: String, 
-        /**
-         * The original formatted body field, deserialized from the event. Prefer
-         * the use of `filename` and `formatted_caption` over this.
-         */formatted: FormattedBody?, 
-        /**
-         * The original filename field, deserialized from the event. Prefer the use
-         * of `filename` over this.
-         */rawFilename: String?, 
-        /**
          * The computed filename, for use in a client.
          */filename: String, caption: String?, formattedCaption: FormattedBody?, source: MediaSource, info: FileInfo?) {
-        self.body = body
-        self.formatted = formatted
-        self.rawFilename = rawFilename
         self.filename = filename
         self.caption = caption
         self.formattedCaption = formattedCaption
@@ -12302,9 +12291,6 @@ public struct FfiConverterTypeFileMessageContent: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileMessageContent {
         return
             try FileMessageContent(
-                body: FfiConverterString.read(from: &buf), 
-                formatted: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
-                rawFilename: FfiConverterOptionString.read(from: &buf), 
                 filename: FfiConverterString.read(from: &buf), 
                 caption: FfiConverterOptionString.read(from: &buf), 
                 formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
@@ -12314,9 +12300,6 @@ public struct FfiConverterTypeFileMessageContent: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: FileMessageContent, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.body, into: &buf)
-        FfiConverterOptionTypeFormattedBody.write(value.formatted, into: &buf)
-        FfiConverterOptionString.write(value.rawFilename, into: &buf)
         FfiConverterString.write(value.filename, into: &buf)
         FfiConverterOptionString.write(value.caption, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
@@ -12587,21 +12570,6 @@ public func FfiConverterTypeImageInfo_lower(_ value: ImageInfo) -> RustBuffer {
 
 public struct ImageMessageContent {
     /**
-     * The original body field, deserialized from the event. Prefer the use of
-     * `filename` and `caption` over this.
-     */
-    public var body: String
-    /**
-     * The original formatted body field, deserialized from the event. Prefer
-     * the use of `filename` and `formatted_caption` over this.
-     */
-    public var formatted: FormattedBody?
-    /**
-     * The original filename field, deserialized from the event. Prefer the use
-     * of `filename` over this.
-     */
-    public var rawFilename: String?
-    /**
      * The computed filename, for use in a client.
      */
     public var filename: String
@@ -12614,23 +12582,8 @@ public struct ImageMessageContent {
     // declare one manually.
     public init(
         /**
-         * The original body field, deserialized from the event. Prefer the use of
-         * `filename` and `caption` over this.
-         */body: String, 
-        /**
-         * The original formatted body field, deserialized from the event. Prefer
-         * the use of `filename` and `formatted_caption` over this.
-         */formatted: FormattedBody?, 
-        /**
-         * The original filename field, deserialized from the event. Prefer the use
-         * of `filename` over this.
-         */rawFilename: String?, 
-        /**
          * The computed filename, for use in a client.
          */filename: String, caption: String?, formattedCaption: FormattedBody?, source: MediaSource, info: ImageInfo?) {
-        self.body = body
-        self.formatted = formatted
-        self.rawFilename = rawFilename
         self.filename = filename
         self.caption = caption
         self.formattedCaption = formattedCaption
@@ -12645,9 +12598,6 @@ public struct FfiConverterTypeImageMessageContent: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ImageMessageContent {
         return
             try ImageMessageContent(
-                body: FfiConverterString.read(from: &buf), 
-                formatted: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
-                rawFilename: FfiConverterOptionString.read(from: &buf), 
                 filename: FfiConverterString.read(from: &buf), 
                 caption: FfiConverterOptionString.read(from: &buf), 
                 formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
@@ -12657,9 +12607,6 @@ public struct FfiConverterTypeImageMessageContent: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: ImageMessageContent, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.body, into: &buf)
-        FfiConverterOptionTypeFormattedBody.write(value.formatted, into: &buf)
-        FfiConverterOptionString.write(value.rawFilename, into: &buf)
         FfiConverterString.write(value.filename, into: &buf)
         FfiConverterOptionString.write(value.caption, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
@@ -16482,21 +16429,6 @@ public func FfiConverterTypeVideoInfo_lower(_ value: VideoInfo) -> RustBuffer {
 
 public struct VideoMessageContent {
     /**
-     * The original body field, deserialized from the event. Prefer the use of
-     * `filename` and `caption` over this.
-     */
-    public var body: String
-    /**
-     * The original formatted body field, deserialized from the event. Prefer
-     * the use of `filename` and `formatted_caption` over this.
-     */
-    public var formatted: FormattedBody?
-    /**
-     * The original filename field, deserialized from the event. Prefer the use
-     * of `filename` over this.
-     */
-    public var rawFilename: String?
-    /**
      * The computed filename, for use in a client.
      */
     public var filename: String
@@ -16509,23 +16441,8 @@ public struct VideoMessageContent {
     // declare one manually.
     public init(
         /**
-         * The original body field, deserialized from the event. Prefer the use of
-         * `filename` and `caption` over this.
-         */body: String, 
-        /**
-         * The original formatted body field, deserialized from the event. Prefer
-         * the use of `filename` and `formatted_caption` over this.
-         */formatted: FormattedBody?, 
-        /**
-         * The original filename field, deserialized from the event. Prefer the use
-         * of `filename` over this.
-         */rawFilename: String?, 
-        /**
          * The computed filename, for use in a client.
          */filename: String, caption: String?, formattedCaption: FormattedBody?, source: MediaSource, info: VideoInfo?) {
-        self.body = body
-        self.formatted = formatted
-        self.rawFilename = rawFilename
         self.filename = filename
         self.caption = caption
         self.formattedCaption = formattedCaption
@@ -16540,9 +16457,6 @@ public struct FfiConverterTypeVideoMessageContent: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> VideoMessageContent {
         return
             try VideoMessageContent(
-                body: FfiConverterString.read(from: &buf), 
-                formatted: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
-                rawFilename: FfiConverterOptionString.read(from: &buf), 
                 filename: FfiConverterString.read(from: &buf), 
                 caption: FfiConverterOptionString.read(from: &buf), 
                 formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
@@ -16552,9 +16466,6 @@ public struct FfiConverterTypeVideoMessageContent: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: VideoMessageContent, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.body, into: &buf)
-        FfiConverterOptionTypeFormattedBody.write(value.formatted, into: &buf)
-        FfiConverterOptionString.write(value.rawFilename, into: &buf)
         FfiConverterString.write(value.filename, into: &buf)
         FfiConverterOptionString.write(value.caption, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
@@ -23745,7 +23656,7 @@ public enum TimelineItemContent {
     case callNotify
     case unableToDecrypt(msg: EncryptedMessage
     )
-    case roomMembership(userId: String, userDisplayName: String?, change: MembershipChange?
+    case roomMembership(userId: String, userDisplayName: String?, change: MembershipChange?, reason: String?
     )
     case profileChange(displayName: String?, prevDisplayName: String?, avatarUrl: String?, prevAvatarUrl: String?
     )
@@ -23783,7 +23694,7 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
         case 7: return .unableToDecrypt(msg: try FfiConverterTypeEncryptedMessage.read(from: &buf)
         )
         
-        case 8: return .roomMembership(userId: try FfiConverterString.read(from: &buf), userDisplayName: try FfiConverterOptionString.read(from: &buf), change: try FfiConverterOptionTypeMembershipChange.read(from: &buf)
+        case 8: return .roomMembership(userId: try FfiConverterString.read(from: &buf), userDisplayName: try FfiConverterOptionString.read(from: &buf), change: try FfiConverterOptionTypeMembershipChange.read(from: &buf), reason: try FfiConverterOptionString.read(from: &buf)
         )
         
         case 9: return .profileChange(displayName: try FfiConverterOptionString.read(from: &buf), prevDisplayName: try FfiConverterOptionString.read(from: &buf), avatarUrl: try FfiConverterOptionString.read(from: &buf), prevAvatarUrl: try FfiConverterOptionString.read(from: &buf)
@@ -23846,11 +23757,12 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
             FfiConverterTypeEncryptedMessage.write(msg, into: &buf)
             
         
-        case let .roomMembership(userId,userDisplayName,change):
+        case let .roomMembership(userId,userDisplayName,change,reason):
             writeInt(&buf, Int32(8))
             FfiConverterString.write(userId, into: &buf)
             FfiConverterOptionString.write(userDisplayName, into: &buf)
             FfiConverterOptionTypeMembershipChange.write(change, into: &buf)
+            FfiConverterOptionString.write(reason, into: &buf)
             
         
         case let .profileChange(displayName,prevDisplayName,avatarUrl,prevAvatarUrl):
@@ -26717,6 +26629,27 @@ fileprivate struct FfiConverterOptionTypeRoomMessageEventContentWithoutRelation:
     }
 }
 
+fileprivate struct FfiConverterOptionTypeSendHandle: FfiConverterRustBuffer {
+    typealias SwiftType = SendHandle?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeSendHandle.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeSendHandle.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeTaskHandle: FfiConverterRustBuffer {
     typealias SwiftType = TaskHandle?
 
@@ -28832,6 +28765,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_create_room() != 52700) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_create_room_alias() != 54261) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_custom_login_with_jwt() != 19710) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -29021,6 +28957,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_build_with_qr_code() != 51905) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_cross_process_store_locks_holder_name() != 46627) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_automatic_token_refresh() != 43839) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -29030,7 +28969,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_ssl_verification() != 2334) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_enable_cross_process_refresh_lock() != 34129) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_enable_oidc_refresh_lock() != 42214) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_homeserver_url() != 28347) {
@@ -29163,6 +29102,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_debug_info() != 55450) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_get_send_handle() != 46057) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_get_shields() != 12518) {
@@ -29312,7 +29254,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_id() != 61990) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_ignore_device_trust_and_resend() != 18289) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_ignore_device_trust_and_resend() != 39984) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_ignore_user() != 62239) {
@@ -29456,9 +29398,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_topic() != 59745) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_try_resend() != 40157) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_typing_notice() != 28642) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -29471,7 +29410,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_upload_avatar() != 19069) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_withdraw_verification_and_resend() != 48968) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_withdraw_verification_and_resend() != 33485) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomdirectorysearch_is_at_last_page() != 34221) {
@@ -29591,6 +29530,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_sendhandle_abort() != 11570) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_sendhandle_try_resend() != 28691) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_accept_verification_request() != 53466) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -29651,7 +29593,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_finish() != 22814) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_cross_process_lock() != 31599) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_cross_process_lock() != 56326) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_utd_hook() != 9029) {
