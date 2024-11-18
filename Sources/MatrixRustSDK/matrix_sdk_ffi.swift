@@ -7896,6 +7896,11 @@ public protocol RoomPreviewProtocol : AnyObject {
     func info() throws  -> RoomPreviewInfo
     
     /**
+     * Get the user who created the invite, if any.
+     */
+    func inviter() async  -> RoomMember?
+    
+    /**
      * Leave the room if the room preview state is either joined, invited or
      * knocked.
      *
@@ -7958,6 +7963,27 @@ open func info()throws  -> RoomPreviewInfo {
     uniffi_matrix_sdk_ffi_fn_method_roompreview_info(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+    /**
+     * Get the user who created the invite, if any.
+     */
+open func inviter()async  -> RoomMember? {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_roompreview_inviter(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeRoomMember.lift,
+            errorHandler: nil
+            
+        )
 }
     
     /**
@@ -9583,7 +9609,7 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
     
-    func sendFile(url: String, fileInfo: FileInfo, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
+    func sendFile(url: String, fileInfo: FileInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
     
     func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
     
@@ -9996,11 +10022,13 @@ open func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formatt
 })
 }
     
-open func sendFile(url: String, fileInfo: FileInfo, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
+open func sendFile(url: String, fileInfo: FileInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
     return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_file(self.uniffiClonePointer(),
         FfiConverterString.lower(url),
         FfiConverterTypeFileInfo.lower(fileInfo),
+        FfiConverterOptionString.lower(caption),
+        FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
         FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),
         FfiConverterBool.lower(useSendQueue),$0
     )
@@ -15120,9 +15148,13 @@ public struct RoomPreviewInfo {
      */
     public var numJoinedMembers: UInt64
     /**
+     * The number of active members, if known (joined + invited).
+     */
+    public var numActiveMembers: UInt64?
+    /**
      * The room type (space, custom) or nothing, if it's a regular room.
      */
-    public var roomType: String?
+    public var roomType: RoomType
     /**
      * Is the history world-readable for this room?
      */
@@ -15135,6 +15167,10 @@ public struct RoomPreviewInfo {
      * The join rule for this room (private, public, knock, etc.).
      */
     public var joinRule: JoinRule
+    /**
+     * Whether the room is direct or not, if known.
+     */
+    public var isDirect: Bool?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -15158,8 +15194,11 @@ public struct RoomPreviewInfo {
          * The number of joined members.
          */numJoinedMembers: UInt64, 
         /**
+         * The number of active members, if known (joined + invited).
+         */numActiveMembers: UInt64?, 
+        /**
          * The room type (space, custom) or nothing, if it's a regular room.
-         */roomType: String?, 
+         */roomType: RoomType, 
         /**
          * Is the history world-readable for this room?
          */isHistoryWorldReadable: Bool, 
@@ -15168,17 +15207,22 @@ public struct RoomPreviewInfo {
          */membership: Membership?, 
         /**
          * The join rule for this room (private, public, knock, etc.).
-         */joinRule: JoinRule) {
+         */joinRule: JoinRule, 
+        /**
+         * Whether the room is direct or not, if known.
+         */isDirect: Bool?) {
         self.roomId = roomId
         self.canonicalAlias = canonicalAlias
         self.name = name
         self.topic = topic
         self.avatarUrl = avatarUrl
         self.numJoinedMembers = numJoinedMembers
+        self.numActiveMembers = numActiveMembers
         self.roomType = roomType
         self.isHistoryWorldReadable = isHistoryWorldReadable
         self.membership = membership
         self.joinRule = joinRule
+        self.isDirect = isDirect
     }
 }
 
@@ -15204,6 +15248,9 @@ extension RoomPreviewInfo: Equatable, Hashable {
         if lhs.numJoinedMembers != rhs.numJoinedMembers {
             return false
         }
+        if lhs.numActiveMembers != rhs.numActiveMembers {
+            return false
+        }
         if lhs.roomType != rhs.roomType {
             return false
         }
@@ -15216,6 +15263,9 @@ extension RoomPreviewInfo: Equatable, Hashable {
         if lhs.joinRule != rhs.joinRule {
             return false
         }
+        if lhs.isDirect != rhs.isDirect {
+            return false
+        }
         return true
     }
 
@@ -15226,10 +15276,12 @@ extension RoomPreviewInfo: Equatable, Hashable {
         hasher.combine(topic)
         hasher.combine(avatarUrl)
         hasher.combine(numJoinedMembers)
+        hasher.combine(numActiveMembers)
         hasher.combine(roomType)
         hasher.combine(isHistoryWorldReadable)
         hasher.combine(membership)
         hasher.combine(joinRule)
+        hasher.combine(isDirect)
     }
 }
 
@@ -15244,10 +15296,12 @@ public struct FfiConverterTypeRoomPreviewInfo: FfiConverterRustBuffer {
                 topic: FfiConverterOptionString.read(from: &buf), 
                 avatarUrl: FfiConverterOptionString.read(from: &buf), 
                 numJoinedMembers: FfiConverterUInt64.read(from: &buf), 
-                roomType: FfiConverterOptionString.read(from: &buf), 
+                numActiveMembers: FfiConverterOptionUInt64.read(from: &buf), 
+                roomType: FfiConverterTypeRoomType.read(from: &buf), 
                 isHistoryWorldReadable: FfiConverterBool.read(from: &buf), 
                 membership: FfiConverterOptionTypeMembership.read(from: &buf), 
-                joinRule: FfiConverterTypeJoinRule.read(from: &buf)
+                joinRule: FfiConverterTypeJoinRule.read(from: &buf), 
+                isDirect: FfiConverterOptionBool.read(from: &buf)
         )
     }
 
@@ -15258,10 +15312,12 @@ public struct FfiConverterTypeRoomPreviewInfo: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.topic, into: &buf)
         FfiConverterOptionString.write(value.avatarUrl, into: &buf)
         FfiConverterUInt64.write(value.numJoinedMembers, into: &buf)
-        FfiConverterOptionString.write(value.roomType, into: &buf)
+        FfiConverterOptionUInt64.write(value.numActiveMembers, into: &buf)
+        FfiConverterTypeRoomType.write(value.roomType, into: &buf)
         FfiConverterBool.write(value.isHistoryWorldReadable, into: &buf)
         FfiConverterOptionTypeMembership.write(value.membership, into: &buf)
         FfiConverterTypeJoinRule.write(value.joinRule, into: &buf)
+        FfiConverterOptionBool.write(value.isDirect, into: &buf)
     }
 }
 
@@ -22477,6 +22533,83 @@ extension RoomPreset: Equatable, Hashable {}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The type of room for a [`RoomPreviewInfo`].
+ */
+
+public enum RoomType {
+    
+    /**
+     * It's a plain chat room.
+     */
+    case room
+    /**
+     * It's a space that can group several rooms.
+     */
+    case space
+    /**
+     * It's a custom implementation.
+     */
+    case custom(value: String
+    )
+}
+
+
+public struct FfiConverterTypeRoomType: FfiConverterRustBuffer {
+    typealias SwiftType = RoomType
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomType {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .room
+        
+        case 2: return .space
+        
+        case 3: return .custom(value: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RoomType, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .room:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .space:
+            writeInt(&buf, Int32(2))
+        
+        
+        case let .custom(value):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(value, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeRoomType_lift(_ buf: RustBuffer) throws -> RoomType {
+    return try FfiConverterTypeRoomType.lift(buf)
+}
+
+public func FfiConverterTypeRoomType_lower(_ value: RoomType) -> RustBuffer {
+    return FfiConverterTypeRoomType.lower(value)
+}
+
+
+
+extension RoomType: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum RoomVisibility {
     
@@ -29518,6 +29651,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_info() != 9145) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_inviter() != 1297) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_leave() != 5096) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -29656,7 +29792,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 43163) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_file() != 35408) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_file() != 37925) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 45681) {
