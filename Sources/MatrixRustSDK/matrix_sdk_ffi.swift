@@ -15171,6 +15171,10 @@ public struct RoomPreviewInfo {
      * Whether the room is direct or not, if known.
      */
     public var isDirect: Bool?
+    /**
+     * Room heroes.
+     */
+    public var heroes: [RoomHero]?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -15210,7 +15214,10 @@ public struct RoomPreviewInfo {
          */joinRule: JoinRule, 
         /**
          * Whether the room is direct or not, if known.
-         */isDirect: Bool?) {
+         */isDirect: Bool?, 
+        /**
+         * Room heroes.
+         */heroes: [RoomHero]?) {
         self.roomId = roomId
         self.canonicalAlias = canonicalAlias
         self.name = name
@@ -15223,6 +15230,7 @@ public struct RoomPreviewInfo {
         self.membership = membership
         self.joinRule = joinRule
         self.isDirect = isDirect
+        self.heroes = heroes
     }
 }
 
@@ -15266,6 +15274,9 @@ extension RoomPreviewInfo: Equatable, Hashable {
         if lhs.isDirect != rhs.isDirect {
             return false
         }
+        if lhs.heroes != rhs.heroes {
+            return false
+        }
         return true
     }
 
@@ -15282,6 +15293,7 @@ extension RoomPreviewInfo: Equatable, Hashable {
         hasher.combine(membership)
         hasher.combine(joinRule)
         hasher.combine(isDirect)
+        hasher.combine(heroes)
     }
 }
 
@@ -15301,7 +15313,8 @@ public struct FfiConverterTypeRoomPreviewInfo: FfiConverterRustBuffer {
                 isHistoryWorldReadable: FfiConverterBool.read(from: &buf), 
                 membership: FfiConverterOptionTypeMembership.read(from: &buf), 
                 joinRule: FfiConverterTypeJoinRule.read(from: &buf), 
-                isDirect: FfiConverterOptionBool.read(from: &buf)
+                isDirect: FfiConverterOptionBool.read(from: &buf), 
+                heroes: FfiConverterOptionSequenceTypeRoomHero.read(from: &buf)
         )
     }
 
@@ -15318,6 +15331,7 @@ public struct FfiConverterTypeRoomPreviewInfo: FfiConverterRustBuffer {
         FfiConverterOptionTypeMembership.write(value.membership, into: &buf)
         FfiConverterTypeJoinRule.write(value.joinRule, into: &buf)
         FfiConverterOptionBool.write(value.isDirect, into: &buf)
+        FfiConverterOptionSequenceTypeRoomHero.write(value.heroes, into: &buf)
     }
 }
 
@@ -27702,6 +27716,27 @@ fileprivate struct FfiConverterOptionSequenceTypeTimelineItem: FfiConverterRustB
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterSequenceTypeTimelineItem.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+fileprivate struct FfiConverterOptionSequenceTypeRoomHero: FfiConverterRustBuffer {
+    typealias SwiftType = [RoomHero]?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterSequenceTypeRoomHero.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterSequenceTypeRoomHero.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
