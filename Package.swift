@@ -10,7 +10,7 @@ let package = Package(
         .iOS(.v16)
     ],
     products: [
-        .library(name: "MatrixRustSDK", targets: ["MatrixRustSDK"]),
+        .library(name: "MatrixRustSDK", type: .dynamic, targets: ["MatrixRustSDK"]),
     ],
     targets: [
         .binaryTarget(name: "MatrixSDKFFI", url: url, checksum: checksum),
