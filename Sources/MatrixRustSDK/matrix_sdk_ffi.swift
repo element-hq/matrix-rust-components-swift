@@ -17825,6 +17825,8 @@ public enum EditedContent {
     
     case roomMessage(content: RoomMessageEventContentWithoutRelation
     )
+    case mediaCaption(caption: String?, formattedCaption: FormattedBody?
+    )
     case pollStart(pollData: PollData
     )
 }
@@ -17840,7 +17842,10 @@ public struct FfiConverterTypeEditedContent: FfiConverterRustBuffer {
         case 1: return .roomMessage(content: try FfiConverterTypeRoomMessageEventContentWithoutRelation.read(from: &buf)
         )
         
-        case 2: return .pollStart(pollData: try FfiConverterTypePollData.read(from: &buf)
+        case 2: return .mediaCaption(caption: try FfiConverterOptionString.read(from: &buf), formattedCaption: try FfiConverterOptionTypeFormattedBody.read(from: &buf)
+        )
+        
+        case 3: return .pollStart(pollData: try FfiConverterTypePollData.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -17856,8 +17861,14 @@ public struct FfiConverterTypeEditedContent: FfiConverterRustBuffer {
             FfiConverterTypeRoomMessageEventContentWithoutRelation.write(content, into: &buf)
             
         
-        case let .pollStart(pollData):
+        case let .mediaCaption(caption,formattedCaption):
             writeInt(&buf, Int32(2))
+            FfiConverterOptionString.write(caption, into: &buf)
+            FfiConverterOptionTypeFormattedBody.write(formattedCaption, into: &buf)
+            
+        
+        case let .pollStart(pollData):
+            writeInt(&buf, Int32(3))
             FfiConverterTypePollData.write(pollData, into: &buf)
             
         }
