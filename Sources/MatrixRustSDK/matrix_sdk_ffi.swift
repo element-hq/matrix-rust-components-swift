@@ -28583,6 +28583,20 @@ public func contentWithoutRelationFromMessage(message: MessageContent)throws  ->
     )
 })
 }
+/**
+ * Create a caption edit.
+ *
+ * If no `formatted_caption` is provided, then it's assumed the `caption`
+ * represents valid Markdown that can be used as the formatted caption.
+ */
+public func createCaptionEdit(caption: String?, formattedCaption: FormattedBody?) -> EditedContent {
+    return try!  FfiConverterTypeEditedContent.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_func_create_caption_edit(
+        FfiConverterOptionString.lower(caption),
+        FfiConverterOptionTypeFormattedBody.lower(formattedCaption),$0
+    )
+})
+}
 public func genTransactionId() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_func_gen_transaction_id($0
@@ -28840,6 +28854,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.contractVersionMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_content_without_relation_from_message() != 1366) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_func_create_caption_edit() != 49747) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_gen_transaction_id() != 15808) {
