@@ -14429,9 +14429,13 @@ public struct RoomInfo {
      */
     public var numUnreadMentions: UInt64
     /**
-     * The currently pinned event ids
+     * The currently pinned event ids.
      */
     public var pinnedEventIds: [String]
+    /**
+     * The join rule for this room, if known.
+     */
+    public var joinRule: JoinRule?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -14466,8 +14470,11 @@ public struct RoomInfo {
          * notification settings.
          */numUnreadMentions: UInt64, 
         /**
-         * The currently pinned event ids
-         */pinnedEventIds: [String]) {
+         * The currently pinned event ids.
+         */pinnedEventIds: [String], 
+        /**
+         * The join rule for this room, if known.
+         */joinRule: JoinRule?) {
         self.id = id
         self.creator = creator
         self.displayName = displayName
@@ -14498,6 +14505,7 @@ public struct RoomInfo {
         self.numUnreadNotifications = numUnreadNotifications
         self.numUnreadMentions = numUnreadMentions
         self.pinnedEventIds = pinnedEventIds
+        self.joinRule = joinRule
     }
 }
 
@@ -14595,6 +14603,9 @@ extension RoomInfo: Equatable, Hashable {
         if lhs.pinnedEventIds != rhs.pinnedEventIds {
             return false
         }
+        if lhs.joinRule != rhs.joinRule {
+            return false
+        }
         return true
     }
 
@@ -14629,6 +14640,7 @@ extension RoomInfo: Equatable, Hashable {
         hasher.combine(numUnreadNotifications)
         hasher.combine(numUnreadMentions)
         hasher.combine(pinnedEventIds)
+        hasher.combine(joinRule)
     }
 }
 
@@ -14666,7 +14678,8 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 numUnreadMessages: FfiConverterUInt64.read(from: &buf), 
                 numUnreadNotifications: FfiConverterUInt64.read(from: &buf), 
                 numUnreadMentions: FfiConverterUInt64.read(from: &buf), 
-                pinnedEventIds: FfiConverterSequenceString.read(from: &buf)
+                pinnedEventIds: FfiConverterSequenceString.read(from: &buf), 
+                joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf)
         )
     }
 
@@ -14701,6 +14714,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.numUnreadNotifications, into: &buf)
         FfiConverterUInt64.write(value.numUnreadMentions, into: &buf)
         FfiConverterSequenceString.write(value.pinnedEventIds, into: &buf)
+        FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
     }
 }
 
@@ -17195,6 +17209,12 @@ public enum AllowRule {
      */
     case roomMembership(roomId: String
     )
+    /**
+     * A custom allow rule implementation, containing its JSON representation
+     * as a `String`.
+     */
+    case custom(json: String
+    )
 }
 
 
@@ -17208,6 +17228,9 @@ public struct FfiConverterTypeAllowRule: FfiConverterRustBuffer {
         case 1: return .roomMembership(roomId: try FfiConverterString.read(from: &buf)
         )
         
+        case 2: return .custom(json: try FfiConverterString.read(from: &buf)
+        )
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -17219,6 +17242,11 @@ public struct FfiConverterTypeAllowRule: FfiConverterRustBuffer {
         case let .roomMembership(roomId):
             writeInt(&buf, Int32(1))
             FfiConverterString.write(roomId, into: &buf)
+            
+        
+        case let .custom(json):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(json, into: &buf)
             
         }
     }
