@@ -3828,8 +3828,6 @@ public func FfiConverterTypeMediaFileHandle_lower(_ value: MediaFileHandle) -> U
 
 public protocol MediaSourceProtocol : AnyObject {
     
-    func toJson()  -> String
-    
     func url()  -> String
     
 }
@@ -3873,22 +3871,7 @@ open class MediaSource:
     }
 
     
-public static func fromJson(json: String)throws  -> MediaSource {
-    return try  FfiConverterTypeMediaSource.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
-    uniffi_matrix_sdk_ffi_fn_constructor_mediasource_from_json(
-        FfiConverterString.lower(json),$0
-    )
-})
-}
-    
 
-    
-open func toJson() -> String {
-    return try!  FfiConverterString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_mediasource_to_json(self.uniffiClonePointer(),$0
-    )
-})
-}
     
 open func url() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
@@ -28953,12 +28936,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_suggested_role_for_power_level() != 48532) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_mediasource_to_json() != 2998) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_mediasource_url() != 34026) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_roommessageeventcontentwithoutrelation_with_mentions() != 8867) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -29338,6 +29315,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediafilehandle_persist() != 12883) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_mediasource_url() != 62692) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_notification() != 2524) {
@@ -29992,9 +29972,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_widgetdriverhandle_send() != 18689) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_constructor_mediasource_from_json() != 29216) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_clientbuilder_new() != 27991) {
