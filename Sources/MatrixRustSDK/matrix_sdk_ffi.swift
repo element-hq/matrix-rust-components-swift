@@ -3828,6 +3828,8 @@ public func FfiConverterTypeMediaFileHandle_lower(_ value: MediaFileHandle) -> U
 
 public protocol MediaSourceProtocol : AnyObject {
     
+    func toJson()  -> String
+    
     func url()  -> String
     
 }
@@ -3871,7 +3873,30 @@ open class MediaSource:
     }
 
     
+public static func fromJson(json: String)throws  -> MediaSource {
+    return try  FfiConverterTypeMediaSource.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_constructor_mediasource_from_json(
+        FfiConverterString.lower(json),$0
+    )
+})
+}
+    
+public static func fromUrl(url: String)throws  -> MediaSource {
+    return try  FfiConverterTypeMediaSource.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_constructor_mediasource_from_url(
+        FfiConverterString.lower(url),$0
+    )
+})
+}
+    
 
+    
+open func toJson() -> String {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_mediasource_to_json(self.uniffiClonePointer(),$0
+    )
+})
+}
     
 open func url() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
@@ -15155,7 +15180,7 @@ public struct RoomPreviewInfo {
     /**
      * Is the history world-readable for this room?
      */
-    public var isHistoryWorldReadable: Bool
+    public var isHistoryWorldReadable: Bool?
     /**
      * The membership state for the current user, if known.
      */
@@ -15202,7 +15227,7 @@ public struct RoomPreviewInfo {
          */roomType: RoomType, 
         /**
          * Is the history world-readable for this room?
-         */isHistoryWorldReadable: Bool, 
+         */isHistoryWorldReadable: Bool?, 
         /**
          * The membership state for the current user, if known.
          */membership: Membership?, 
@@ -15307,7 +15332,7 @@ public struct FfiConverterTypeRoomPreviewInfo: FfiConverterRustBuffer {
                 numJoinedMembers: FfiConverterUInt64.read(from: &buf), 
                 numActiveMembers: FfiConverterOptionUInt64.read(from: &buf), 
                 roomType: FfiConverterTypeRoomType.read(from: &buf), 
-                isHistoryWorldReadable: FfiConverterBool.read(from: &buf), 
+                isHistoryWorldReadable: FfiConverterOptionBool.read(from: &buf), 
                 membership: FfiConverterOptionTypeMembership.read(from: &buf), 
                 joinRule: FfiConverterTypeJoinRule.read(from: &buf), 
                 isDirect: FfiConverterOptionBool.read(from: &buf), 
@@ -15324,7 +15349,7 @@ public struct FfiConverterTypeRoomPreviewInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.numJoinedMembers, into: &buf)
         FfiConverterOptionUInt64.write(value.numActiveMembers, into: &buf)
         FfiConverterTypeRoomType.write(value.roomType, into: &buf)
-        FfiConverterBool.write(value.isHistoryWorldReadable, into: &buf)
+        FfiConverterOptionBool.write(value.isHistoryWorldReadable, into: &buf)
         FfiConverterOptionTypeMembership.write(value.membership, into: &buf)
         FfiConverterTypeJoinRule.write(value.joinRule, into: &buf)
         FfiConverterOptionBool.write(value.isDirect, into: &buf)
@@ -28735,13 +28760,6 @@ public func matrixToUserPermalink(userId: String)throws  -> String {
     )
 })
 }
-public func mediaSourceFromUrl(url: String) -> MediaSource {
-    return try!  FfiConverterTypeMediaSource.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_func_media_source_from_url(
-        FfiConverterString.lower(url),$0
-    )
-})
-}
 public func messageEventContentFromHtml(body: String, htmlBody: String) -> RoomMessageEventContentWithoutRelation {
     return try!  FfiConverterTypeRoomMessageEventContentWithoutRelation.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_func_message_event_content_from_html(
@@ -28895,9 +28913,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_matrix_to_user_permalink() != 46473) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_func_media_source_from_url() != 12165) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_message_event_content_from_html() != 37203) {
@@ -29315,6 +29330,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediafilehandle_persist() != 12883) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_mediasource_to_json() != 23306) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediasource_url() != 62692) {
@@ -29975,6 +29993,12 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_clientbuilder_new() != 27991) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_mediasource_from_json() != 10564) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_mediasource_from_url() != 11983) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_qrcodedata_from_bytes() != 32675) {
