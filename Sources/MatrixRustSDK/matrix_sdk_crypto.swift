@@ -1100,6 +1100,17 @@ public enum UtdCause {
      * obtained from a legacy (asymmetric) backup, unsafe key forward, etc.)
      */
     case unknownDevice
+    /**
+     * We are missing the keys for this event, but it is a "device-historical"
+     * message and no backup is accessible or usable.
+     *
+     * Device-historical means that the message was sent before the current
+     * device existed (but the current user was probably a member of the room
+     * at the time the message was sent). Not to
+     * be confused with pre-join or pre-invite messages (see
+     * [`UtdCause::SentBeforeWeJoined`] for that).
+     */
+    case historicalMessage
 }
 
 
@@ -1119,6 +1130,8 @@ public struct FfiConverterTypeUtdCause: FfiConverterRustBuffer {
         case 4: return .unsignedDevice
         
         case 5: return .unknownDevice
+        
+        case 6: return .historicalMessage
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -1146,6 +1159,10 @@ public struct FfiConverterTypeUtdCause: FfiConverterRustBuffer {
         
         case .unknownDevice:
             writeInt(&buf, Int32(5))
+        
+        
+        case .historicalMessage:
+            writeInt(&buf, Int32(6))
         
         }
     }
