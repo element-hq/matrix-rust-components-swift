@@ -5032,6 +5032,24 @@ public protocol RoomProtocol : AnyObject {
     
     func membership()  -> Membership
     
+    /**
+     * A timeline instance that can be configured to only include RoomMessage
+     * type events and filter those further based on their message type.
+     *
+     * Virtual timeline items will still be provided and the
+     * `default_event_filter` will be applied before everything else.
+     *
+     * # Arguments
+     *
+     * * `internal_id_prefix` - An optional String that will be prepended to
+     * all the timeline item's internal IDs, making it possible to
+     * distinguish different timeline instances from each other.
+     *
+     * * `allowed_message_types` - A list of `RoomMessageEventMessageType` that
+     * will be allowed to appear in the timeline
+     */
+    func messageFilteredTimeline(internalIdPrefix: String?, allowedMessageTypes: [RoomMessageEventMessageType]) async throws  -> Timeline
+    
     func ownUserId()  -> String
     
     func pinnedEventsTimeline(internalIdPrefix: String?, maxEventsToLoad: UInt16, maxConcurrentRequests: UInt16) async throws  -> Timeline
@@ -5978,6 +5996,39 @@ open func membership() -> Membership {
     uniffi_matrix_sdk_ffi_fn_method_room_membership(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+    /**
+     * A timeline instance that can be configured to only include RoomMessage
+     * type events and filter those further based on their message type.
+     *
+     * Virtual timeline items will still be provided and the
+     * `default_event_filter` will be applied before everything else.
+     *
+     * # Arguments
+     *
+     * * `internal_id_prefix` - An optional String that will be prepended to
+     * all the timeline item's internal IDs, making it possible to
+     * distinguish different timeline instances from each other.
+     *
+     * * `allowed_message_types` - A list of `RoomMessageEventMessageType` that
+     * will be allowed to appear in the timeline
+     */
+open func messageFilteredTimeline(internalIdPrefix: String?, allowedMessageTypes: [RoomMessageEventMessageType])async throws  -> Timeline {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_message_filtered_timeline(
+                    self.uniffiClonePointer(),
+                    FfiConverterOptionString.lower(internalIdPrefix),FfiConverterSequenceTypeRoomMessageEventMessageType.lower(allowedMessageTypes)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeTimeline.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func ownUserId() -> String {
@@ -22446,6 +22497,124 @@ extension RoomListServiceSyncIndicator: Equatable, Hashable {}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum RoomMessageEventMessageType {
+    
+    case audio
+    case emote
+    case file
+    case image
+    case location
+    case notice
+    case serverNotice
+    case text
+    case video
+    case verificationRequest
+    case other
+}
+
+
+public struct FfiConverterTypeRoomMessageEventMessageType: FfiConverterRustBuffer {
+    typealias SwiftType = RoomMessageEventMessageType
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomMessageEventMessageType {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .audio
+        
+        case 2: return .emote
+        
+        case 3: return .file
+        
+        case 4: return .image
+        
+        case 5: return .location
+        
+        case 6: return .notice
+        
+        case 7: return .serverNotice
+        
+        case 8: return .text
+        
+        case 9: return .video
+        
+        case 10: return .verificationRequest
+        
+        case 11: return .other
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RoomMessageEventMessageType, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .audio:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .emote:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .file:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .image:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .location:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .notice:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .serverNotice:
+            writeInt(&buf, Int32(7))
+        
+        
+        case .text:
+            writeInt(&buf, Int32(8))
+        
+        
+        case .video:
+            writeInt(&buf, Int32(9))
+        
+        
+        case .verificationRequest:
+            writeInt(&buf, Int32(10))
+        
+        
+        case .other:
+            writeInt(&buf, Int32(11))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeRoomMessageEventMessageType_lift(_ buf: RustBuffer) throws -> RoomMessageEventMessageType {
+    return try FfiConverterTypeRoomMessageEventMessageType.lift(buf)
+}
+
+public func FfiConverterTypeRoomMessageEventMessageType_lower(_ value: RoomMessageEventMessageType) -> RustBuffer {
+    return FfiConverterTypeRoomMessageEventMessageType.lower(value)
+}
+
+
+
+extension RoomMessageEventMessageType: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
  * Enum representing the push notification modes for a room.
  */
@@ -28380,6 +28549,28 @@ fileprivate struct FfiConverterSequenceTypeRoomListEntriesUpdate: FfiConverterRu
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeRoomMessageEventMessageType: FfiConverterRustBuffer {
+    typealias SwiftType = [RoomMessageEventMessageType]
+
+    public static func write(_ value: [RoomMessageEventMessageType], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRoomMessageEventMessageType.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RoomMessageEventMessageType] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RoomMessageEventMessageType]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRoomMessageEventMessageType.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypeSlidingSyncVersion: FfiConverterRustBuffer {
     typealias SwiftType = [SlidingSyncVersion]
 
@@ -29549,6 +29740,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_membership() != 26065) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_message_filtered_timeline() != 47862) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_own_user_id() != 39510) {

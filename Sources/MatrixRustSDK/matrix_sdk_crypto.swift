@@ -1111,6 +1111,21 @@ public enum UtdCause {
      * [`UtdCause::SentBeforeWeJoined`] for that).
      */
     case historicalMessage
+    /**
+     * The keys for this event are intentionally withheld.
+     *
+     * The sender has refused to share the key because our device does not meet
+     * the sender's security requirements.
+     */
+    case withheldForUnverifiedOrInsecureDevice
+    /**
+     * The keys for this event are missing, likely because the sender was
+     * unable to share them (e.g., failure to establish an Olm 1:1
+     * channel). Alternatively, the sender may have deliberately excluded
+     * this device by cherry-picking and blocking it, in which case, no action
+     * can be taken on our side.
+     */
+    case withheldBySender
 }
 
 
@@ -1132,6 +1147,10 @@ public struct FfiConverterTypeUtdCause: FfiConverterRustBuffer {
         case 5: return .unknownDevice
         
         case 6: return .historicalMessage
+        
+        case 7: return .withheldForUnverifiedOrInsecureDevice
+        
+        case 8: return .withheldBySender
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -1163,6 +1182,14 @@ public struct FfiConverterTypeUtdCause: FfiConverterRustBuffer {
         
         case .historicalMessage:
             writeInt(&buf, Int32(6))
+        
+        
+        case .withheldForUnverifiedOrInsecureDevice:
+            writeInt(&buf, Int32(7))
+        
+        
+        case .withheldBySender:
+            writeInt(&buf, Int32(8))
         
         }
     }
