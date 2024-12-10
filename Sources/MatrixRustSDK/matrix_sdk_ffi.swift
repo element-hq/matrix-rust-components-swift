@@ -2241,6 +2241,21 @@ public protocol ClientBuilderProtocol : AnyObject {
     
     func slidingSyncVersionBuilder(versionBuilder: SlidingSyncVersionBuilder)  -> ClientBuilder
     
+    /**
+     * Whether to use the event cache persistent storage or not.
+     *
+     * This is a temporary feature flag, for testing the event cache's
+     * persistent storage. Follow new developments in https://github.com/matrix-org/matrix-rust-sdk/issues/3280.
+     *
+     * This is disabled by default. When disabled, a one-time cleanup is
+     * performed when creating the client, and it will clear all the events
+     * previously stored in the event cache.
+     *
+     * When enabled, it will attempt to store events in the event cache as
+     * they're received, and reuse them when reconstructing timelines.
+     */
+    func useEventCachePersistentStorage(value: Bool)  -> ClientBuilder
+    
     func userAgent(userAgent: String)  -> ClientBuilder
     
     func username(username: String)  -> ClientBuilder
@@ -2528,6 +2543,27 @@ open func slidingSyncVersionBuilder(versionBuilder: SlidingSyncVersionBuilder) -
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_sliding_sync_version_builder(self.uniffiClonePointer(),
         FfiConverterTypeSlidingSyncVersionBuilder.lower(versionBuilder),$0
+    )
+})
+}
+    
+    /**
+     * Whether to use the event cache persistent storage or not.
+     *
+     * This is a temporary feature flag, for testing the event cache's
+     * persistent storage. Follow new developments in https://github.com/matrix-org/matrix-rust-sdk/issues/3280.
+     *
+     * This is disabled by default. When disabled, a one-time cleanup is
+     * performed when creating the client, and it will clear all the events
+     * previously stored in the event cache.
+     *
+     * When enabled, it will attempt to store events in the event cache as
+     * they're received, and reuse them when reconstructing timelines.
+     */
+open func useEventCachePersistentStorage(value: Bool) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_use_event_cache_persistent_storage(self.uniffiClonePointer(),
+        FfiConverterBool.lower(value),$0
     )
 })
 }
@@ -4891,6 +4927,14 @@ public protocol RoomProtocol : AnyObject {
     func clearComposerDraft() async throws 
     
     /**
+     * Clear the event cache storage for the current room.
+     *
+     * This will remove all the information related to the event cache, in
+     * memory and in the persisted storage, if enabled.
+     */
+    func clearEventCacheStorage() async throws 
+    
+    /**
      * Forces the currently active room key, which is used to encrypt messages,
      * to be rotated.
      *
@@ -5048,7 +5092,7 @@ public protocol RoomProtocol : AnyObject {
      * * `allowed_message_types` - A list of `RoomMessageEventMessageType` that
      * will be allowed to appear in the timeline
      */
-    func messageFilteredTimeline(internalIdPrefix: String?, allowedMessageTypes: [RoomMessageEventMessageType]) async throws  -> Timeline
+    func messageFilteredTimeline(internalIdPrefix: String?, allowedMessageTypes: [RoomMessageEventMessageType], dateDividerMode: DateDividerMode) async throws  -> Timeline
     
     func ownUserId()  -> String
     
@@ -5127,6 +5171,17 @@ public protocol RoomProtocol : AnyObject {
      * - is this a group with more than one other member -> notify
      */
     func sendCallNotificationIfNeeded() async throws 
+    
+    /**
+     * Send a raw event to the room.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the event to send.
+     *
+     * * `content` - The content of the event to send encoded as JSON string.
+     */
+    func sendRaw(eventType: String, content: String) async throws 
     
     func setIsFavourite(isFavourite: Bool, tagOrder: Double?) async throws 
     
@@ -5488,6 +5543,29 @@ open func clearComposerDraft()async throws  {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_clear_composer_draft(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Clear the event cache storage for the current room.
+     *
+     * This will remove all the information related to the event cache, in
+     * memory and in the persisted storage, if enabled.
+     */
+open func clearEventCacheStorage()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_clear_event_cache_storage(
                     self.uniffiClonePointer()
                     
                 )
@@ -6014,13 +6092,13 @@ open func membership() -> Membership {
      * * `allowed_message_types` - A list of `RoomMessageEventMessageType` that
      * will be allowed to appear in the timeline
      */
-open func messageFilteredTimeline(internalIdPrefix: String?, allowedMessageTypes: [RoomMessageEventMessageType])async throws  -> Timeline {
+open func messageFilteredTimeline(internalIdPrefix: String?, allowedMessageTypes: [RoomMessageEventMessageType], dateDividerMode: DateDividerMode)async throws  -> Timeline {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_message_filtered_timeline(
                     self.uniffiClonePointer(),
-                    FfiConverterOptionString.lower(internalIdPrefix),FfiConverterSequenceTypeRoomMessageEventMessageType.lower(allowedMessageTypes)
+                    FfiConverterOptionString.lower(internalIdPrefix),FfiConverterSequenceTypeRoomMessageEventMessageType.lower(allowedMessageTypes),FfiConverterTypeDateDividerMode.lower(dateDividerMode)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
@@ -6244,6 +6322,32 @@ open func sendCallNotificationIfNeeded()async throws  {
                 uniffi_matrix_sdk_ffi_fn_method_room_send_call_notification_if_needed(
                     self.uniffiClonePointer()
                     
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Send a raw event to the room.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the event to send.
+     *
+     * * `content` - The content of the event to send encoded as JSON string.
+     */
+open func sendRaw(eventType: String, content: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_raw(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(eventType),FfiConverterString.lower(content)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -17617,6 +17721,8 @@ public enum ClientBuildError {
     
     case Sdk(message: String)
     
+    case EventCache(message: String)
+    
     case Generic(message: String)
     
 }
@@ -17660,7 +17766,11 @@ public struct FfiConverterTypeClientBuildError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 8: return .Generic(
+        case 8: return .EventCache(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 9: return .Generic(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -17689,8 +17799,10 @@ public struct FfiConverterTypeClientBuildError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(6))
         case .Sdk(_ /* message is ignored*/):
             writeInt(&buf, Int32(7))
-        case .Generic(_ /* message is ignored*/):
+        case .EventCache(_ /* message is ignored*/):
             writeInt(&buf, Int32(8))
+        case .Generic(_ /* message is ignored*/):
+            writeInt(&buf, Int32(9))
 
         
         }
@@ -17902,6 +18014,65 @@ public func FfiConverterTypeCrossSigningResetAuthType_lower(_ value: CrossSignin
 
 
 extension CrossSigningResetAuthType: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Changes how date dividers get inserted, either in between each day or in
+ * between each month
+ */
+
+public enum DateDividerMode {
+    
+    case daily
+    case monthly
+}
+
+
+public struct FfiConverterTypeDateDividerMode: FfiConverterRustBuffer {
+    typealias SwiftType = DateDividerMode
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DateDividerMode {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .daily
+        
+        case 2: return .monthly
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: DateDividerMode, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .daily:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .monthly:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeDateDividerMode_lift(_ buf: RustBuffer) throws -> DateDividerMode {
+    return try FfiConverterTypeDateDividerMode.lift(buf)
+}
+
+public func FfiConverterTypeDateDividerMode_lower(_ value: DateDividerMode) -> RustBuffer {
+    return FfiConverterTypeDateDividerMode.lower(value)
+}
+
+
+
+extension DateDividerMode: Equatable, Hashable {}
 
 
 
@@ -24241,9 +24412,10 @@ extension VerificationState: Equatable, Hashable {}
 public enum VirtualTimelineItem {
     
     /**
-     * A divider between messages of two days.
+     * A divider between messages of different day or month depending on
+     * timeline settings.
      */
-    case dayDivider(
+    case dateDivider(
         /**
          * A timestamp in milliseconds since Unix Epoch on that day in local
          * time.
@@ -24263,7 +24435,7 @@ public struct FfiConverterTypeVirtualTimelineItem: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .dayDivider(ts: try FfiConverterUInt64.read(from: &buf)
+        case 1: return .dateDivider(ts: try FfiConverterUInt64.read(from: &buf)
         )
         
         case 2: return .readMarker
@@ -24276,7 +24448,7 @@ public struct FfiConverterTypeVirtualTimelineItem: FfiConverterRustBuffer {
         switch value {
         
         
-        case let .dayDivider(ts):
+        case let .dateDivider(ts):
             writeInt(&buf, Int32(1))
             FfiConverterUInt64.write(ts, into: &buf)
             
@@ -29412,6 +29584,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_sliding_sync_version_builder() != 39381) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_use_event_cache_persistent_storage() != 58836) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_user_agent() != 13719) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -29643,6 +29818,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_composer_draft() != 39667) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_event_cache_storage() != 13838) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_discard_room_key() != 18081) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -29742,7 +29920,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_membership() != 26065) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_message_filtered_timeline() != 47862) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_message_filtered_timeline() != 32258) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_own_user_id() != 39510) {
@@ -29776,6 +29954,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_call_notification_if_needed() != 53551) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_raw() != 20486) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_is_favourite() != 64403) {
