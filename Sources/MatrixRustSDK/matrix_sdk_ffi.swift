@@ -16301,6 +16301,26 @@ public struct UnableToDecryptInfo {
      * we were not a member of this room?
      */
     public var cause: UtdCause
+    /**
+     * The difference between the event creation time (`origin_server_ts`) and
+     * the time our device was created. If negative, this event was sent
+     * *before* our device was created.
+     */
+    public var eventLocalAgeMillis: Int64
+    /**
+     * Whether the user had verified their own identity at the point they
+     * received the UTD event.
+     */
+    public var userTrustsOwnIdentity: Bool
+    /**
+     * The homeserver of the user that sent the undecryptable event.
+     */
+    public var senderHomeserver: String
+    /**
+     * Our local user's own homeserver, or `None` if the client is not logged
+     * in.
+     */
+    public var ownHomeserver: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -16319,10 +16339,30 @@ public struct UnableToDecryptInfo {
         /**
          * What we know about what caused this UTD. E.g. was this event sent when
          * we were not a member of this room?
-         */cause: UtdCause) {
+         */cause: UtdCause, 
+        /**
+         * The difference between the event creation time (`origin_server_ts`) and
+         * the time our device was created. If negative, this event was sent
+         * *before* our device was created.
+         */eventLocalAgeMillis: Int64, 
+        /**
+         * Whether the user had verified their own identity at the point they
+         * received the UTD event.
+         */userTrustsOwnIdentity: Bool, 
+        /**
+         * The homeserver of the user that sent the undecryptable event.
+         */senderHomeserver: String, 
+        /**
+         * Our local user's own homeserver, or `None` if the client is not logged
+         * in.
+         */ownHomeserver: String?) {
         self.eventId = eventId
         self.timeToDecryptMs = timeToDecryptMs
         self.cause = cause
+        self.eventLocalAgeMillis = eventLocalAgeMillis
+        self.userTrustsOwnIdentity = userTrustsOwnIdentity
+        self.senderHomeserver = senderHomeserver
+        self.ownHomeserver = ownHomeserver
     }
 }
 
@@ -16339,6 +16379,18 @@ extension UnableToDecryptInfo: Equatable, Hashable {
         if lhs.cause != rhs.cause {
             return false
         }
+        if lhs.eventLocalAgeMillis != rhs.eventLocalAgeMillis {
+            return false
+        }
+        if lhs.userTrustsOwnIdentity != rhs.userTrustsOwnIdentity {
+            return false
+        }
+        if lhs.senderHomeserver != rhs.senderHomeserver {
+            return false
+        }
+        if lhs.ownHomeserver != rhs.ownHomeserver {
+            return false
+        }
         return true
     }
 
@@ -16346,6 +16398,10 @@ extension UnableToDecryptInfo: Equatable, Hashable {
         hasher.combine(eventId)
         hasher.combine(timeToDecryptMs)
         hasher.combine(cause)
+        hasher.combine(eventLocalAgeMillis)
+        hasher.combine(userTrustsOwnIdentity)
+        hasher.combine(senderHomeserver)
+        hasher.combine(ownHomeserver)
     }
 }
 
@@ -16356,7 +16412,11 @@ public struct FfiConverterTypeUnableToDecryptInfo: FfiConverterRustBuffer {
             try UnableToDecryptInfo(
                 eventId: FfiConverterString.read(from: &buf), 
                 timeToDecryptMs: FfiConverterOptionUInt64.read(from: &buf), 
-                cause: FfiConverterTypeUtdCause.read(from: &buf)
+                cause: FfiConverterTypeUtdCause.read(from: &buf), 
+                eventLocalAgeMillis: FfiConverterInt64.read(from: &buf), 
+                userTrustsOwnIdentity: FfiConverterBool.read(from: &buf), 
+                senderHomeserver: FfiConverterString.read(from: &buf), 
+                ownHomeserver: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -16364,6 +16424,10 @@ public struct FfiConverterTypeUnableToDecryptInfo: FfiConverterRustBuffer {
         FfiConverterString.write(value.eventId, into: &buf)
         FfiConverterOptionUInt64.write(value.timeToDecryptMs, into: &buf)
         FfiConverterTypeUtdCause.write(value.cause, into: &buf)
+        FfiConverterInt64.write(value.eventLocalAgeMillis, into: &buf)
+        FfiConverterBool.write(value.userTrustsOwnIdentity, into: &buf)
+        FfiConverterString.write(value.senderHomeserver, into: &buf)
+        FfiConverterOptionString.write(value.ownHomeserver, into: &buf)
     }
 }
 
