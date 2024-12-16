@@ -3590,6 +3590,215 @@ public func FfiConverterTypeInReplyToDetails_lower(_ value: InReplyToDetails) ->
 
 
 /**
+ * A set of actions to perform for a knock request.
+ */
+public protocol KnockRequestActionsProtocol : AnyObject {
+    
+    /**
+     * Accepts the knock request by inviting the user to the room.
+     */
+    func accept() async throws 
+    
+    /**
+     * Declines the knock request by kicking the user from the room with an
+     * optional reason.
+     */
+    func decline(reason: String?) async throws 
+    
+    /**
+     * Declines the knock request by banning the user from the room with an
+     * optional reason.
+     */
+    func declineAndBan(reason: String?) async throws 
+    
+    /**
+     * Marks the knock request as 'seen'.
+     *
+     * **IMPORTANT**: this won't update the current reference to this request,
+     * a new one with the updated value should be emitted instead.
+     */
+    func markAsSeen() async throws 
+    
+}
+
+/**
+ * A set of actions to perform for a knock request.
+ */
+open class KnockRequestActions:
+    KnockRequestActionsProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_knockrequestactions(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_knockrequestactions(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Accepts the knock request by inviting the user to the room.
+     */
+open func accept()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_knockrequestactions_accept(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Declines the knock request by kicking the user from the room with an
+     * optional reason.
+     */
+open func decline(reason: String?)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_knockrequestactions_decline(
+                    self.uniffiClonePointer(),
+                    FfiConverterOptionString.lower(reason)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Declines the knock request by banning the user from the room with an
+     * optional reason.
+     */
+open func declineAndBan(reason: String?)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_knockrequestactions_decline_and_ban(
+                    self.uniffiClonePointer(),
+                    FfiConverterOptionString.lower(reason)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Marks the knock request as 'seen'.
+     *
+     * **IMPORTANT**: this won't update the current reference to this request,
+     * a new one with the updated value should be emitted instead.
+     */
+open func markAsSeen()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_knockrequestactions_mark_as_seen(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+
+}
+
+public struct FfiConverterTypeKnockRequestActions: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = KnockRequestActions
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> KnockRequestActions {
+        return KnockRequestActions(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: KnockRequestActions) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KnockRequestActions {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: KnockRequestActions, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeKnockRequestActions_lift(_ pointer: UnsafeMutableRawPointer) throws -> KnockRequestActions {
+    return try FfiConverterTypeKnockRequestActions.lift(pointer)
+}
+
+public func FfiConverterTypeKnockRequestActions_lower(_ value: KnockRequestActions) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeKnockRequestActions.lower(value)
+}
+
+
+
+
+/**
  * Wrapper to retrieve some timeline item info lazily.
  */
 public protocol LazyTimelineItemProviderProtocol : AnyObject {
@@ -5205,6 +5414,16 @@ public protocol RoomProtocol : AnyObject {
     
     func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener)  -> TaskHandle
     
+    /**
+     * Subscribes to requests to join this room (knock member events), using a
+     * `listener` to be notified of the changes.
+     *
+     * The current requests to join the room will be emitted immediately
+     * when subscribing, along with a [`TaskHandle`] to cancel the
+     * subscription.
+     */
+    func subscribeToKnockRequests(listener: KnockRequestsListener) async throws  -> TaskHandle
+    
     func subscribeToRoomInfoUpdates(listener: RoomInfoListener)  -> TaskHandle
     
     func subscribeToTypingNotifications(listener: TypingNotificationsListener)  -> TaskHandle
@@ -6459,6 +6678,31 @@ open func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListene
         FfiConverterCallbackInterfaceIdentityStatusChangeListener.lower(listener),$0
     )
 })
+}
+    
+    /**
+     * Subscribes to requests to join this room (knock member events), using a
+     * `listener` to be notified of the changes.
+     *
+     * The current requests to join the room will be emitted immediately
+     * when subscribing, along with a [`TaskHandle`] to cancel the
+     * subscription.
+     */
+open func subscribeToKnockRequests(listener: KnockRequestsListener)async throws  -> TaskHandle {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_knock_requests(
+                    self.uniffiClonePointer(),
+                    FfiConverterCallbackInterfaceKnockRequestsListener.lower(listener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeTaskHandle.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func subscribeToRoomInfoUpdates(listener: RoomInfoListener) -> TaskHandle {
@@ -12852,6 +13096,132 @@ public func FfiConverterTypeInsertData_lift(_ buf: RustBuffer) throws -> InsertD
 
 public func FfiConverterTypeInsertData_lower(_ value: InsertData) -> RustBuffer {
     return FfiConverterTypeInsertData.lower(value)
+}
+
+
+/**
+ * An FFI representation of a request to join a room.
+ */
+public struct KnockRequest {
+    /**
+     * The event id of the event that contains the `knock` membership change.
+     */
+    public var eventId: String
+    /**
+     * The user id of the user who's requesting to join the room.
+     */
+    public var userId: String
+    /**
+     * The room id of the room whose access was requested.
+     */
+    public var roomId: String
+    /**
+     * The optional display name of the user who's requesting to join the room.
+     */
+    public var displayName: String?
+    /**
+     * The optional avatar url of the user who's requesting to join the room.
+     */
+    public var avatarUrl: String?
+    /**
+     * An optional reason why the user wants join the room.
+     */
+    public var reason: String?
+    /**
+     * The timestamp when this request was created.
+     */
+    public var timestamp: UInt64?
+    /**
+     * Whether the knock request has been marked as `seen` so it can be
+     * filtered by the client.
+     */
+    public var isSeen: Bool
+    /**
+     * A set of actions to perform for this knock request.
+     */
+    public var actions: KnockRequestActions
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The event id of the event that contains the `knock` membership change.
+         */eventId: String, 
+        /**
+         * The user id of the user who's requesting to join the room.
+         */userId: String, 
+        /**
+         * The room id of the room whose access was requested.
+         */roomId: String, 
+        /**
+         * The optional display name of the user who's requesting to join the room.
+         */displayName: String?, 
+        /**
+         * The optional avatar url of the user who's requesting to join the room.
+         */avatarUrl: String?, 
+        /**
+         * An optional reason why the user wants join the room.
+         */reason: String?, 
+        /**
+         * The timestamp when this request was created.
+         */timestamp: UInt64?, 
+        /**
+         * Whether the knock request has been marked as `seen` so it can be
+         * filtered by the client.
+         */isSeen: Bool, 
+        /**
+         * A set of actions to perform for this knock request.
+         */actions: KnockRequestActions) {
+        self.eventId = eventId
+        self.userId = userId
+        self.roomId = roomId
+        self.displayName = displayName
+        self.avatarUrl = avatarUrl
+        self.reason = reason
+        self.timestamp = timestamp
+        self.isSeen = isSeen
+        self.actions = actions
+    }
+}
+
+
+
+public struct FfiConverterTypeKnockRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KnockRequest {
+        return
+            try KnockRequest(
+                eventId: FfiConverterString.read(from: &buf), 
+                userId: FfiConverterString.read(from: &buf), 
+                roomId: FfiConverterString.read(from: &buf), 
+                displayName: FfiConverterOptionString.read(from: &buf), 
+                avatarUrl: FfiConverterOptionString.read(from: &buf), 
+                reason: FfiConverterOptionString.read(from: &buf), 
+                timestamp: FfiConverterOptionUInt64.read(from: &buf), 
+                isSeen: FfiConverterBool.read(from: &buf), 
+                actions: FfiConverterTypeKnockRequestActions.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: KnockRequest, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.eventId, into: &buf)
+        FfiConverterString.write(value.userId, into: &buf)
+        FfiConverterString.write(value.roomId, into: &buf)
+        FfiConverterOptionString.write(value.displayName, into: &buf)
+        FfiConverterOptionString.write(value.avatarUrl, into: &buf)
+        FfiConverterOptionString.write(value.reason, into: &buf)
+        FfiConverterOptionUInt64.write(value.timestamp, into: &buf)
+        FfiConverterBool.write(value.isSeen, into: &buf)
+        FfiConverterTypeKnockRequestActions.write(value.actions, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeKnockRequest_lift(_ buf: RustBuffer) throws -> KnockRequest {
+    return try FfiConverterTypeKnockRequest.lift(buf)
+}
+
+public func FfiConverterTypeKnockRequest_lower(_ value: KnockRequest) -> RustBuffer {
+    return FfiConverterTypeKnockRequest.lower(value)
 }
 
 
@@ -25264,6 +25634,90 @@ extension FfiConverterCallbackInterfaceIgnoredUsersListener : FfiConverter {
 
 
 /**
+ * A listener for receiving new requests to a join a room.
+ */
+public protocol KnockRequestsListener : AnyObject {
+    
+    func call(joinRequests: [KnockRequest]) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceKnockRequestsListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceKnockRequestsListener = UniffiVTableCallbackInterfaceKnockRequestsListener(
+        call: { (
+            uniffiHandle: UInt64,
+            joinRequests: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceKnockRequestsListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.call(
+                     joinRequests: try FfiConverterSequenceTypeKnockRequest.lift(joinRequests)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceKnockRequestsListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface KnockRequestsListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitKnockRequestsListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_knockrequestslistener(&UniffiCallbackInterfaceKnockRequestsListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceKnockRequestsListener {
+    fileprivate static var handleMap = UniffiHandleMap<KnockRequestsListener>()
+}
+
+extension FfiConverterCallbackInterfaceKnockRequestsListener : FfiConverter {
+    typealias SwiftType = KnockRequestsListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
+/**
  * Delegate to notify of changes in push rules
  */
 public protocol NotificationSettingsDelegate : AnyObject {
@@ -28455,6 +28909,28 @@ fileprivate struct FfiConverterSequenceTypeIdentityStatusChange: FfiConverterRus
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeKnockRequest: FfiConverterRustBuffer {
+    typealias SwiftType = [KnockRequest]
+
+    public static func write(_ value: [KnockRequest], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeKnockRequest.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [KnockRequest] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [KnockRequest]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeKnockRequest.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypePollAnswer: FfiConverterRustBuffer {
     typealias SwiftType = [PollAnswer]
 
@@ -29747,6 +30223,18 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_inreplytodetails_event_id() != 5876) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_knockrequestactions_accept() != 25656) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_knockrequestactions_decline() != 65054) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_knockrequestactions_decline_and_ban() != 26242) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_knockrequestactions_mark_as_seen() != 36036) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_debug_info() != 55450) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -30039,6 +30527,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_identity_status_changes() != 14290) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_knock_requests() != 30649) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_room_info_updates() != 48209) {
@@ -30482,6 +30973,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_ignoreduserslistener_call() != 47519) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_knockrequestslistener_call() != 10077) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettingsdelegate_settings_did_change() != 51708) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -30565,6 +31059,7 @@ private var initializationResult: InitializationResult = {
     uniffiCallbackInitEnableRecoveryProgressListener()
     uniffiCallbackInitIdentityStatusChangeListener()
     uniffiCallbackInitIgnoredUsersListener()
+    uniffiCallbackInitKnockRequestsListener()
     uniffiCallbackInitNotificationSettingsDelegate()
     uniffiCallbackInitPaginationStatusListener()
     uniffiCallbackInitProgressWatcher()

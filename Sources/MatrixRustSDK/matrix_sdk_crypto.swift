@@ -1073,6 +1073,15 @@ public enum UtdCause {
     /**
      * We don't have an explanation for why this UTD happened - it is probably
      * a bug, or a network split between the two homeservers.
+     *
+     * For example:
+     *
+     * - the keys for this event are missing, but a key storage backup exists
+     * and is working, so we should be able to find the keys in the backup.
+     *
+     * - the keys for this event are missing, and a key storage backup exists
+     * on the server, but that backup is not working on this client even
+     * though this device is verified.
      */
     case unknown
     /**
@@ -1102,15 +1111,18 @@ public enum UtdCause {
     case unknownDevice
     /**
      * We are missing the keys for this event, but it is a "device-historical"
-     * message and no backup is accessible or usable.
+     * message and there is no key storage backup on the server, presumably
+     * because the user has turned it off.
      *
      * Device-historical means that the message was sent before the current
      * device existed (but the current user was probably a member of the room
      * at the time the message was sent). Not to
      * be confused with pre-join or pre-invite messages (see
      * [`UtdCause::SentBeforeWeJoined`] for that).
+     *
+     * Expected message to user: "History is not available on this device".
      */
-    case historicalMessage
+    case historicalMessageAndBackupIsDisabled
     /**
      * The keys for this event are intentionally withheld.
      *
@@ -1126,6 +1138,20 @@ public enum UtdCause {
      * can be taken on our side.
      */
     case withheldBySender
+    /**
+     * We are missing the keys for this event, but it is a "device-historical"
+     * message, and even though a key storage backup does exist, we can't use
+     * it because our device is unverified.
+     *
+     * Device-historical means that the message was sent before the current
+     * device existed (but the current user was probably a member of the room
+     * at the time the message was sent). Not to
+     * be confused with pre-join or pre-invite messages (see
+     * [`UtdCause::SentBeforeWeJoined`] for that).
+     *
+     * Expected message to user: "You need to verify this device".
+     */
+    case historicalMessageAndDeviceIsUnverified
 }
 
 
@@ -1146,11 +1172,13 @@ public struct FfiConverterTypeUtdCause: FfiConverterRustBuffer {
         
         case 5: return .unknownDevice
         
-        case 6: return .historicalMessage
+        case 6: return .historicalMessageAndBackupIsDisabled
         
         case 7: return .withheldForUnverifiedOrInsecureDevice
         
         case 8: return .withheldBySender
+        
+        case 9: return .historicalMessageAndDeviceIsUnverified
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -1180,7 +1208,7 @@ public struct FfiConverterTypeUtdCause: FfiConverterRustBuffer {
             writeInt(&buf, Int32(5))
         
         
-        case .historicalMessage:
+        case .historicalMessageAndBackupIsDisabled:
             writeInt(&buf, Int32(6))
         
         
@@ -1190,6 +1218,10 @@ public struct FfiConverterTypeUtdCause: FfiConverterRustBuffer {
         
         case .withheldBySender:
             writeInt(&buf, Int32(8))
+        
+        
+        case .historicalMessageAndDeviceIsUnverified:
+            writeInt(&buf, Int32(9))
         
         }
     }
