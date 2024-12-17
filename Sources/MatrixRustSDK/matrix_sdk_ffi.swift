@@ -5345,6 +5345,12 @@ public protocol RoomProtocol : AnyObject {
     
     func resetPowerLevels() async throws  -> RoomPowerLevels
     
+    /**
+     * Return a debug representation for the internal room events data
+     * structure, one line per entry in the resulting vector.
+     */
+    func roomEventsDebugString() async throws  -> [String]
+    
     func roomInfo() async throws  -> RoomInfo
     
     /**
@@ -6451,6 +6457,27 @@ open func resetPowerLevels()async throws  -> RoomPowerLevels {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterTypeRoomPowerLevels.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Return a debug representation for the internal room events data
+     * structure, one line per entry in the resulting vector.
+     */
+open func roomEventsDebugString()async throws  -> [String] {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_room_events_debug_string(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceString.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -19594,6 +19621,7 @@ public enum Membership {
     case joined
     case left
     case knocked
+    case banned
 }
 
 
@@ -19611,6 +19639,8 @@ public struct FfiConverterTypeMembership: FfiConverterRustBuffer {
         case 3: return .left
         
         case 4: return .knocked
+        
+        case 5: return .banned
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -19634,6 +19664,10 @@ public struct FfiConverterTypeMembership: FfiConverterRustBuffer {
         
         case .knocked:
             writeInt(&buf, Int32(4))
+        
+        
+        case .banned:
+            writeInt(&buf, Int32(5))
         
         }
     }
@@ -30494,6 +30528,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_reset_power_levels() != 63622) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_room_events_debug_string() != 37832) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_room_info() != 41146) {
