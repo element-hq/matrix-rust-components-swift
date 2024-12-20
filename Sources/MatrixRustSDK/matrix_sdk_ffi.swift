@@ -10881,7 +10881,7 @@ public protocol TimelineEventProtocol : AnyObject {
     
     func senderId()  -> String
     
-    func timestamp()  -> UInt64
+    func timestamp()  -> Timestamp
     
 }
 
@@ -10947,8 +10947,8 @@ open func senderId() -> String {
 })
 }
     
-open func timestamp() -> UInt64 {
-    return try!  FfiConverterUInt64.lift(try! rustCall() {
+open func timestamp() -> Timestamp {
+    return try!  FfiConverterTypeTimestamp.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timelineevent_timestamp(self.uniffiClonePointer(),$0
     )
 })
@@ -12529,7 +12529,7 @@ public struct EventTimelineItem {
     public var isOwn: Bool
     public var isEditable: Bool
     public var content: TimelineItemContent
-    public var timestamp: UInt64
+    public var timestamp: Timestamp
     public var reactions: [Reaction]
     public var localSendState: EventSendState?
     public var readReceipts: [String: Receipt]
@@ -12542,7 +12542,7 @@ public struct EventTimelineItem {
     public init(
         /**
          * Indicates that an event is remote.
-         */isRemote: Bool, eventOrTransactionId: EventOrTransactionId, sender: String, senderProfile: ProfileDetails, isOwn: Bool, isEditable: Bool, content: TimelineItemContent, timestamp: UInt64, reactions: [Reaction], localSendState: EventSendState?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, lazyProvider: LazyTimelineItemProvider) {
+         */isRemote: Bool, eventOrTransactionId: EventOrTransactionId, sender: String, senderProfile: ProfileDetails, isOwn: Bool, isEditable: Bool, content: TimelineItemContent, timestamp: Timestamp, reactions: [Reaction], localSendState: EventSendState?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, lazyProvider: LazyTimelineItemProvider) {
         self.isRemote = isRemote
         self.eventOrTransactionId = eventOrTransactionId
         self.sender = sender
@@ -12573,7 +12573,7 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
                 isOwn: FfiConverterBool.read(from: &buf), 
                 isEditable: FfiConverterBool.read(from: &buf), 
                 content: FfiConverterTypeTimelineItemContent.read(from: &buf), 
-                timestamp: FfiConverterUInt64.read(from: &buf), 
+                timestamp: FfiConverterTypeTimestamp.read(from: &buf), 
                 reactions: FfiConverterSequenceTypeReaction.read(from: &buf), 
                 localSendState: FfiConverterOptionTypeEventSendState.read(from: &buf), 
                 readReceipts: FfiConverterDictionaryStringTypeReceipt.read(from: &buf), 
@@ -12591,7 +12591,7 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isOwn, into: &buf)
         FfiConverterBool.write(value.isEditable, into: &buf)
         FfiConverterTypeTimelineItemContent.write(value.content, into: &buf)
-        FfiConverterUInt64.write(value.timestamp, into: &buf)
+        FfiConverterTypeTimestamp.write(value.timestamp, into: &buf)
         FfiConverterSequenceTypeReaction.write(value.reactions, into: &buf)
         FfiConverterOptionTypeEventSendState.write(value.localSendState, into: &buf)
         FfiConverterDictionaryStringTypeReceipt.write(value.readReceipts, into: &buf)
@@ -14427,11 +14427,11 @@ public func FfiConverterTypeReaction_lower(_ value: Reaction) -> RustBuffer {
 
 public struct ReactionSenderData {
     public var senderId: String
-    public var timestamp: UInt64
+    public var timestamp: Timestamp
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(senderId: String, timestamp: UInt64) {
+    public init(senderId: String, timestamp: Timestamp) {
         self.senderId = senderId
         self.timestamp = timestamp
     }
@@ -14462,13 +14462,13 @@ public struct FfiConverterTypeReactionSenderData: FfiConverterRustBuffer {
         return
             try ReactionSenderData(
                 senderId: FfiConverterString.read(from: &buf), 
-                timestamp: FfiConverterUInt64.read(from: &buf)
+                timestamp: FfiConverterTypeTimestamp.read(from: &buf)
         )
     }
 
     public static func write(_ value: ReactionSenderData, into buf: inout [UInt8]) {
         FfiConverterString.write(value.senderId, into: &buf)
-        FfiConverterUInt64.write(value.timestamp, into: &buf)
+        FfiConverterTypeTimestamp.write(value.timestamp, into: &buf)
     }
 }
 
@@ -14483,11 +14483,11 @@ public func FfiConverterTypeReactionSenderData_lower(_ value: ReactionSenderData
 
 
 public struct Receipt {
-    public var timestamp: UInt64?
+    public var timestamp: Timestamp?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(timestamp: UInt64?) {
+    public init(timestamp: Timestamp?) {
         self.timestamp = timestamp
     }
 }
@@ -14512,12 +14512,12 @@ public struct FfiConverterTypeReceipt: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Receipt {
         return
             try Receipt(
-                timestamp: FfiConverterOptionUInt64.read(from: &buf)
+                timestamp: FfiConverterOptionTypeTimestamp.read(from: &buf)
         )
     }
 
     public static func write(_ value: Receipt, into buf: inout [UInt8]) {
-        FfiConverterOptionUInt64.write(value.timestamp, into: &buf)
+        FfiConverterOptionTypeTimestamp.write(value.timestamp, into: &buf)
     }
 }
 
@@ -16132,14 +16132,14 @@ public struct SessionVerificationRequestDetails {
     /**
      * First time this device was seen in milliseconds since epoch.
      */
-    public var firstSeenTimestamp: UInt64
+    public var firstSeenTimestamp: Timestamp
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(senderId: String, flowId: String, deviceId: String, displayName: String?, 
         /**
          * First time this device was seen in milliseconds since epoch.
-         */firstSeenTimestamp: UInt64) {
+         */firstSeenTimestamp: Timestamp) {
         self.senderId = senderId
         self.flowId = flowId
         self.deviceId = deviceId
@@ -16188,7 +16188,7 @@ public struct FfiConverterTypeSessionVerificationRequestDetails: FfiConverterRus
                 flowId: FfiConverterString.read(from: &buf), 
                 deviceId: FfiConverterString.read(from: &buf), 
                 displayName: FfiConverterOptionString.read(from: &buf), 
-                firstSeenTimestamp: FfiConverterUInt64.read(from: &buf)
+                firstSeenTimestamp: FfiConverterTypeTimestamp.read(from: &buf)
         )
     }
 
@@ -16197,7 +16197,7 @@ public struct FfiConverterTypeSessionVerificationRequestDetails: FfiConverterRus
         FfiConverterString.write(value.flowId, into: &buf)
         FfiConverterString.write(value.deviceId, into: &buf)
         FfiConverterOptionString.write(value.displayName, into: &buf)
-        FfiConverterUInt64.write(value.firstSeenTimestamp, into: &buf)
+        FfiConverterTypeTimestamp.write(value.firstSeenTimestamp, into: &buf)
     }
 }
 
@@ -24652,7 +24652,7 @@ public enum TimelineItemContent {
     case redactedMessage
     case sticker(body: String, info: ImageInfo, source: MediaSource
     )
-    case poll(question: String, kind: PollKind, maxSelections: UInt64, answers: [PollAnswer], votes: [String: [String]], endTime: UInt64?, hasBeenEdited: Bool
+    case poll(question: String, kind: PollKind, maxSelections: UInt64, answers: [PollAnswer], votes: [String: [String]], endTime: Timestamp?, hasBeenEdited: Bool
     )
     case callInvite
     case callNotify
@@ -24686,7 +24686,7 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
         case 3: return .sticker(body: try FfiConverterString.read(from: &buf), info: try FfiConverterTypeImageInfo.read(from: &buf), source: try FfiConverterTypeMediaSource.read(from: &buf)
         )
         
-        case 4: return .poll(question: try FfiConverterString.read(from: &buf), kind: try FfiConverterTypePollKind.read(from: &buf), maxSelections: try FfiConverterUInt64.read(from: &buf), answers: try FfiConverterSequenceTypePollAnswer.read(from: &buf), votes: try FfiConverterDictionaryStringSequenceString.read(from: &buf), endTime: try FfiConverterOptionUInt64.read(from: &buf), hasBeenEdited: try FfiConverterBool.read(from: &buf)
+        case 4: return .poll(question: try FfiConverterString.read(from: &buf), kind: try FfiConverterTypePollKind.read(from: &buf), maxSelections: try FfiConverterUInt64.read(from: &buf), answers: try FfiConverterSequenceTypePollAnswer.read(from: &buf), votes: try FfiConverterDictionaryStringSequenceString.read(from: &buf), endTime: try FfiConverterOptionTypeTimestamp.read(from: &buf), hasBeenEdited: try FfiConverterBool.read(from: &buf)
         )
         
         case 5: return .callInvite
@@ -24742,7 +24742,7 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
             FfiConverterUInt64.write(maxSelections, into: &buf)
             FfiConverterSequenceTypePollAnswer.write(answers, into: &buf)
             FfiConverterDictionaryStringSequenceString.write(votes, into: &buf)
-            FfiConverterOptionUInt64.write(endTime, into: &buf)
+            FfiConverterOptionTypeTimestamp.write(endTime, into: &buf)
             FfiConverterBool.write(hasBeenEdited, into: &buf)
             
         
@@ -24887,7 +24887,7 @@ public enum VirtualTimelineItem {
         /**
          * A timestamp in milliseconds since Unix Epoch on that day in local
          * time.
-         */ts: UInt64
+         */ts: Timestamp
     )
     /**
      * The user's own read marker.
@@ -24903,7 +24903,7 @@ public struct FfiConverterTypeVirtualTimelineItem: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .dateDivider(ts: try FfiConverterUInt64.read(from: &buf)
+        case 1: return .dateDivider(ts: try FfiConverterTypeTimestamp.read(from: &buf)
         )
         
         case 2: return .readMarker
@@ -24918,7 +24918,7 @@ public struct FfiConverterTypeVirtualTimelineItem: FfiConverterRustBuffer {
         
         case let .dateDivider(ts):
             writeInt(&buf, Int32(1))
-            FfiConverterUInt64.write(ts, into: &buf)
+            FfiConverterTypeTimestamp.write(ts, into: &buf)
             
         
         case .readMarker:
@@ -28745,6 +28745,27 @@ fileprivate struct FfiConverterOptionTypeEventItemOrigin: FfiConverterRustBuffer
     }
 }
 
+fileprivate struct FfiConverterOptionTypeTimestamp: FfiConverterRustBuffer {
+    typealias SwiftType = Timestamp?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeTimestamp.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeTimestamp.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterSequenceUInt16: FfiConverterRustBuffer {
     typealias SwiftType = [UInt16]
 
@@ -29498,6 +29519,40 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
 
 
 
+
+
+
+/**
+ * Typealias from the type name used in the UDL file to the builtin type.  This
+ * is needed because the UDL type name is used in function/method signatures.
+ */
+public typealias Timestamp = UInt64
+public struct FfiConverterTypeTimestamp: FfiConverter {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Timestamp {
+        return try FfiConverterUInt64.read(from: &buf)
+    }
+
+    public static func write(_ value: Timestamp, into buf: inout [UInt8]) {
+        return FfiConverterUInt64.write(value, into: &buf)
+    }
+
+    public static func lift(_ value: UInt64) throws -> Timestamp {
+        return try FfiConverterUInt64.lift(value)
+    }
+
+    public static func lower(_ value: Timestamp) -> UInt64 {
+        return FfiConverterUInt64.lower(value)
+    }
+}
+
+
+public func FfiConverterTypeTimestamp_lift(_ value: UInt64) throws -> Timestamp {
+    return try FfiConverterTypeTimestamp.lift(value)
+}
+
+public func FfiConverterTypeTimestamp_lower(_ value: Timestamp) -> UInt64 {
+    return FfiConverterTypeTimestamp.lower(value)
+}
 
 private let UNIFFI_RUST_FUTURE_POLL_READY: Int8 = 0
 private let UNIFFI_RUST_FUTURE_POLL_MAYBE_READY: Int8 = 1
@@ -30917,7 +30972,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timelineevent_sender_id() != 18142) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelineevent_timestamp() != 58123) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timelineevent_timestamp() != 50929) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timelineitem_as_event() != 6106) {
