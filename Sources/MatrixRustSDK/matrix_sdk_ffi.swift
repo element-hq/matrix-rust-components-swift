@@ -10041,11 +10041,11 @@ public protocol TimelineProtocol : AnyObject {
      */
     func send(msg: RoomMessageEventContentWithoutRelation) async throws  -> SendHandle
     
-    func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
+    func sendAudio(params: UploadParameters, audioInfo: AudioInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
     
-    func sendFile(url: String, fileInfo: FileInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
+    func sendFile(params: UploadParameters, fileInfo: FileInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
     
-    func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
+    func sendImage(params: UploadParameters, thumbnailPath: String?, imageInfo: ImageInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
     
     func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?) async 
     
@@ -10055,9 +10055,9 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String) async throws 
     
-    func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
+    func sendVideo(params: UploadParameters, thumbnailPath: String?, videoInfo: VideoInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
     
-    func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16], caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool)  -> SendAttachmentJoinHandle
+    func sendVoiceMessage(params: UploadParameters, audioInfo: AudioInfo, waveform: [UInt16], progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
     
     func subscribeToBackPaginationStatus(listener: PaginationStatusListener) async throws  -> TaskHandle
     
@@ -10443,42 +10443,33 @@ open func send(msg: RoomMessageEventContentWithoutRelation)async throws  -> Send
         )
 }
     
-open func sendAudio(url: String, audioInfo: AudioInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
-    return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
+open func sendAudio(params: UploadParameters, audioInfo: AudioInfo, progressWatcher: ProgressWatcher?)throws  -> SendAttachmentJoinHandle {
+    return try  FfiConverterTypeSendAttachmentJoinHandle.lift(try rustCallWithError(FfiConverterTypeRoomError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_audio(self.uniffiClonePointer(),
-        FfiConverterString.lower(url),
+        FfiConverterTypeUploadParameters.lower(params),
         FfiConverterTypeAudioInfo.lower(audioInfo),
-        FfiConverterOptionString.lower(caption),
-        FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),
-        FfiConverterBool.lower(useSendQueue),$0
+        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
     )
 })
 }
     
-open func sendFile(url: String, fileInfo: FileInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
-    return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
+open func sendFile(params: UploadParameters, fileInfo: FileInfo, progressWatcher: ProgressWatcher?)throws  -> SendAttachmentJoinHandle {
+    return try  FfiConverterTypeSendAttachmentJoinHandle.lift(try rustCallWithError(FfiConverterTypeRoomError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_file(self.uniffiClonePointer(),
-        FfiConverterString.lower(url),
+        FfiConverterTypeUploadParameters.lower(params),
         FfiConverterTypeFileInfo.lower(fileInfo),
-        FfiConverterOptionString.lower(caption),
-        FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),
-        FfiConverterBool.lower(useSendQueue),$0
+        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
     )
 })
 }
     
-open func sendImage(url: String, thumbnailUrl: String?, imageInfo: ImageInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
-    return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
+open func sendImage(params: UploadParameters, thumbnailPath: String?, imageInfo: ImageInfo, progressWatcher: ProgressWatcher?)throws  -> SendAttachmentJoinHandle {
+    return try  FfiConverterTypeSendAttachmentJoinHandle.lift(try rustCallWithError(FfiConverterTypeRoomError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_image(self.uniffiClonePointer(),
-        FfiConverterString.lower(url),
-        FfiConverterOptionString.lower(thumbnailUrl),
+        FfiConverterTypeUploadParameters.lower(params),
+        FfiConverterOptionString.lower(thumbnailPath),
         FfiConverterTypeImageInfo.lower(imageInfo),
-        FfiConverterOptionString.lower(caption),
-        FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),
-        FfiConverterBool.lower(useSendQueue),$0
+        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
     )
 })
 }
@@ -10552,30 +10543,24 @@ open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String
         )
 }
     
-open func sendVideo(url: String, thumbnailUrl: String?, videoInfo: VideoInfo, caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
-    return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
+open func sendVideo(params: UploadParameters, thumbnailPath: String?, videoInfo: VideoInfo, progressWatcher: ProgressWatcher?)throws  -> SendAttachmentJoinHandle {
+    return try  FfiConverterTypeSendAttachmentJoinHandle.lift(try rustCallWithError(FfiConverterTypeRoomError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_video(self.uniffiClonePointer(),
-        FfiConverterString.lower(url),
-        FfiConverterOptionString.lower(thumbnailUrl),
+        FfiConverterTypeUploadParameters.lower(params),
+        FfiConverterOptionString.lower(thumbnailPath),
         FfiConverterTypeVideoInfo.lower(videoInfo),
-        FfiConverterOptionString.lower(caption),
-        FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),
-        FfiConverterBool.lower(useSendQueue),$0
+        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
     )
 })
 }
     
-open func sendVoiceMessage(url: String, audioInfo: AudioInfo, waveform: [UInt16], caption: String?, formattedCaption: FormattedBody?, progressWatcher: ProgressWatcher?, useSendQueue: Bool) -> SendAttachmentJoinHandle {
-    return try!  FfiConverterTypeSendAttachmentJoinHandle.lift(try! rustCall() {
+open func sendVoiceMessage(params: UploadParameters, audioInfo: AudioInfo, waveform: [UInt16], progressWatcher: ProgressWatcher?)throws  -> SendAttachmentJoinHandle {
+    return try  FfiConverterTypeSendAttachmentJoinHandle.lift(try rustCallWithError(FfiConverterTypeRoomError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_voice_message(self.uniffiClonePointer(),
-        FfiConverterString.lower(url),
+        FfiConverterTypeUploadParameters.lower(params),
         FfiConverterTypeAudioInfo.lower(audioInfo),
         FfiConverterSequenceUInt16.lower(waveform),
-        FfiConverterOptionString.lower(caption),
-        FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),
-        FfiConverterBool.lower(useSendQueue),$0
+        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
     )
 })
 }
@@ -16431,11 +16416,14 @@ public func FfiConverterTypeTimelineUniqueId_lower(_ value: TimelineUniqueId) ->
 
 public struct TracingConfiguration {
     /**
-     * A filter line following the [RUST_LOG format].
-     *
-     * [RUST_LOG format]: https://rust-lang-nursery.github.io/rust-cookbook/development_tools/debugging/config_log.html
+     * The desired log level
      */
-    public var filter: String
+    public var logLevel: LogLevel
+    /**
+     * Additional targets that the FFI client would like to use e.g.
+     * the target names for created [`crate::tracing::Span`]
+     */
+    public var extraTargets: [String]?
     /**
      * Whether to log to stdout, or in the logcat on Android.
      */
@@ -16449,17 +16437,20 @@ public struct TracingConfiguration {
     // declare one manually.
     public init(
         /**
-         * A filter line following the [RUST_LOG format].
-         *
-         * [RUST_LOG format]: https://rust-lang-nursery.github.io/rust-cookbook/development_tools/debugging/config_log.html
-         */filter: String, 
+         * The desired log level
+         */logLevel: LogLevel, 
+        /**
+         * Additional targets that the FFI client would like to use e.g.
+         * the target names for created [`crate::tracing::Span`]
+         */extraTargets: [String]?, 
         /**
          * Whether to log to stdout, or in the logcat on Android.
          */writeToStdoutOrSystem: Bool, 
         /**
          * If set, configures rotated log files where to write additional logs.
          */writeToFiles: TracingFileConfiguration?) {
-        self.filter = filter
+        self.logLevel = logLevel
+        self.extraTargets = extraTargets
         self.writeToStdoutOrSystem = writeToStdoutOrSystem
         self.writeToFiles = writeToFiles
     }
@@ -16469,7 +16460,10 @@ public struct TracingConfiguration {
 
 extension TracingConfiguration: Equatable, Hashable {
     public static func ==(lhs: TracingConfiguration, rhs: TracingConfiguration) -> Bool {
-        if lhs.filter != rhs.filter {
+        if lhs.logLevel != rhs.logLevel {
+            return false
+        }
+        if lhs.extraTargets != rhs.extraTargets {
             return false
         }
         if lhs.writeToStdoutOrSystem != rhs.writeToStdoutOrSystem {
@@ -16482,7 +16476,8 @@ extension TracingConfiguration: Equatable, Hashable {
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(filter)
+        hasher.combine(logLevel)
+        hasher.combine(extraTargets)
         hasher.combine(writeToStdoutOrSystem)
         hasher.combine(writeToFiles)
     }
@@ -16493,14 +16488,16 @@ public struct FfiConverterTypeTracingConfiguration: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TracingConfiguration {
         return
             try TracingConfiguration(
-                filter: FfiConverterString.read(from: &buf), 
+                logLevel: FfiConverterTypeLogLevel.read(from: &buf), 
+                extraTargets: FfiConverterOptionSequenceString.read(from: &buf), 
                 writeToStdoutOrSystem: FfiConverterBool.read(from: &buf), 
                 writeToFiles: FfiConverterOptionTypeTracingFileConfiguration.read(from: &buf)
         )
     }
 
     public static func write(_ value: TracingConfiguration, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.filter, into: &buf)
+        FfiConverterTypeLogLevel.write(value.logLevel, into: &buf)
+        FfiConverterOptionSequenceString.write(value.extraTargets, into: &buf)
         FfiConverterBool.write(value.writeToStdoutOrSystem, into: &buf)
         FfiConverterOptionTypeTracingFileConfiguration.write(value.writeToFiles, into: &buf)
     }
@@ -16932,6 +16929,115 @@ public func FfiConverterTypeUnstableVoiceContent_lift(_ buf: RustBuffer) throws 
 
 public func FfiConverterTypeUnstableVoiceContent_lower(_ value: UnstableVoiceContent) -> RustBuffer {
     return FfiConverterTypeUnstableVoiceContent.lower(value)
+}
+
+
+public struct UploadParameters {
+    /**
+     * Filename (previously called "url") for the media to be sent.
+     */
+    public var filename: String
+    /**
+     * Optional non-formatted caption, for clients that support it.
+     */
+    public var caption: String?
+    /**
+     * Optional HTML-formatted caption, for clients that support it.
+     */
+    public var formattedCaption: FormattedBody?
+    public var mentions: Mentions?
+    /**
+     * Should the media be sent with the send queue, or synchronously?
+     *
+     * Watching progress only works with the synchronous method, at the moment.
+     */
+    public var useSendQueue: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Filename (previously called "url") for the media to be sent.
+         */filename: String, 
+        /**
+         * Optional non-formatted caption, for clients that support it.
+         */caption: String?, 
+        /**
+         * Optional HTML-formatted caption, for clients that support it.
+         */formattedCaption: FormattedBody?, mentions: Mentions?, 
+        /**
+         * Should the media be sent with the send queue, or synchronously?
+         *
+         * Watching progress only works with the synchronous method, at the moment.
+         */useSendQueue: Bool) {
+        self.filename = filename
+        self.caption = caption
+        self.formattedCaption = formattedCaption
+        self.mentions = mentions
+        self.useSendQueue = useSendQueue
+    }
+}
+
+
+
+extension UploadParameters: Equatable, Hashable {
+    public static func ==(lhs: UploadParameters, rhs: UploadParameters) -> Bool {
+        if lhs.filename != rhs.filename {
+            return false
+        }
+        if lhs.caption != rhs.caption {
+            return false
+        }
+        if lhs.formattedCaption != rhs.formattedCaption {
+            return false
+        }
+        if lhs.mentions != rhs.mentions {
+            return false
+        }
+        if lhs.useSendQueue != rhs.useSendQueue {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(filename)
+        hasher.combine(caption)
+        hasher.combine(formattedCaption)
+        hasher.combine(mentions)
+        hasher.combine(useSendQueue)
+    }
+}
+
+
+public struct FfiConverterTypeUploadParameters: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UploadParameters {
+        return
+            try UploadParameters(
+                filename: FfiConverterString.read(from: &buf), 
+                caption: FfiConverterOptionString.read(from: &buf), 
+                formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
+                mentions: FfiConverterOptionTypeMentions.read(from: &buf), 
+                useSendQueue: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: UploadParameters, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.filename, into: &buf)
+        FfiConverterOptionString.write(value.caption, into: &buf)
+        FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
+        FfiConverterOptionTypeMentions.write(value.mentions, into: &buf)
+        FfiConverterBool.write(value.useSendQueue, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeUploadParameters_lift(_ buf: RustBuffer) throws -> UploadParameters {
+    return try FfiConverterTypeUploadParameters.lift(buf)
+}
+
+public func FfiConverterTypeUploadParameters_lower(_ value: UploadParameters) -> RustBuffer {
+    return FfiConverterTypeUploadParameters.lower(value)
 }
 
 
@@ -18544,7 +18650,7 @@ public enum EditedContent {
     
     case roomMessage(content: RoomMessageEventContentWithoutRelation
     )
-    case mediaCaption(caption: String?, formattedCaption: FormattedBody?
+    case mediaCaption(caption: String?, formattedCaption: FormattedBody?, mentions: Mentions?
     )
     case pollStart(pollData: PollData
     )
@@ -18561,7 +18667,7 @@ public struct FfiConverterTypeEditedContent: FfiConverterRustBuffer {
         case 1: return .roomMessage(content: try FfiConverterTypeRoomMessageEventContentWithoutRelation.read(from: &buf)
         )
         
-        case 2: return .mediaCaption(caption: try FfiConverterOptionString.read(from: &buf), formattedCaption: try FfiConverterOptionTypeFormattedBody.read(from: &buf)
+        case 2: return .mediaCaption(caption: try FfiConverterOptionString.read(from: &buf), formattedCaption: try FfiConverterOptionTypeFormattedBody.read(from: &buf), mentions: try FfiConverterOptionTypeMentions.read(from: &buf)
         )
         
         case 3: return .pollStart(pollData: try FfiConverterTypePollData.read(from: &buf)
@@ -18580,10 +18686,11 @@ public struct FfiConverterTypeEditedContent: FfiConverterRustBuffer {
             FfiConverterTypeRoomMessageEventContentWithoutRelation.write(content, into: &buf)
             
         
-        case let .mediaCaption(caption,formattedCaption):
+        case let .mediaCaption(caption,formattedCaption,mentions):
             writeInt(&buf, Int32(2))
             FfiConverterOptionString.write(caption, into: &buf)
             FfiConverterOptionTypeFormattedBody.write(formattedCaption, into: &buf)
+            FfiConverterOptionTypeMentions.write(mentions, into: &buf)
             
         
         case let .pollStart(pollData):
@@ -29617,11 +29724,12 @@ public func contentWithoutRelationFromMessage(message: MessageContent)throws  ->
  * If no `formatted_caption` is provided, then it's assumed the `caption`
  * represents valid Markdown that can be used as the formatted caption.
  */
-public func createCaptionEdit(caption: String?, formattedCaption: FormattedBody?) -> EditedContent {
+public func createCaptionEdit(caption: String?, formattedCaption: FormattedBody?, mentions: Mentions?) -> EditedContent {
     return try!  FfiConverterTypeEditedContent.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_func_create_caption_edit(
         FfiConverterOptionString.lower(caption),
-        FfiConverterOptionTypeFormattedBody.lower(formattedCaption),$0
+        FfiConverterOptionTypeFormattedBody.lower(formattedCaption),
+        FfiConverterOptionTypeMentions.lower(mentions),$0
     )
 })
 }
@@ -29877,7 +29985,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_content_without_relation_from_message() != 1366) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_func_create_caption_edit() != 49747) {
+    if (uniffi_matrix_sdk_ffi_checksum_func_create_caption_edit() != 33992) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_gen_transaction_id() != 15808) {
@@ -30900,13 +31008,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send() != 9553) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 43163) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 22559) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_file() != 37925) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_file() != 4588) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 45681) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 25436) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_location() != 47400) {
@@ -30921,10 +31029,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 64747) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 22670) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 1445) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_voice_message() != 58509) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_voice_message() != 50042) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_back_pagination_status() != 46161) {
