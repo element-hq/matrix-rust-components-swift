@@ -633,11 +633,6 @@ public protocol ClientProtocol : AnyObject {
     func createRoom(request: CreateRoomParameters) async throws  -> String
     
     /**
-     * Creates a new room alias associated with the provided room id.
-     */
-    func createRoomAlias(roomAlias: String, roomId: String) async throws 
-    
-    /**
      * Login using JWT
      * This is an implementation of the custom_login https://docs.rs/matrix-sdk/latest/matrix_sdk/matrix_auth/struct.MatrixAuth.html#method.login_custom
      * For more information on logging in with JWT: https://element-hq.github.io/synapse/latest/jwt.html
@@ -1112,26 +1107,6 @@ open func createRoom(request: CreateRoomParameters)async throws  -> String {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterString.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-    /**
-     * Creates a new room alias associated with the provided room id.
-     */
-open func createRoomAlias(roomAlias: String, roomId: String)async throws  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_create_room_alias(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(roomAlias),FfiConverterString.lower(roomId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -5170,11 +5145,24 @@ public protocol RoomProtocol : AnyObject {
     func edit(eventId: String, newContent: RoomMessageEventContentWithoutRelation) async throws 
     
     /**
+     * Enable End-to-end encryption in this room.
+     */
+    func enableEncryption() async throws 
+    
+    /**
      * Enable or disable the send queue for that particular room.
      */
     func enableSendQueue(enable: Bool) 
     
     func getPowerLevels() async throws  -> RoomPowerLevels
+    
+    /**
+     * Returns the visibility for this room in the room directory.
+     *
+     * [Public](`RoomVisibility::Public`) rooms are listed in the room
+     * directory and can be found using it.
+     */
+    func getRoomVisibility() async throws  -> RoomVisibility
     
     /**
      * Is there a non expired membership with application "m.call" and scope
@@ -5308,6 +5296,16 @@ public protocol RoomProtocol : AnyObject {
     func pinnedEventsTimeline(internalIdPrefix: String?, maxEventsToLoad: UInt16, maxConcurrentRequests: UInt16) async throws  -> Timeline
     
     /**
+     * Publish a new room alias for this room in the room directory.
+     *
+     * Returns:
+     * - `true` if the room alias didn't exist and it's now published.
+     * - `false` if the room alias was already present so it couldn't be
+     * published.
+     */
+    func publishRoomAliasInRoomDirectory(alias: String) async throws  -> Bool
+    
+    /**
      * The raw name as present in the room state event.
      */
     func rawName()  -> String?
@@ -5328,6 +5326,16 @@ public protocol RoomProtocol : AnyObject {
      * Removes the current room avatar
      */
     func removeAvatar() async throws 
+    
+    /**
+     * Remove an existing room alias for this room in the room directory.
+     *
+     * Returns:
+     * - `true` if the room alias was present and it's now removed from the
+     * room directory.
+     * - `false` if the room alias didn't exist so it couldn't be removed.
+     */
+    func removeRoomAliasFromRoomDirectory(alias: String) async throws  -> Bool
     
     /**
      * Reports an event from the room.
@@ -5452,7 +5460,29 @@ public protocol RoomProtocol : AnyObject {
     
     func unbanUser(userId: String, reason: String?) async throws 
     
+    /**
+     * Update the canonical alias of the room.
+     *
+     * Note that publishing the alias in the room directory is done separately.
+     */
+    func updateCanonicalAlias(alias: String?, altAliases: [String]) async throws 
+    
+    /**
+     * Update room history visibility for this room.
+     */
+    func updateHistoryVisibility(visibility: RoomHistoryVisibility) async throws 
+    
+    /**
+     * Update the join rule for this room.
+     */
+    func updateJoinRules(newRule: JoinRule) async throws 
+    
     func updatePowerLevelsForUsers(updates: [UserPowerLevelUpdate]) async throws 
+    
+    /**
+     * Update the room's visibility in the room directory.
+     */
+    func updateRoomVisibility(visibility: RoomVisibility) async throws 
     
     /**
      * Upload and set the room's avatar.
@@ -5865,6 +5895,26 @@ open func edit(eventId: String, newContent: RoomMessageEventContentWithoutRelati
 }
     
     /**
+     * Enable End-to-end encryption in this room.
+     */
+open func enableEncryption()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_enable_encryption(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
      * Enable or disable the send queue for that particular room.
      */
 open func enableSendQueue(enable: Bool) {try! rustCall() {
@@ -5887,6 +5937,29 @@ open func getPowerLevels()async throws  -> RoomPowerLevels {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterTypeRoomPowerLevels.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Returns the visibility for this room in the room directory.
+     *
+     * [Public](`RoomVisibility::Public`) rooms are listed in the room
+     * directory and can be found using it.
+     */
+open func getRoomVisibility()async throws  -> RoomVisibility {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_get_room_visibility(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeRoomVisibility.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -6359,6 +6432,31 @@ open func pinnedEventsTimeline(internalIdPrefix: String?, maxEventsToLoad: UInt1
 }
     
     /**
+     * Publish a new room alias for this room in the room directory.
+     *
+     * Returns:
+     * - `true` if the room alias didn't exist and it's now published.
+     * - `false` if the room alias was already present so it couldn't be
+     * published.
+     */
+open func publishRoomAliasInRoomDirectory(alias: String)async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_publish_room_alias_in_room_directory(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(alias)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
      * The raw name as present in the room state event.
      */
 open func rawName() -> String? {
@@ -6411,6 +6509,31 @@ open func removeAvatar()async throws  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Remove an existing room alias for this room in the room directory.
+     *
+     * Returns:
+     * - `true` if the room alias was present and it's now removed from the
+     * room directory.
+     * - `false` if the room alias didn't exist so it couldn't be removed.
+     */
+open func removeRoomAliasFromRoomDirectory(alias: String)async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_remove_room_alias_from_room_directory(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(alias)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -6846,6 +6969,68 @@ open func unbanUser(userId: String, reason: String?)async throws  {
         )
 }
     
+    /**
+     * Update the canonical alias of the room.
+     *
+     * Note that publishing the alias in the room directory is done separately.
+     */
+open func updateCanonicalAlias(alias: String?, altAliases: [String])async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_update_canonical_alias(
+                    self.uniffiClonePointer(),
+                    FfiConverterOptionString.lower(alias),FfiConverterSequenceString.lower(altAliases)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Update room history visibility for this room.
+     */
+open func updateHistoryVisibility(visibility: RoomHistoryVisibility)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_update_history_visibility(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeRoomHistoryVisibility.lower(visibility)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Update the join rule for this room.
+     */
+open func updateJoinRules(newRule: JoinRule)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_update_join_rules(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeJoinRule.lower(newRule)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
 open func updatePowerLevelsForUsers(updates: [UserPowerLevelUpdate])async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -6853,6 +7038,26 @@ open func updatePowerLevelsForUsers(updates: [UserPowerLevelUpdate])async throws
                 uniffi_matrix_sdk_ffi_fn_method_room_update_power_levels_for_users(
                     self.uniffiClonePointer(),
                     FfiConverterSequenceTypeUserPowerLevelUpdate.lower(updates)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Update the room's visibility in the room directory.
+     */
+open func updateRoomVisibility(visibility: RoomVisibility)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_update_room_visibility(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeRoomVisibility.lower(visibility)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -11392,6 +11597,15 @@ public protocol UserIdentityProtocol : AnyObject {
      */
     func pin() async throws 
     
+    /**
+     * Remove the requirement for this identity to be verified.
+     *
+     * If an identity was previously verified and is not anymore it will be
+     * reported to the user. In order to remove this notice users have to
+     * verify again or to withdraw the verification requirement.
+     */
+    func withdrawVerification() async throws 
+    
 }
 
 /**
@@ -11487,6 +11701,30 @@ open func pin()async throws  {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_useridentity_pin(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Remove the requirement for this identity to be verified.
+     *
+     * If an identity was previously verified and is not anymore it will be
+     * reported to the user. In order to remove this notice users have to
+     * verify again or to withdraw the verification requirement.
+     */
+open func withdrawVerification()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_useridentity_withdraw_verification(
                     self.uniffiClonePointer()
                     
                 )
@@ -12964,10 +13202,11 @@ public struct ImageInfo {
     public var thumbnailInfo: ThumbnailInfo?
     public var thumbnailSource: MediaSource?
     public var blurhash: String?
+    public var isAnimated: Bool?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(height: UInt64?, width: UInt64?, mimetype: String?, size: UInt64?, thumbnailInfo: ThumbnailInfo?, thumbnailSource: MediaSource?, blurhash: String?) {
+    public init(height: UInt64?, width: UInt64?, mimetype: String?, size: UInt64?, thumbnailInfo: ThumbnailInfo?, thumbnailSource: MediaSource?, blurhash: String?, isAnimated: Bool?) {
         self.height = height
         self.width = width
         self.mimetype = mimetype
@@ -12975,6 +13214,7 @@ public struct ImageInfo {
         self.thumbnailInfo = thumbnailInfo
         self.thumbnailSource = thumbnailSource
         self.blurhash = blurhash
+        self.isAnimated = isAnimated
     }
 }
 
@@ -12990,7 +13230,8 @@ public struct FfiConverterTypeImageInfo: FfiConverterRustBuffer {
                 size: FfiConverterOptionUInt64.read(from: &buf), 
                 thumbnailInfo: FfiConverterOptionTypeThumbnailInfo.read(from: &buf), 
                 thumbnailSource: FfiConverterOptionTypeMediaSource.read(from: &buf), 
-                blurhash: FfiConverterOptionString.read(from: &buf)
+                blurhash: FfiConverterOptionString.read(from: &buf), 
+                isAnimated: FfiConverterOptionBool.read(from: &buf)
         )
     }
 
@@ -13002,6 +13243,7 @@ public struct FfiConverterTypeImageInfo: FfiConverterRustBuffer {
         FfiConverterOptionTypeThumbnailInfo.write(value.thumbnailInfo, into: &buf)
         FfiConverterOptionTypeMediaSource.write(value.thumbnailSource, into: &buf)
         FfiConverterOptionString.write(value.blurhash, into: &buf)
+        FfiConverterOptionBool.write(value.isAnimated, into: &buf)
     }
 }
 
@@ -14981,6 +15223,10 @@ public struct RoomInfo {
      * The join rule for this room, if known.
      */
     public var joinRule: JoinRule?
+    /**
+     * The history visibility for this room, if known.
+     */
+    public var historyVisibility: RoomHistoryVisibility
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -15019,7 +15265,10 @@ public struct RoomInfo {
          */pinnedEventIds: [String], 
         /**
          * The join rule for this room, if known.
-         */joinRule: JoinRule?) {
+         */joinRule: JoinRule?, 
+        /**
+         * The history visibility for this room, if known.
+         */historyVisibility: RoomHistoryVisibility) {
         self.id = id
         self.creator = creator
         self.displayName = displayName
@@ -15051,6 +15300,7 @@ public struct RoomInfo {
         self.numUnreadMentions = numUnreadMentions
         self.pinnedEventIds = pinnedEventIds
         self.joinRule = joinRule
+        self.historyVisibility = historyVisibility
     }
 }
 
@@ -15151,6 +15401,9 @@ extension RoomInfo: Equatable, Hashable {
         if lhs.joinRule != rhs.joinRule {
             return false
         }
+        if lhs.historyVisibility != rhs.historyVisibility {
+            return false
+        }
         return true
     }
 
@@ -15186,6 +15439,7 @@ extension RoomInfo: Equatable, Hashable {
         hasher.combine(numUnreadMentions)
         hasher.combine(pinnedEventIds)
         hasher.combine(joinRule)
+        hasher.combine(historyVisibility)
     }
 }
 
@@ -15224,7 +15478,8 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 numUnreadNotifications: FfiConverterUInt64.read(from: &buf), 
                 numUnreadMentions: FfiConverterUInt64.read(from: &buf), 
                 pinnedEventIds: FfiConverterSequenceString.read(from: &buf), 
-                joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf)
+                joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
+                historyVisibility: FfiConverterTypeRoomHistoryVisibility.read(from: &buf)
         )
     }
 
@@ -15260,6 +15515,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.numUnreadMentions, into: &buf)
         FfiConverterSequenceString.write(value.pinnedEventIds, into: &buf)
         FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
+        FfiConverterTypeRoomHistoryVisibility.write(value.historyVisibility, into: &buf)
     }
 }
 
@@ -22579,6 +22835,112 @@ extension RoomError: Foundation.LocalizedError {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
+public enum RoomHistoryVisibility {
+    
+    /**
+     * Previous events are accessible to newly joined members from the point
+     * they were invited onwards.
+     *
+     * Events stop being accessible when the member's state changes to
+     * something other than *invite* or *join*.
+     */
+    case invited
+    /**
+     * Previous events are accessible to newly joined members from the point
+     * they joined the room onwards.
+     * Events stop being accessible when the member's state changes to
+     * something other than *join*.
+     */
+    case joined
+    /**
+     * Previous events are always accessible to newly joined members.
+     *
+     * All events in the room are accessible, even those sent when the member
+     * was not a part of the room.
+     */
+    case shared
+    /**
+     * All events while this is the `HistoryVisibility` value may be shared by
+     * any participating homeserver with anyone, regardless of whether they
+     * have ever joined the room.
+     */
+    case worldReadable
+    /**
+     * A custom visibility value.
+     */
+    case custom(value: String
+    )
+}
+
+
+public struct FfiConverterTypeRoomHistoryVisibility: FfiConverterRustBuffer {
+    typealias SwiftType = RoomHistoryVisibility
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomHistoryVisibility {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .invited
+        
+        case 2: return .joined
+        
+        case 3: return .shared
+        
+        case 4: return .worldReadable
+        
+        case 5: return .custom(value: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RoomHistoryVisibility, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .invited:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .joined:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .shared:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .worldReadable:
+            writeInt(&buf, Int32(4))
+        
+        
+        case let .custom(value):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(value, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeRoomHistoryVisibility_lift(_ buf: RustBuffer) throws -> RoomHistoryVisibility {
+    return try FfiConverterTypeRoomHistoryVisibility.lift(buf)
+}
+
+public func FfiConverterTypeRoomHistoryVisibility_lower(_ value: RoomHistoryVisibility) -> RustBuffer {
+    return FfiConverterTypeRoomHistoryVisibility.lower(value)
+}
+
+
+
+extension RoomHistoryVisibility: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 public enum RoomListEntriesDynamicFilterKind {
     
     case all(filters: [RoomListEntriesDynamicFilterKind]
@@ -23597,6 +23959,11 @@ public enum RoomVisibility {
      * Indicates that the room will not be shown in the published room list.
      */
     case `private`
+    /**
+     * A custom value that's not present in the spec.
+     */
+    case custom(value: String
+    )
 }
 
 
@@ -23610,6 +23977,9 @@ public struct FfiConverterTypeRoomVisibility: FfiConverterRustBuffer {
         case 1: return .`public`
         
         case 2: return .`private`
+        
+        case 3: return .custom(value: try FfiConverterString.read(from: &buf)
+        )
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -23626,6 +23996,11 @@ public struct FfiConverterTypeRoomVisibility: FfiConverterRustBuffer {
         case .`private`:
             writeInt(&buf, Int32(2))
         
+        
+        case let .custom(value):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(value, into: &buf)
+            
         }
     }
 }
@@ -30081,9 +30456,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_create_room() != 52700) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_create_room_alias() != 54261) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_custom_login_with_jwt() != 19710) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -30579,10 +30951,16 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_edit() != 61956) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_enable_encryption() != 14669) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_enable_send_queue() != 23914) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_get_power_levels() != 54094) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_get_room_visibility() != 412) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_has_active_room_call() != 33588) {
@@ -30678,6 +31056,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_pinned_events_timeline() != 29596) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_publish_room_alias_in_room_directory() != 13924) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_raw_name() != 15453) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -30685,6 +31066,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_remove_avatar() != 7230) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_remove_room_alias_from_room_directory() != 16926) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_report_content() != 16529) {
@@ -30756,7 +31140,19 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_unban_user() != 1803) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_update_canonical_alias() != 25065) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_update_history_visibility() != 26248) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_update_join_rules() != 49303) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_update_power_levels_for_users() != 52057) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_update_room_visibility() != 64724) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_upload_avatar() != 19069) {
@@ -31111,6 +31507,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_pin() != 62925) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_withdraw_verification() != 3578) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_widgetdriver_run() != 7519) {
