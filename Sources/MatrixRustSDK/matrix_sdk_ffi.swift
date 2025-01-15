@@ -8547,6 +8547,11 @@ public protocol RoomPreviewProtocol : AnyObject {
      */
     func leave() async throws 
     
+    /**
+     * Get the membership details for the current user.
+     */
+    func ownMembershipDetails() async  -> RoomMembershipDetails?
+    
 }
 
 /**
@@ -8645,6 +8650,27 @@ open func leave()async throws  {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Get the membership details for the current user.
+     */
+open func ownMembershipDetails()async  -> RoomMembershipDetails? {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_roompreview_own_membership_details(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeRoomMembershipDetails.lift,
+            errorHandler: nil
+            
         )
 }
     
@@ -12755,6 +12781,7 @@ public struct EventTimelineItem {
     public var timestamp: Timestamp
     public var reactions: [Reaction]
     public var localSendState: EventSendState?
+    public var localCreatedAt: UInt64?
     public var readReceipts: [String: Receipt]
     public var origin: EventItemOrigin?
     public var canBeRepliedTo: Bool
@@ -12765,7 +12792,7 @@ public struct EventTimelineItem {
     public init(
         /**
          * Indicates that an event is remote.
-         */isRemote: Bool, eventOrTransactionId: EventOrTransactionId, sender: String, senderProfile: ProfileDetails, isOwn: Bool, isEditable: Bool, content: TimelineItemContent, timestamp: Timestamp, reactions: [Reaction], localSendState: EventSendState?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, lazyProvider: LazyTimelineItemProvider) {
+         */isRemote: Bool, eventOrTransactionId: EventOrTransactionId, sender: String, senderProfile: ProfileDetails, isOwn: Bool, isEditable: Bool, content: TimelineItemContent, timestamp: Timestamp, reactions: [Reaction], localSendState: EventSendState?, localCreatedAt: UInt64?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, lazyProvider: LazyTimelineItemProvider) {
         self.isRemote = isRemote
         self.eventOrTransactionId = eventOrTransactionId
         self.sender = sender
@@ -12776,6 +12803,7 @@ public struct EventTimelineItem {
         self.timestamp = timestamp
         self.reactions = reactions
         self.localSendState = localSendState
+        self.localCreatedAt = localCreatedAt
         self.readReceipts = readReceipts
         self.origin = origin
         self.canBeRepliedTo = canBeRepliedTo
@@ -12799,6 +12827,7 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
                 timestamp: FfiConverterTypeTimestamp.read(from: &buf), 
                 reactions: FfiConverterSequenceTypeReaction.read(from: &buf), 
                 localSendState: FfiConverterOptionTypeEventSendState.read(from: &buf), 
+                localCreatedAt: FfiConverterOptionUInt64.read(from: &buf), 
                 readReceipts: FfiConverterDictionaryStringTypeReceipt.read(from: &buf), 
                 origin: FfiConverterOptionTypeEventItemOrigin.read(from: &buf), 
                 canBeRepliedTo: FfiConverterBool.read(from: &buf), 
@@ -12817,6 +12846,7 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
         FfiConverterTypeTimestamp.write(value.timestamp, into: &buf)
         FfiConverterSequenceTypeReaction.write(value.reactions, into: &buf)
         FfiConverterOptionTypeEventSendState.write(value.localSendState, into: &buf)
+        FfiConverterOptionUInt64.write(value.localCreatedAt, into: &buf)
         FfiConverterDictionaryStringTypeReceipt.write(value.readReceipts, into: &buf)
         FfiConverterOptionTypeEventItemOrigin.write(value.origin, into: &buf)
         FfiConverterBool.write(value.canBeRepliedTo, into: &buf)
@@ -15578,10 +15608,11 @@ public struct RoomMember {
     public var normalizedPowerLevel: Int64
     public var isIgnored: Bool
     public var suggestedRoleForPowerLevel: RoomMemberRole
+    public var membershipChangeReason: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(userId: String, displayName: String?, avatarUrl: String?, membership: MembershipState, isNameAmbiguous: Bool, powerLevel: Int64, normalizedPowerLevel: Int64, isIgnored: Bool, suggestedRoleForPowerLevel: RoomMemberRole) {
+    public init(userId: String, displayName: String?, avatarUrl: String?, membership: MembershipState, isNameAmbiguous: Bool, powerLevel: Int64, normalizedPowerLevel: Int64, isIgnored: Bool, suggestedRoleForPowerLevel: RoomMemberRole, membershipChangeReason: String?) {
         self.userId = userId
         self.displayName = displayName
         self.avatarUrl = avatarUrl
@@ -15591,6 +15622,7 @@ public struct RoomMember {
         self.normalizedPowerLevel = normalizedPowerLevel
         self.isIgnored = isIgnored
         self.suggestedRoleForPowerLevel = suggestedRoleForPowerLevel
+        self.membershipChangeReason = membershipChangeReason
     }
 }
 
@@ -15625,6 +15657,9 @@ extension RoomMember: Equatable, Hashable {
         if lhs.suggestedRoleForPowerLevel != rhs.suggestedRoleForPowerLevel {
             return false
         }
+        if lhs.membershipChangeReason != rhs.membershipChangeReason {
+            return false
+        }
         return true
     }
 
@@ -15638,6 +15673,7 @@ extension RoomMember: Equatable, Hashable {
         hasher.combine(normalizedPowerLevel)
         hasher.combine(isIgnored)
         hasher.combine(suggestedRoleForPowerLevel)
+        hasher.combine(membershipChangeReason)
     }
 }
 
@@ -15654,7 +15690,8 @@ public struct FfiConverterTypeRoomMember: FfiConverterRustBuffer {
                 powerLevel: FfiConverterInt64.read(from: &buf), 
                 normalizedPowerLevel: FfiConverterInt64.read(from: &buf), 
                 isIgnored: FfiConverterBool.read(from: &buf), 
-                suggestedRoleForPowerLevel: FfiConverterTypeRoomMemberRole.read(from: &buf)
+                suggestedRoleForPowerLevel: FfiConverterTypeRoomMemberRole.read(from: &buf), 
+                membershipChangeReason: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -15668,6 +15705,7 @@ public struct FfiConverterTypeRoomMember: FfiConverterRustBuffer {
         FfiConverterInt64.write(value.normalizedPowerLevel, into: &buf)
         FfiConverterBool.write(value.isIgnored, into: &buf)
         FfiConverterTypeRoomMemberRole.write(value.suggestedRoleForPowerLevel, into: &buf)
+        FfiConverterOptionString.write(value.membershipChangeReason, into: &buf)
     }
 }
 
@@ -15678,6 +15716,67 @@ public func FfiConverterTypeRoomMember_lift(_ buf: RustBuffer) throws -> RoomMem
 
 public func FfiConverterTypeRoomMember_lower(_ value: RoomMember) -> RustBuffer {
     return FfiConverterTypeRoomMember.lower(value)
+}
+
+
+/**
+ * Contains the current user's room member info and the optional room member
+ * info of the sender of the `m.room.member` event that this info represents.
+ */
+public struct RoomMembershipDetails {
+    public var ownRoomMember: RoomMember
+    public var senderRoomMember: RoomMember?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(ownRoomMember: RoomMember, senderRoomMember: RoomMember?) {
+        self.ownRoomMember = ownRoomMember
+        self.senderRoomMember = senderRoomMember
+    }
+}
+
+
+
+extension RoomMembershipDetails: Equatable, Hashable {
+    public static func ==(lhs: RoomMembershipDetails, rhs: RoomMembershipDetails) -> Bool {
+        if lhs.ownRoomMember != rhs.ownRoomMember {
+            return false
+        }
+        if lhs.senderRoomMember != rhs.senderRoomMember {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(ownRoomMember)
+        hasher.combine(senderRoomMember)
+    }
+}
+
+
+public struct FfiConverterTypeRoomMembershipDetails: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomMembershipDetails {
+        return
+            try RoomMembershipDetails(
+                ownRoomMember: FfiConverterTypeRoomMember.read(from: &buf), 
+                senderRoomMember: FfiConverterOptionTypeRoomMember.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RoomMembershipDetails, into buf: inout [UInt8]) {
+        FfiConverterTypeRoomMember.write(value.ownRoomMember, into: &buf)
+        FfiConverterOptionTypeRoomMember.write(value.senderRoomMember, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeRoomMembershipDetails_lift(_ buf: RustBuffer) throws -> RoomMembershipDetails {
+    return try FfiConverterTypeRoomMembershipDetails.lift(buf)
+}
+
+public func FfiConverterTypeRoomMembershipDetails_lower(_ value: RoomMembershipDetails) -> RustBuffer {
+    return FfiConverterTypeRoomMembershipDetails.lower(value)
 }
 
 
@@ -28618,6 +28717,27 @@ fileprivate struct FfiConverterOptionTypeRoomMember: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeRoomMembershipDetails: FfiConverterRustBuffer {
+    typealias SwiftType = RoomMembershipDetails?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRoomMembershipDetails.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRoomMembershipDetails.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeSetData: FfiConverterRustBuffer {
     typealias SwiftType = SetData?
 
@@ -31270,6 +31390,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_leave() != 5096) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_own_membership_details() != 1443) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sendattachmentjoinhandle_cancel() != 62384) {
