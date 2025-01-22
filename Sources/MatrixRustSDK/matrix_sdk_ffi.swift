@@ -5273,27 +5273,7 @@ public protocol RoomProtocol : AnyObject {
     
     func membership()  -> Membership
     
-    /**
-     * A timeline instance that can be configured to only include RoomMessage
-     * type events and filter those further based on their message type.
-     *
-     * Virtual timeline items will still be provided and the
-     * `default_event_filter` will be applied before everything else.
-     *
-     * # Arguments
-     *
-     * * `internal_id_prefix` - An optional String that will be prepended to
-     * all the timeline item's internal IDs, making it possible to
-     * distinguish different timeline instances from each other.
-     *
-     * * `allowed_message_types` - A list of `RoomMessageEventMessageType` that
-     * will be allowed to appear in the timeline
-     */
-    func messageFilteredTimeline(internalIdPrefix: String?, allowedMessageTypes: [RoomMessageEventMessageType], dateDividerMode: DateDividerMode) async throws  -> Timeline
-    
     func ownUserId()  -> String
-    
-    func pinnedEventsTimeline(internalIdPrefix: String?, maxEventsToLoad: UInt16, maxConcurrentRequests: UInt16) async throws  -> Timeline
     
     /**
      * Publish a new room alias for this room in the room directory.
@@ -5447,12 +5427,9 @@ public protocol RoomProtocol : AnyObject {
     func timeline() async throws  -> Timeline
     
     /**
-     * Returns a timeline focused on the given event.
-     *
-     * Note: this timeline is independent from that returned with
-     * [`Self::timeline`], and as such it is not cached.
+     * Build a new timeline instance with the given configuration.
      */
-    func timelineFocusedOnEvent(eventId: String, numContextEvents: UInt16, internalIdPrefix: String?) async throws  -> Timeline
+    func timelineWithConfiguration(configuration: TimelineConfiguration) async throws  -> Timeline
     
     func topic()  -> String?
     
@@ -6374,61 +6351,11 @@ open func membership() -> Membership {
 })
 }
     
-    /**
-     * A timeline instance that can be configured to only include RoomMessage
-     * type events and filter those further based on their message type.
-     *
-     * Virtual timeline items will still be provided and the
-     * `default_event_filter` will be applied before everything else.
-     *
-     * # Arguments
-     *
-     * * `internal_id_prefix` - An optional String that will be prepended to
-     * all the timeline item's internal IDs, making it possible to
-     * distinguish different timeline instances from each other.
-     *
-     * * `allowed_message_types` - A list of `RoomMessageEventMessageType` that
-     * will be allowed to appear in the timeline
-     */
-open func messageFilteredTimeline(internalIdPrefix: String?, allowedMessageTypes: [RoomMessageEventMessageType], dateDividerMode: DateDividerMode)async throws  -> Timeline {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_message_filtered_timeline(
-                    self.uniffiClonePointer(),
-                    FfiConverterOptionString.lower(internalIdPrefix),FfiConverterSequenceTypeRoomMessageEventMessageType.lower(allowedMessageTypes),FfiConverterTypeDateDividerMode.lower(dateDividerMode)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeTimeline.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
 open func ownUserId() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_own_user_id(self.uniffiClonePointer(),$0
     )
 })
-}
-    
-open func pinnedEventsTimeline(internalIdPrefix: String?, maxEventsToLoad: UInt16, maxConcurrentRequests: UInt16)async throws  -> Timeline {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_pinned_events_timeline(
-                    self.uniffiClonePointer(),
-                    FfiConverterOptionString.lower(internalIdPrefix),FfiConverterUInt16.lower(maxEventsToLoad),FfiConverterUInt16.lower(maxConcurrentRequests)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeTimeline.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
 }
     
     /**
@@ -6906,25 +6833,22 @@ open func timeline()async throws  -> Timeline {
 }
     
     /**
-     * Returns a timeline focused on the given event.
-     *
-     * Note: this timeline is independent from that returned with
-     * [`Self::timeline`], and as such it is not cached.
+     * Build a new timeline instance with the given configuration.
      */
-open func timelineFocusedOnEvent(eventId: String, numContextEvents: UInt16, internalIdPrefix: String?)async throws  -> Timeline {
+open func timelineWithConfiguration(configuration: TimelineConfiguration)async throws  -> Timeline {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_timeline_focused_on_event(
+                uniffi_matrix_sdk_ffi_fn_method_room_timeline_with_configuration(
                     self.uniffiClonePointer(),
-                    FfiConverterString.lower(eventId),FfiConverterUInt16.lower(numContextEvents),FfiConverterOptionString.lower(internalIdPrefix)
+                    FfiConverterTypeTimelineConfiguration.lower(configuration)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
             liftFunc: FfiConverterTypeTimeline.lift,
-            errorHandler: FfiConverterTypeFocusEventError.lift
+            errorHandler: FfiConverterTypeClientError.lift
         )
 }
     
@@ -16720,6 +16644,120 @@ public func FfiConverterTypeThumbnailInfo_lower(_ value: ThumbnailInfo) -> RustB
 }
 
 
+/**
+ * Various options used to configure the timeline's behavior.
+ *
+ * # Arguments
+ *
+ * * `internal_id_prefix` -
+ *
+ * * `allowed_message_types` -
+ *
+ * * `date_divider_mode` -
+ */
+public struct TimelineConfiguration {
+    /**
+     * What should the timeline focus on?
+     */
+    public var focus: TimelineFocus
+    /**
+     * A list of [`RoomMessageEventMessageType`] that will be allowed to appear
+     * in the timeline
+     */
+    public var allowedMessageTypes: AllowedMessageTypes
+    /**
+     * An optional String that will be prepended to
+     * all the timeline item's internal IDs, making it possible to
+     * distinguish different timeline instances from each other.
+     */
+    public var internalIdPrefix: String?
+    /**
+     * How often to insert date dividers
+     */
+    public var dateDividerMode: DateDividerMode
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * What should the timeline focus on?
+         */focus: TimelineFocus, 
+        /**
+         * A list of [`RoomMessageEventMessageType`] that will be allowed to appear
+         * in the timeline
+         */allowedMessageTypes: AllowedMessageTypes, 
+        /**
+         * An optional String that will be prepended to
+         * all the timeline item's internal IDs, making it possible to
+         * distinguish different timeline instances from each other.
+         */internalIdPrefix: String?, 
+        /**
+         * How often to insert date dividers
+         */dateDividerMode: DateDividerMode) {
+        self.focus = focus
+        self.allowedMessageTypes = allowedMessageTypes
+        self.internalIdPrefix = internalIdPrefix
+        self.dateDividerMode = dateDividerMode
+    }
+}
+
+
+
+extension TimelineConfiguration: Equatable, Hashable {
+    public static func ==(lhs: TimelineConfiguration, rhs: TimelineConfiguration) -> Bool {
+        if lhs.focus != rhs.focus {
+            return false
+        }
+        if lhs.allowedMessageTypes != rhs.allowedMessageTypes {
+            return false
+        }
+        if lhs.internalIdPrefix != rhs.internalIdPrefix {
+            return false
+        }
+        if lhs.dateDividerMode != rhs.dateDividerMode {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(focus)
+        hasher.combine(allowedMessageTypes)
+        hasher.combine(internalIdPrefix)
+        hasher.combine(dateDividerMode)
+    }
+}
+
+
+public struct FfiConverterTypeTimelineConfiguration: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineConfiguration {
+        return
+            try TimelineConfiguration(
+                focus: FfiConverterTypeTimelineFocus.read(from: &buf), 
+                allowedMessageTypes: FfiConverterTypeAllowedMessageTypes.read(from: &buf), 
+                internalIdPrefix: FfiConverterOptionString.read(from: &buf), 
+                dateDividerMode: FfiConverterTypeDateDividerMode.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TimelineConfiguration, into buf: inout [UInt8]) {
+        FfiConverterTypeTimelineFocus.write(value.focus, into: &buf)
+        FfiConverterTypeAllowedMessageTypes.write(value.allowedMessageTypes, into: &buf)
+        FfiConverterOptionString.write(value.internalIdPrefix, into: &buf)
+        FfiConverterTypeDateDividerMode.write(value.dateDividerMode, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeTimelineConfiguration_lift(_ buf: RustBuffer) throws -> TimelineConfiguration {
+    return try FfiConverterTypeTimelineConfiguration.lift(buf)
+}
+
+public func FfiConverterTypeTimelineConfiguration_lower(_ value: TimelineConfiguration) -> RustBuffer {
+    return FfiConverterTypeTimelineConfiguration.lower(value)
+}
+
+
 public struct TimelineUniqueId {
     public var id: String
 
@@ -18349,6 +18387,64 @@ public func FfiConverterTypeAllowRule_lower(_ value: AllowRule) -> RustBuffer {
 
 
 extension AllowRule: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum AllowedMessageTypes {
+    
+    case all
+    case only(types: [RoomMessageEventMessageType]
+    )
+}
+
+
+public struct FfiConverterTypeAllowedMessageTypes: FfiConverterRustBuffer {
+    typealias SwiftType = AllowedMessageTypes
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AllowedMessageTypes {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .all
+        
+        case 2: return .only(types: try FfiConverterSequenceTypeRoomMessageEventMessageType.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: AllowedMessageTypes, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .all:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .only(types):
+            writeInt(&buf, Int32(2))
+            FfiConverterSequenceTypeRoomMessageEventMessageType.write(types, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeAllowedMessageTypes_lift(_ buf: RustBuffer) throws -> AllowedMessageTypes {
+    return try FfiConverterTypeAllowedMessageTypes.lift(buf)
+}
+
+public func FfiConverterTypeAllowedMessageTypes_lower(_ value: AllowedMessageTypes) -> RustBuffer {
+    return FfiConverterTypeAllowedMessageTypes.lower(value)
+}
+
+
+
+extension AllowedMessageTypes: Equatable, Hashable {}
 
 
 
@@ -25226,6 +25322,76 @@ public func FfiConverterTypeTimelineEventType_lower(_ value: TimelineEventType) 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
+public enum TimelineFocus {
+    
+    case live
+    case event(eventId: String, numContextEvents: UInt16
+    )
+    case pinnedEvents(maxEventsToLoad: UInt16, maxConcurrentRequests: UInt16
+    )
+}
+
+
+public struct FfiConverterTypeTimelineFocus: FfiConverterRustBuffer {
+    typealias SwiftType = TimelineFocus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineFocus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .live
+        
+        case 2: return .event(eventId: try FfiConverterString.read(from: &buf), numContextEvents: try FfiConverterUInt16.read(from: &buf)
+        )
+        
+        case 3: return .pinnedEvents(maxEventsToLoad: try FfiConverterUInt16.read(from: &buf), maxConcurrentRequests: try FfiConverterUInt16.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: TimelineFocus, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .live:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .event(eventId,numContextEvents):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(eventId, into: &buf)
+            FfiConverterUInt16.write(numContextEvents, into: &buf)
+            
+        
+        case let .pinnedEvents(maxEventsToLoad,maxConcurrentRequests):
+            writeInt(&buf, Int32(3))
+            FfiConverterUInt16.write(maxEventsToLoad, into: &buf)
+            FfiConverterUInt16.write(maxConcurrentRequests, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeTimelineFocus_lift(_ buf: RustBuffer) throws -> TimelineFocus {
+    return try FfiConverterTypeTimelineFocus.lift(buf)
+}
+
+public func FfiConverterTypeTimelineFocus_lower(_ value: TimelineFocus) -> RustBuffer {
+    return FfiConverterTypeTimelineFocus.lower(value)
+}
+
+
+
+extension TimelineFocus: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 public enum TimelineItemContent {
     
     case message(content: MessageContent
@@ -31167,13 +31333,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_membership() != 26065) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_message_filtered_timeline() != 32258) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_own_user_id() != 39510) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_pinned_events_timeline() != 29596) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_publish_room_alias_in_room_directory() != 13924) {
@@ -31248,7 +31408,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_timeline() != 701) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_timeline_focused_on_event() != 27319) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_timeline_with_configuration() != 35159) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_topic() != 59745) {
