@@ -3778,6 +3778,8 @@ public func FfiConverterTypeKnockRequestActions_lower(_ value: KnockRequestActio
  */
 public protocol LazyTimelineItemProviderProtocol : AnyObject {
     
+    func containsOnlyEmojis()  -> Bool
+    
     /**
      * Returns some debug information for this event timeline item.
      */
@@ -3839,6 +3841,13 @@ open class LazyTimelineItemProvider:
 
     
 
+    
+open func containsOnlyEmojis() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_lazytimelineitemprovider_contains_only_emojis(self.uniffiClonePointer(),$0
+    )
+})
+}
     
     /**
      * Returns some debug information for this event timeline item.
@@ -5376,6 +5385,11 @@ public protocol RoomProtocol : AnyObject {
     func sendCallNotificationIfNeeded() async throws 
     
     /**
+     * Send the current users live location beacon in the room.
+     */
+    func sendLiveLocation(geoUri: String) async throws 
+    
+    /**
      * Send a raw event to the room.
      *
      * # Arguments
@@ -5406,6 +5420,16 @@ public protocol RoomProtocol : AnyObject {
      */
     func setUnreadFlag(newValue: Bool) async throws 
     
+    /**
+     * Start the current users live location share in the room.
+     */
+    func startLiveLocationShare(durationMillis: UInt64) async throws 
+    
+    /**
+     * Stop the current users live location share in the room.
+     */
+    func stopLiveLocationShare() async throws 
+    
     func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener)  -> TaskHandle
     
     /**
@@ -5417,6 +5441,15 @@ public protocol RoomProtocol : AnyObject {
      * subscription.
      */
     func subscribeToKnockRequests(listener: KnockRequestsListener) async throws  -> TaskHandle
+    
+    /**
+     * Subscribes to live location shares in this room, using a `listener` to
+     * be notified of the changes.
+     *
+     * The current live location shares will be emitted immediately when
+     * subscribing, along with a [`TaskHandle`] to cancel the subscription.
+     */
+    func subscribeToLiveLocationShares(listener: LiveLocationShareListener)  -> TaskHandle
     
     func subscribeToRoomInfoUpdates(listener: RoomInfoListener)  -> TaskHandle
     
@@ -6629,6 +6662,26 @@ open func sendCallNotificationIfNeeded()async throws  {
 }
     
     /**
+     * Send the current users live location beacon in the room.
+     */
+open func sendLiveLocation(geoUri: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_live_location(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(geoUri)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
      * Send a raw event to the room.
      *
      * # Arguments
@@ -6749,6 +6802,46 @@ open func setUnreadFlag(newValue: Bool)async throws  {
         )
 }
     
+    /**
+     * Start the current users live location share in the room.
+     */
+open func startLiveLocationShare(durationMillis: UInt64)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_start_live_location_share(
+                    self.uniffiClonePointer(),
+                    FfiConverterUInt64.lower(durationMillis)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Stop the current users live location share in the room.
+     */
+open func stopLiveLocationShare()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_stop_live_location_share(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
 open func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener) -> TaskHandle {
     return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_identity_status_changes(self.uniffiClonePointer(),
@@ -6780,6 +6873,21 @@ open func subscribeToKnockRequests(listener: KnockRequestsListener)async throws 
             liftFunc: FfiConverterTypeTaskHandle.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
+}
+    
+    /**
+     * Subscribes to live location shares in this room, using a `listener` to
+     * be notified of the changes.
+     *
+     * The current live location shares will be emitted immediately when
+     * subscribing, along with a [`TaskHandle`] to cancel the subscription.
+     */
+open func subscribeToLiveLocationShares(listener: LiveLocationShareListener) -> TaskHandle {
+    return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_live_location_shares(self.uniffiClonePointer(),
+        FfiConverterCallbackInterfaceLiveLocationShareListener.lower(listener),$0
+    )
+})
 }
     
 open func subscribeToRoomInfoUpdates(listener: RoomInfoListener) -> TaskHandle {
@@ -10120,13 +10228,6 @@ public protocol TimelineProtocol : AnyObject {
     func fetchMembers() async 
     
     /**
-     * Paginate forwards, when in focused mode.
-     *
-     * Returns whether we hit the end of the timeline or not.
-     */
-    func focusedPaginateForwards(numEvents: UInt16) async throws  -> Bool
-    
-    /**
      * Get the current timeline item for the given event ID, if any.
      *
      * Will return a remote event, *or* a local echo that has been sent but not
@@ -10159,9 +10260,16 @@ public protocol TimelineProtocol : AnyObject {
     /**
      * Paginate backwards, whether we are in focused mode or in live mode.
      *
-     * Returns whether we hit the end of the timeline or not.
+     * Returns whether we hit the start of the timeline or not.
      */
     func paginateBackwards(numEvents: UInt16) async throws  -> Bool
+    
+    /**
+     * Paginate forwards, whether we are in focused mode or in live mode.
+     *
+     * Returns whether we hit the end of the timeline or not.
+     */
+    func paginateForwards(numEvents: UInt16) async throws  -> Bool
     
     /**
      * Adds a new pinned event by sending an updated `m.room.pinned_events`
@@ -10397,28 +10505,6 @@ open func fetchMembers()async  {
 }
     
     /**
-     * Paginate forwards, when in focused mode.
-     *
-     * Returns whether we hit the end of the timeline or not.
-     */
-open func focusedPaginateForwards(numEvents: UInt16)async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_timeline_focused_paginate_forwards(
-                    self.uniffiClonePointer(),
-                    FfiConverterUInt16.lower(numEvents)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-    /**
      * Get the current timeline item for the given event ID, if any.
      *
      * Will return a remote event, *or* a local echo that has been sent but not
@@ -10496,13 +10582,35 @@ open func markAsRead(receiptType: ReceiptType)async throws  {
     /**
      * Paginate backwards, whether we are in focused mode or in live mode.
      *
-     * Returns whether we hit the end of the timeline or not.
+     * Returns whether we hit the start of the timeline or not.
      */
 open func paginateBackwards(numEvents: UInt16)async throws  -> Bool {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_paginate_backwards(
+                    self.uniffiClonePointer(),
+                    FfiConverterUInt16.lower(numEvents)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Paginate forwards, whether we are in focused mode or in live mode.
+     *
+     * Returns whether we hit the end of the timeline or not.
+     */
+open func paginateForwards(numEvents: UInt16)async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_paginate_forwards(
                     self.uniffiClonePointer(),
                     FfiConverterUInt16.lower(numEvents)
                 )
@@ -13430,6 +13538,163 @@ public func FfiConverterTypeKnockRequest_lift(_ buf: RustBuffer) throws -> Knock
 
 public func FfiConverterTypeKnockRequest_lower(_ value: KnockRequest) -> RustBuffer {
     return FfiConverterTypeKnockRequest.lower(value)
+}
+
+
+public struct LastLocation {
+    /**
+     * The most recent location content of the user.
+     */
+    public var location: LocationContent
+    /**
+     * A timestamp in milliseconds since Unix Epoch on that day in local
+     * time.
+     */
+    public var ts: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The most recent location content of the user.
+         */location: LocationContent, 
+        /**
+         * A timestamp in milliseconds since Unix Epoch on that day in local
+         * time.
+         */ts: UInt64) {
+        self.location = location
+        self.ts = ts
+    }
+}
+
+
+
+extension LastLocation: Equatable, Hashable {
+    public static func ==(lhs: LastLocation, rhs: LastLocation) -> Bool {
+        if lhs.location != rhs.location {
+            return false
+        }
+        if lhs.ts != rhs.ts {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(location)
+        hasher.combine(ts)
+    }
+}
+
+
+public struct FfiConverterTypeLastLocation: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LastLocation {
+        return
+            try LastLocation(
+                location: FfiConverterTypeLocationContent.read(from: &buf), 
+                ts: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LastLocation, into buf: inout [UInt8]) {
+        FfiConverterTypeLocationContent.write(value.location, into: &buf)
+        FfiConverterUInt64.write(value.ts, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeLastLocation_lift(_ buf: RustBuffer) throws -> LastLocation {
+    return try FfiConverterTypeLastLocation.lift(buf)
+}
+
+public func FfiConverterTypeLastLocation_lower(_ value: LastLocation) -> RustBuffer {
+    return FfiConverterTypeLastLocation.lower(value)
+}
+
+
+/**
+ * Details of a users live location share.
+ */
+public struct LiveLocationShare {
+    /**
+     * The user's last known location.
+     */
+    public var lastLocation: LastLocation
+    /**
+     * The live status of the live location share.
+     */
+    public var isLive: Bool
+    /**
+     * The user ID of the person sharing their live location.
+     */
+    public var userId: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The user's last known location.
+         */lastLocation: LastLocation, 
+        /**
+         * The live status of the live location share.
+         */isLive: Bool, 
+        /**
+         * The user ID of the person sharing their live location.
+         */userId: String) {
+        self.lastLocation = lastLocation
+        self.isLive = isLive
+        self.userId = userId
+    }
+}
+
+
+
+extension LiveLocationShare: Equatable, Hashable {
+    public static func ==(lhs: LiveLocationShare, rhs: LiveLocationShare) -> Bool {
+        if lhs.lastLocation != rhs.lastLocation {
+            return false
+        }
+        if lhs.isLive != rhs.isLive {
+            return false
+        }
+        if lhs.userId != rhs.userId {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(lastLocation)
+        hasher.combine(isLive)
+        hasher.combine(userId)
+    }
+}
+
+
+public struct FfiConverterTypeLiveLocationShare: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LiveLocationShare {
+        return
+            try LiveLocationShare(
+                lastLocation: FfiConverterTypeLastLocation.read(from: &buf), 
+                isLive: FfiConverterBool.read(from: &buf), 
+                userId: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LiveLocationShare, into buf: inout [UInt8]) {
+        FfiConverterTypeLastLocation.write(value.lastLocation, into: &buf)
+        FfiConverterBool.write(value.isLive, into: &buf)
+        FfiConverterString.write(value.userId, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeLiveLocationShare_lift(_ buf: RustBuffer) throws -> LiveLocationShare {
+    return try FfiConverterTypeLiveLocationShare.lift(buf)
+}
+
+public func FfiConverterTypeLiveLocationShare_lower(_ value: LiveLocationShare) -> RustBuffer {
+    return FfiConverterTypeLiveLocationShare.lower(value)
 }
 
 
@@ -26499,6 +26764,90 @@ extension FfiConverterCallbackInterfaceKnockRequestsListener : FfiConverter {
 
 
 /**
+ * A listener for receiving new live location shares in a room.
+ */
+public protocol LiveLocationShareListener : AnyObject {
+    
+    func call(liveLocationShares: [LiveLocationShare]) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceLiveLocationShareListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceLiveLocationShareListener = UniffiVTableCallbackInterfaceLiveLocationShareListener(
+        call: { (
+            uniffiHandle: UInt64,
+            liveLocationShares: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceLiveLocationShareListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.call(
+                     liveLocationShares: try FfiConverterSequenceTypeLiveLocationShare.lift(liveLocationShares)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceLiveLocationShareListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface LiveLocationShareListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitLiveLocationShareListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_livelocationsharelistener(&UniffiCallbackInterfaceLiveLocationShareListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceLiveLocationShareListener {
+    fileprivate static var handleMap = UniffiHandleMap<LiveLocationShareListener>()
+}
+
+extension FfiConverterCallbackInterfaceLiveLocationShareListener : FfiConverter {
+    typealias SwiftType = LiveLocationShareListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
+/**
  * Delegate to notify of changes in push rules
  */
 public protocol NotificationSettingsDelegate : AnyObject {
@@ -29754,6 +30103,28 @@ fileprivate struct FfiConverterSequenceTypeKnockRequest: FfiConverterRustBuffer 
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeLiveLocationShare: FfiConverterRustBuffer {
+    typealias SwiftType = [LiveLocationShare]
+
+    public static func write(_ value: [LiveLocationShare], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeLiveLocationShare.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [LiveLocationShare] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [LiveLocationShare]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeLiveLocationShare.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypePollAnswer: FfiConverterRustBuffer {
     typealias SwiftType = [PollAnswer]
 
@@ -31090,6 +31461,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_knockrequestactions_mark_as_seen() != 36036) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_contains_only_emojis() != 5211) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_debug_info() != 55450) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -31372,6 +31746,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_call_notification_if_needed() != 53551) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_live_location() != 34248) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_raw() != 20486) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -31390,10 +31767,19 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_unread_flag() != 2381) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_start_live_location_share() != 11488) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_stop_live_location_share() != 19983) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_identity_status_changes() != 14290) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_knock_requests() != 30649) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_live_location_shares() != 57037) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_room_info_updates() != 48209) {
@@ -31660,9 +32046,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_fetch_members() != 37994) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_focused_paginate_forwards() != 51003) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_event_id() != 33999) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -31672,7 +32055,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_mark_as_read() != 16621) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_paginate_backwards() != 65175) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_paginate_backwards() != 36829) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_paginate_forwards() != 30268) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_pin_event() != 41687) {
@@ -31858,6 +32244,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_knockrequestslistener_call() != 10077) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_livelocationsharelistener_call() != 34519) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettingsdelegate_settings_did_change() != 51708) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -31942,6 +32331,7 @@ private var initializationResult: InitializationResult = {
     uniffiCallbackInitIdentityStatusChangeListener()
     uniffiCallbackInitIgnoredUsersListener()
     uniffiCallbackInitKnockRequestsListener()
+    uniffiCallbackInitLiveLocationShareListener()
     uniffiCallbackInitNotificationSettingsDelegate()
     uniffiCallbackInitPaginationStatusListener()
     uniffiCallbackInitProgressWatcher()
