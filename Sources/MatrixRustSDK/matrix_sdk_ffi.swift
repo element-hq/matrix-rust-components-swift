@@ -9789,7 +9789,7 @@ public protocol SyncServiceProtocol : AnyObject {
     
     func state(listener: SyncServiceStateObserver)  -> TaskHandle
     
-    func stop() async throws 
+    func stop() async 
     
 }
 
@@ -9867,9 +9867,9 @@ open func state(listener: SyncServiceStateObserver) -> TaskHandle {
 })
 }
     
-open func stop()async throws  {
+open func stop()async  {
     return
-        try  await uniffiRustCallAsync(
+        try!  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_syncservice_stop(
                     self.uniffiClonePointer()
@@ -9880,7 +9880,8 @@ open func stop()async throws  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
-            errorHandler: FfiConverterTypeClientError.lift
+            errorHandler: nil
+            
         )
 }
     
@@ -9937,6 +9938,11 @@ public protocol SyncServiceBuilderProtocol : AnyObject {
     func finish() async throws  -> SyncService
     
     func withCrossProcessLock()  -> SyncServiceBuilder
+    
+    /**
+     * Enable the "offline" mode for the [`SyncService`].
+     */
+    func withOfflineMode()  -> SyncServiceBuilder
     
     func withUtdHook(delegate: UnableToDecryptDelegate) async  -> SyncServiceBuilder
     
@@ -10003,6 +10009,16 @@ open func finish()async throws  -> SyncService {
 open func withCrossProcessLock() -> SyncServiceBuilder {
     return try!  FfiConverterTypeSyncServiceBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_cross_process_lock(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Enable the "offline" mode for the [`SyncService`].
+     */
+open func withOfflineMode() -> SyncServiceBuilder {
+    return try!  FfiConverterTypeSyncServiceBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_offline_mode(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -25348,6 +25364,7 @@ public enum SyncServiceState {
     case running
     case terminated
     case error
+    case offline
 }
 
 
@@ -25365,6 +25382,8 @@ public struct FfiConverterTypeSyncServiceState: FfiConverterRustBuffer {
         case 3: return .terminated
         
         case 4: return .error
+        
+        case 5: return .offline
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -25388,6 +25407,10 @@ public struct FfiConverterTypeSyncServiceState: FfiConverterRustBuffer {
         
         case .error:
             writeInt(&buf, Int32(4))
+        
+        
+        case .offline:
+            writeInt(&buf, Int32(5))
         
         }
     }
@@ -32007,13 +32030,16 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservice_state() != 61806) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_syncservice_stop() != 23138) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_syncservice_stop() != 42435) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_finish() != 22814) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_cross_process_lock() != 56326) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_offline_mode() != 16958) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_utd_hook() != 9029) {
