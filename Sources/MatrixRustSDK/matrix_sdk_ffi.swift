@@ -7921,10 +7921,7 @@ public protocol RoomListItemProtocol : AnyObject {
     
     /**
      * Builds a `RoomPreview` from a room list item. This is intended for
-     * invited or knocked rooms.
-     *
-     * An error will be returned if the room is in a state other than invited
-     * or knocked.
+     * invited, knocked or banned rooms.
      */
     func previewRoom(via: [String]) async throws  -> RoomPreview
     
@@ -8133,10 +8130,7 @@ open func membership() -> Membership {
     
     /**
      * Builds a `RoomPreview` from a room list item. This is intended for
-     * invited or knocked rooms.
-     *
-     * An error will be returned if the room is in a state other than invited
-     * or knocked.
+     * invited, knocked or banned rooms.
      */
 open func previewRoom(via: [String])async throws  -> RoomPreview {
     return
@@ -32765,7 +32759,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_membership() != 1596) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_preview_room() != 32277) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_preview_room() != 62868) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_room_info() != 32985) {
