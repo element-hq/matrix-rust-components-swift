@@ -9164,7 +9164,12 @@ public protocol SessionVerificationControllerProtocol : AnyObject {
     /**
      * Request verification for the current device
      */
-    func requestVerification() async throws 
+    func requestDeviceVerification() async throws 
+    
+    /**
+     * Request verification for the given user
+     */
+    func requestUserVerification(userId: String) async throws 
     
     func setDelegate(delegate: SessionVerificationControllerDelegate?) 
     
@@ -9323,13 +9328,33 @@ open func declineVerification()async throws  {
     /**
      * Request verification for the current device
      */
-open func requestVerification()async throws  {
+open func requestDeviceVerification()async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_sessionverificationcontroller_request_verification(
+                uniffi_matrix_sdk_ffi_fn_method_sessionverificationcontroller_request_device_verification(
                     self.uniffiClonePointer()
                     
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Request verification for the given user
+     */
+open func requestUserVerification(userId: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_sessionverificationcontroller_request_user_verification(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(userId)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -16723,9 +16748,10 @@ public func FfiConverterTypeSession_lower(_ value: Session) -> RustBuffer {
  */
 public struct SessionVerificationRequestDetails {
     public var senderId: String
+    public var senderDisplayName: String?
     public var flowId: String
     public var deviceId: String
-    public var displayName: String?
+    public var deviceDisplayName: String?
     /**
      * First time this device was seen in milliseconds since epoch.
      */
@@ -16733,14 +16759,15 @@ public struct SessionVerificationRequestDetails {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(senderId: String, flowId: String, deviceId: String, displayName: String?, 
+    public init(senderId: String, senderDisplayName: String?, flowId: String, deviceId: String, deviceDisplayName: String?, 
         /**
          * First time this device was seen in milliseconds since epoch.
          */firstSeenTimestamp: Timestamp) {
         self.senderId = senderId
+        self.senderDisplayName = senderDisplayName
         self.flowId = flowId
         self.deviceId = deviceId
-        self.displayName = displayName
+        self.deviceDisplayName = deviceDisplayName
         self.firstSeenTimestamp = firstSeenTimestamp
     }
 }
@@ -16752,13 +16779,16 @@ extension SessionVerificationRequestDetails: Equatable, Hashable {
         if lhs.senderId != rhs.senderId {
             return false
         }
+        if lhs.senderDisplayName != rhs.senderDisplayName {
+            return false
+        }
         if lhs.flowId != rhs.flowId {
             return false
         }
         if lhs.deviceId != rhs.deviceId {
             return false
         }
-        if lhs.displayName != rhs.displayName {
+        if lhs.deviceDisplayName != rhs.deviceDisplayName {
             return false
         }
         if lhs.firstSeenTimestamp != rhs.firstSeenTimestamp {
@@ -16769,9 +16799,10 @@ extension SessionVerificationRequestDetails: Equatable, Hashable {
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(senderId)
+        hasher.combine(senderDisplayName)
         hasher.combine(flowId)
         hasher.combine(deviceId)
-        hasher.combine(displayName)
+        hasher.combine(deviceDisplayName)
         hasher.combine(firstSeenTimestamp)
     }
 }
@@ -16782,18 +16813,20 @@ public struct FfiConverterTypeSessionVerificationRequestDetails: FfiConverterRus
         return
             try SessionVerificationRequestDetails(
                 senderId: FfiConverterString.read(from: &buf), 
+                senderDisplayName: FfiConverterOptionString.read(from: &buf), 
                 flowId: FfiConverterString.read(from: &buf), 
                 deviceId: FfiConverterString.read(from: &buf), 
-                displayName: FfiConverterOptionString.read(from: &buf), 
+                deviceDisplayName: FfiConverterOptionString.read(from: &buf), 
                 firstSeenTimestamp: FfiConverterTypeTimestamp.read(from: &buf)
         )
     }
 
     public static func write(_ value: SessionVerificationRequestDetails, into buf: inout [UInt8]) {
         FfiConverterString.write(value.senderId, into: &buf)
+        FfiConverterOptionString.write(value.senderDisplayName, into: &buf)
         FfiConverterString.write(value.flowId, into: &buf)
         FfiConverterString.write(value.deviceId, into: &buf)
-        FfiConverterOptionString.write(value.displayName, into: &buf)
+        FfiConverterOptionString.write(value.deviceDisplayName, into: &buf)
         FfiConverterTypeTimestamp.write(value.firstSeenTimestamp, into: &buf)
     }
 }
@@ -32828,7 +32861,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_decline_verification() != 64345) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_request_verification() != 17229) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_request_device_verification() != 4777) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_request_user_verification() != 26149) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_set_delegate() != 42324) {
