@@ -16747,8 +16747,7 @@ public func FfiConverterTypeSession_lower(_ value: Session) -> RustBuffer {
  * Details about the incoming verification request
  */
 public struct SessionVerificationRequestDetails {
-    public var senderId: String
-    public var senderDisplayName: String?
+    public var senderProfile: UserProfile
     public var flowId: String
     public var deviceId: String
     public var deviceDisplayName: String?
@@ -16759,12 +16758,11 @@ public struct SessionVerificationRequestDetails {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(senderId: String, senderDisplayName: String?, flowId: String, deviceId: String, deviceDisplayName: String?, 
+    public init(senderProfile: UserProfile, flowId: String, deviceId: String, deviceDisplayName: String?, 
         /**
          * First time this device was seen in milliseconds since epoch.
          */firstSeenTimestamp: Timestamp) {
-        self.senderId = senderId
-        self.senderDisplayName = senderDisplayName
+        self.senderProfile = senderProfile
         self.flowId = flowId
         self.deviceId = deviceId
         self.deviceDisplayName = deviceDisplayName
@@ -16776,10 +16774,7 @@ public struct SessionVerificationRequestDetails {
 
 extension SessionVerificationRequestDetails: Equatable, Hashable {
     public static func ==(lhs: SessionVerificationRequestDetails, rhs: SessionVerificationRequestDetails) -> Bool {
-        if lhs.senderId != rhs.senderId {
-            return false
-        }
-        if lhs.senderDisplayName != rhs.senderDisplayName {
+        if lhs.senderProfile != rhs.senderProfile {
             return false
         }
         if lhs.flowId != rhs.flowId {
@@ -16798,8 +16793,7 @@ extension SessionVerificationRequestDetails: Equatable, Hashable {
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(senderId)
-        hasher.combine(senderDisplayName)
+        hasher.combine(senderProfile)
         hasher.combine(flowId)
         hasher.combine(deviceId)
         hasher.combine(deviceDisplayName)
@@ -16812,8 +16806,7 @@ public struct FfiConverterTypeSessionVerificationRequestDetails: FfiConverterRus
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SessionVerificationRequestDetails {
         return
             try SessionVerificationRequestDetails(
-                senderId: FfiConverterString.read(from: &buf), 
-                senderDisplayName: FfiConverterOptionString.read(from: &buf), 
+                senderProfile: FfiConverterTypeUserProfile.read(from: &buf), 
                 flowId: FfiConverterString.read(from: &buf), 
                 deviceId: FfiConverterString.read(from: &buf), 
                 deviceDisplayName: FfiConverterOptionString.read(from: &buf), 
@@ -16822,8 +16815,7 @@ public struct FfiConverterTypeSessionVerificationRequestDetails: FfiConverterRus
     }
 
     public static func write(_ value: SessionVerificationRequestDetails, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.senderId, into: &buf)
-        FfiConverterOptionString.write(value.senderDisplayName, into: &buf)
+        FfiConverterTypeUserProfile.write(value.senderProfile, into: &buf)
         FfiConverterString.write(value.flowId, into: &buf)
         FfiConverterString.write(value.deviceId, into: &buf)
         FfiConverterOptionString.write(value.deviceDisplayName, into: &buf)
