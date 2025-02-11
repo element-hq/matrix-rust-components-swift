@@ -11713,6 +11713,11 @@ public func FfiConverterTypeUnreadNotificationsCount_lower(_ value: UnreadNotifi
 public protocol UserIdentityProtocol : AnyObject {
     
     /**
+     * Was this identity previously verified, and is no longer?
+     */
+    func hasVerificationViolation()  -> Bool
+    
+    /**
      * Is the user identity considered to be verified.
      *
      * If the identity belongs to another user, our own user identity needs to
@@ -11747,6 +11752,14 @@ public protocol UserIdentityProtocol : AnyObject {
      * which is not verified and is in pin violation.
      */
     func pin() async throws 
+    
+    /**
+     * True if we verified this identity at some point in the past.
+     *
+     * To reset this latch back to `false`, one must call
+     * [`UserIdentity::withdraw_verification()`].
+     */
+    func wasPreviouslyVerified()  -> Bool
     
     /**
      * Remove the requirement for this identity to be verified.
@@ -11802,6 +11815,16 @@ open class UserIdentity:
 
     
 
+    
+    /**
+     * Was this identity previously verified, and is no longer?
+     */
+open func hasVerificationViolation() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_useridentity_has_verification_violation(self.uniffiClonePointer(),$0
+    )
+})
+}
     
     /**
      * Is the user identity considered to be verified.
@@ -11862,6 +11885,19 @@ open func pin()async throws  {
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
+}
+    
+    /**
+     * True if we verified this identity at some point in the past.
+     *
+     * To reset this latch back to `false`, one must call
+     * [`UserIdentity::withdraw_verification()`].
+     */
+open func wasPreviouslyVerified() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_useridentity_was_previously_verified(self.uniffiClonePointer(),$0
+    )
+})
 }
     
     /**
@@ -33060,6 +33096,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_unreadnotificationscount_notification_count() != 35655) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_has_verification_violation() != 2948) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_is_verified() != 61954) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -33067,6 +33106,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_pin() != 62925) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_was_previously_verified() != 41686) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_withdraw_verification() != 3578) {
