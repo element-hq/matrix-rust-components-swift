@@ -2151,8 +2151,8 @@ public protocol ClientBuilderProtocol : AnyObject {
      *
      * This method will build the client and immediately attempt to log the
      * client in using the provided [`QrCodeData`] using the login
-     * mechanism described in [MSC4108]. As such this methods requires OIDC
-     * support as well as sliding sync support.
+     * mechanism described in [MSC4108]. As such this methods requires OAuth
+     * 2.0 support as well as sliding sync support.
      *
      * The usage of the progress_listener is required to transfer the
      * [`CheckCode`] to the existing client.
@@ -2349,8 +2349,8 @@ open func build()async throws  -> Client {
      *
      * This method will build the client and immediately attempt to log the
      * client in using the provided [`QrCodeData`] using the login
-     * mechanism described in [MSC4108]. As such this methods requires OIDC
-     * support as well as sliding sync support.
+     * mechanism described in [MSC4108]. As such this methods requires OAuth
+     * 2.0 support as well as sliding sync support.
      *
      * The usage of the progress_listener is required to transfer the
      * [`CheckCode`] to the existing client.
@@ -23451,8 +23451,8 @@ public enum QrLoginProgress {
          */checkCodeString: String
     )
     /**
-     * We are waiting for the login and for the OIDC provider to give us an
-     * access token.
+     * We are waiting for the login and for the OAuth 2.0 authorization server
+     * to give us an access token.
      */
     case waitingForToken(userCode: String
     )
@@ -25565,8 +25565,6 @@ extension ShieldState: Equatable, Hashable {}
 public enum SlidingSyncVersion {
     
     case none
-    case proxy(url: String
-    )
     case native
 }
 
@@ -25580,10 +25578,7 @@ public struct FfiConverterTypeSlidingSyncVersion: FfiConverterRustBuffer {
         
         case 1: return .none
         
-        case 2: return .proxy(url: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 3: return .native
+        case 2: return .native
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -25597,13 +25592,8 @@ public struct FfiConverterTypeSlidingSyncVersion: FfiConverterRustBuffer {
             writeInt(&buf, Int32(1))
         
         
-        case let .proxy(url):
-            writeInt(&buf, Int32(2))
-            FfiConverterString.write(url, into: &buf)
-            
-        
         case .native:
-            writeInt(&buf, Int32(3))
+            writeInt(&buf, Int32(2))
         
         }
     }
@@ -25630,10 +25620,7 @@ extension SlidingSyncVersion: Equatable, Hashable {}
 public enum SlidingSyncVersionBuilder {
     
     case none
-    case proxy(url: String
-    )
     case native
-    case discoverProxy
     case discoverNative
 }
 
@@ -25647,14 +25634,9 @@ public struct FfiConverterTypeSlidingSyncVersionBuilder: FfiConverterRustBuffer 
         
         case 1: return .none
         
-        case 2: return .proxy(url: try FfiConverterString.read(from: &buf)
-        )
+        case 2: return .native
         
-        case 3: return .native
-        
-        case 4: return .discoverProxy
-        
-        case 5: return .discoverNative
+        case 3: return .discoverNative
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -25668,21 +25650,12 @@ public struct FfiConverterTypeSlidingSyncVersionBuilder: FfiConverterRustBuffer 
             writeInt(&buf, Int32(1))
         
         
-        case let .proxy(url):
-            writeInt(&buf, Int32(2))
-            FfiConverterString.write(url, into: &buf)
-            
-        
         case .native:
-            writeInt(&buf, Int32(3))
-        
-        
-        case .discoverProxy:
-            writeInt(&buf, Int32(4))
+            writeInt(&buf, Int32(2))
         
         
         case .discoverNative:
-            writeInt(&buf, Int32(5))
+            writeInt(&buf, Int32(3))
         
         }
     }
@@ -32214,7 +32187,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_build() != 56018) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_build_with_qr_code() != 51905) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_build_with_qr_code() != 42452) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_cross_process_store_locks_holder_name() != 46627) {
