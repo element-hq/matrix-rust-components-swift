@@ -776,11 +776,9 @@ public protocol ClientProtocol : AnyObject {
     func loginWithOidcCallback(authorizationData: OidcAuthorizationData, callbackUrl: String) async throws 
     
     /**
-     * Log out the current user. This method returns an optional URL that
-     * should be presented to the user to complete logout (in the case of
-     * Session having been authenticated using OIDC).
+     * Log the current user out.
      */
-    func logout() async throws  -> String?
+    func logout() async throws 
     
     func notificationClient(processSetup: NotificationProcessSetup) async throws  -> NotificationClient
     
@@ -1643,11 +1641,9 @@ open func loginWithOidcCallback(authorizationData: OidcAuthorizationData, callba
 }
     
     /**
-     * Log out the current user. This method returns an optional URL that
-     * should be presented to the user to complete logout (in the case of
-     * Session having been authenticated using OIDC).
+     * Log the current user out.
      */
-open func logout()async throws  -> String? {
+open func logout()async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -1656,10 +1652,10 @@ open func logout()async throws  -> String? {
                     
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterOptionString.lift,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -12641,11 +12637,12 @@ public struct CreateRoomParameters {
     public var avatar: String?
     public var powerLevelContentOverride: PowerLevels?
     public var joinRuleOverride: JoinRule?
+    public var historyVisibilityOverride: RoomHistoryVisibility?
     public var canonicalAlias: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(name: String?, topic: String? = nil, isEncrypted: Bool, isDirect: Bool = false, visibility: RoomVisibility, preset: RoomPreset, invite: [String]? = nil, avatar: String? = nil, powerLevelContentOverride: PowerLevels? = nil, joinRuleOverride: JoinRule? = nil, canonicalAlias: String? = nil) {
+    public init(name: String?, topic: String? = nil, isEncrypted: Bool, isDirect: Bool = false, visibility: RoomVisibility, preset: RoomPreset, invite: [String]? = nil, avatar: String? = nil, powerLevelContentOverride: PowerLevels? = nil, joinRuleOverride: JoinRule? = nil, historyVisibilityOverride: RoomHistoryVisibility? = nil, canonicalAlias: String? = nil) {
         self.name = name
         self.topic = topic
         self.isEncrypted = isEncrypted
@@ -12656,6 +12653,7 @@ public struct CreateRoomParameters {
         self.avatar = avatar
         self.powerLevelContentOverride = powerLevelContentOverride
         self.joinRuleOverride = joinRuleOverride
+        self.historyVisibilityOverride = historyVisibilityOverride
         self.canonicalAlias = canonicalAlias
     }
 }
@@ -12694,6 +12692,9 @@ extension CreateRoomParameters: Equatable, Hashable {
         if lhs.joinRuleOverride != rhs.joinRuleOverride {
             return false
         }
+        if lhs.historyVisibilityOverride != rhs.historyVisibilityOverride {
+            return false
+        }
         if lhs.canonicalAlias != rhs.canonicalAlias {
             return false
         }
@@ -12711,6 +12712,7 @@ extension CreateRoomParameters: Equatable, Hashable {
         hasher.combine(avatar)
         hasher.combine(powerLevelContentOverride)
         hasher.combine(joinRuleOverride)
+        hasher.combine(historyVisibilityOverride)
         hasher.combine(canonicalAlias)
     }
 }
@@ -12730,6 +12732,7 @@ public struct FfiConverterTypeCreateRoomParameters: FfiConverterRustBuffer {
                 avatar: FfiConverterOptionString.read(from: &buf), 
                 powerLevelContentOverride: FfiConverterOptionTypePowerLevels.read(from: &buf), 
                 joinRuleOverride: FfiConverterOptionTypeJoinRule.read(from: &buf), 
+                historyVisibilityOverride: FfiConverterOptionTypeRoomHistoryVisibility.read(from: &buf), 
                 canonicalAlias: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -12745,6 +12748,7 @@ public struct FfiConverterTypeCreateRoomParameters: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.avatar, into: &buf)
         FfiConverterOptionTypePowerLevels.write(value.powerLevelContentOverride, into: &buf)
         FfiConverterOptionTypeJoinRule.write(value.joinRuleOverride, into: &buf)
+        FfiConverterOptionTypeRoomHistoryVisibility.write(value.historyVisibilityOverride, into: &buf)
         FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
     }
 }
@@ -30456,6 +30460,27 @@ fileprivate struct FfiConverterOptionTypePushFormat: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeRoomHistoryVisibility: FfiConverterRustBuffer {
+    typealias SwiftType = RoomHistoryVisibility?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRoomHistoryVisibility.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRoomHistoryVisibility.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeRoomNotificationMode: FfiConverterRustBuffer {
     typealias SwiftType = RoomNotificationMode?
 
@@ -32088,7 +32113,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_oidc_callback() != 35005) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_logout() != 7576) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_logout() != 42911) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_notification_client() != 37308) {
