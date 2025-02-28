@@ -395,6 +395,27 @@ fileprivate struct FfiConverterInt64: FfiConverterPrimitive {
     }
 }
 
+fileprivate struct FfiConverterBool : FfiConverter {
+    typealias FfiType = Int8
+    typealias SwiftType = Bool
+
+    public static func lift(_ value: Int8) throws -> Bool {
+        return value != 0
+    }
+
+    public static func lower(_ value: Bool) -> Int8 {
+        return value ? 1 : 0
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Bool {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: Bool, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
 fileprivate struct FfiConverterString: FfiConverter {
     typealias SwiftType = String
     typealias FfiType = RustBuffer
@@ -1127,6 +1148,77 @@ public func FfiConverterTypeRoomMemberRole_lower(_ value: RoomMemberRole) -> Rus
 
 
 extension RoomMemberRole: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Status for the back-pagination on a room event cache.
+ */
+
+public enum RoomPaginationStatus {
+    
+    /**
+     * No back-pagination is happening right now.
+     */
+    case idle(
+        /**
+         * Have we hit the start of the timeline, i.e. back-paginating wouldn't
+         * have any effect?
+         */hitTimelineStart: Bool
+    )
+    /**
+     * Back-pagination is already running in the background.
+     */
+    case paginating
+}
+
+
+public struct FfiConverterTypeRoomPaginationStatus: FfiConverterRustBuffer {
+    typealias SwiftType = RoomPaginationStatus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomPaginationStatus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .idle(hitTimelineStart: try FfiConverterBool.read(from: &buf)
+        )
+        
+        case 2: return .paginating
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RoomPaginationStatus, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .idle(hitTimelineStart):
+            writeInt(&buf, Int32(1))
+            FfiConverterBool.write(hitTimelineStart, into: &buf)
+            
+        
+        case .paginating:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeRoomPaginationStatus_lift(_ buf: RustBuffer) throws -> RoomPaginationStatus {
+    return try FfiConverterTypeRoomPaginationStatus.lift(buf)
+}
+
+public func FfiConverterTypeRoomPaginationStatus_lower(_ value: RoomPaginationStatus) -> RustBuffer {
+    return FfiConverterTypeRoomPaginationStatus.lower(value)
+}
+
+
+
+extension RoomPaginationStatus: Equatable, Hashable {}
 
 
 

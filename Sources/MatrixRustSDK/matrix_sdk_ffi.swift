@@ -5345,6 +5345,20 @@ public protocol RoomProtocol : AnyObject {
      */
     func reportContent(eventId: String, score: Int32?, reason: String?) async throws 
     
+    /**
+     * Reports a room as inappropriate to the server.
+     * The caller is not required to be joined to the room to report it.
+     *
+     * # Arguments
+     *
+     * * `reason` - The reason the room is being reported.
+     *
+     * # Errors
+     *
+     * Returns an error if the room is not found or on rate limit
+     */
+    func reportRoom(reason: String?) async throws 
+    
     func resetPowerLevels() async throws  -> RoomPowerLevels
     
     /**
@@ -6546,6 +6560,35 @@ open func reportContent(eventId: String, score: Int32?, reason: String?)async th
                 uniffi_matrix_sdk_ffi_fn_method_room_report_content(
                     self.uniffiClonePointer(),
                     FfiConverterString.lower(eventId),FfiConverterOptionInt32.lower(score),FfiConverterOptionString.lower(reason)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Reports a room as inappropriate to the server.
+     * The caller is not required to be joined to the room to report it.
+     *
+     * # Arguments
+     *
+     * * `reason` - The reason the room is being reported.
+     *
+     * # Errors
+     *
+     * Returns an error if the room is not found or on rate limit
+     */
+open func reportRoom(reason: String?)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_report_room(
+                    self.uniffiClonePointer(),
+                    FfiConverterOptionString.lower(reason)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -27802,7 +27845,7 @@ extension FfiConverterCallbackInterfaceNotificationSettingsDelegate : FfiConvert
 
 public protocol PaginationStatusListener : AnyObject {
     
-    func onUpdate(status: LiveBackPaginationStatus) 
+    func onUpdate(status: RoomPaginationStatus) 
     
 }
 
@@ -27826,7 +27869,7 @@ fileprivate struct UniffiCallbackInterfacePaginationStatusListener {
                     throw UniffiInternalError.unexpectedStaleHandle
                 }
                 return uniffiObj.onUpdate(
-                     status: try FfiConverterTypeLiveBackPaginationStatus_lift(status)
+                     status: try FfiConverterTypeRoomPaginationStatus_lift(status)
                 )
             }
 
@@ -32644,6 +32687,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_report_content() != 16529) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_report_room() != 8059) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_reset_power_levels() != 63622) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -33181,7 +33227,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettingsdelegate_settings_did_change() != 51708) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_paginationstatuslistener_on_update() != 29884) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_paginationstatuslistener_on_update() != 65318) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_progresswatcher_transmission_progress() != 41133) {
