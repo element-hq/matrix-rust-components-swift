@@ -622,7 +622,7 @@ public protocol ClientProtocol : AnyObject {
     /**
      * Retrieves an avatar cached from a previous call to [`Self::avatar_url`].
      */
-    func cachedAvatarUrl() throws  -> String?
+    func cachedAvatarUrl() async throws  -> String?
     
     /**
      * Lets the user know whether this is an `m.login.password` based
@@ -693,11 +693,26 @@ public protocol ClientProtocol : AnyObject {
     
     func getMediaThumbnail(mediaSource: MediaSource, width: UInt64, height: UInt64) async throws  -> Data
     
-    func getNotificationSettings()  -> NotificationSettings
+    func getNotificationSettings() async  -> NotificationSettings
     
     func getProfile(userId: String) async throws  -> UserProfile
     
     func getRecentlyVisitedRooms() async throws  -> [String]
+    
+    /**
+     * Get a room by its ID.
+     *
+     * # Arguments
+     *
+     * * `room_id` - The ID of the room to get.
+     *
+     * # Returns
+     *
+     * A `Result` containing an optional room, or a `ClientError`.
+     * This method will not initialize the room's timeline or populate it with
+     * events.
+     */
+    func getRoom(roomId: String) throws  -> Room?
     
     /**
      * Given a room alias, get the preview of a room, to interact with it.
@@ -899,8 +914,18 @@ public protocol ClientProtocol : AnyObject {
      * view has succeeded, call `login_with_oidc_callback` with the callback it
      * returns. If a failure occurs and a callback isn't available, make sure
      * to call `abort_oidc_auth` to inform the client of this.
+     *
+     * # Arguments
+     *
+     * * `oidc_configuration` - The configuration used to load the credentials
+     * of the client if it is already registered with the authorization
+     * server, or register the client and store its credentials if it isn't.
+     *
+     * * `prompt` - The desired user experience in the web UI. No value means
+     * that the user wishes to login into an existing account, and a value of
+     * `Create` means that the user wishes to register a new account.
      */
-    func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt) async throws  -> OidcAuthorizationData
+    func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?) async throws  -> OidcAuthorizationData
     
     func userId() throws  -> String
     
@@ -1089,11 +1114,21 @@ open func awaitRoomRemoteEcho(roomId: String)async throws  -> Room {
     /**
      * Retrieves an avatar cached from a previous call to [`Self::avatar_url`].
      */
-open func cachedAvatarUrl()throws  -> String? {
-    return try  FfiConverterOptionString.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
-    uniffi_matrix_sdk_ffi_fn_method_client_cached_avatar_url(self.uniffiClonePointer(),$0
-    )
-})
+open func cachedAvatarUrl()async throws  -> String? {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_cached_avatar_url(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionString.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
     /**
@@ -1337,11 +1372,22 @@ open func getMediaThumbnail(mediaSource: MediaSource, width: UInt64, height: UIn
         )
 }
     
-open func getNotificationSettings() -> NotificationSettings {
-    return try!  FfiConverterTypeNotificationSettings.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_client_get_notification_settings(self.uniffiClonePointer(),$0
-    )
-})
+open func getNotificationSettings()async  -> NotificationSettings {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_get_notification_settings(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeNotificationSettings.lift,
+            errorHandler: nil
+            
+        )
 }
     
 open func getProfile(userId: String)async throws  -> UserProfile {
@@ -1376,6 +1422,27 @@ open func getRecentlyVisitedRooms()async throws  -> [String] {
             liftFunc: FfiConverterSequenceString.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
+}
+    
+    /**
+     * Get a room by its ID.
+     *
+     * # Arguments
+     *
+     * * `room_id` - The ID of the room to get.
+     *
+     * # Returns
+     *
+     * A `Result` containing an optional room, or a `ClientError`.
+     * This method will not initialize the room's timeline or populate it with
+     * events.
+     */
+open func getRoom(roomId: String)throws  -> Room? {
+    return try  FfiConverterOptionTypeRoom.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_client_get_room(self.uniffiClonePointer(),
+        FfiConverterString.lower(roomId),$0
+    )
+})
 }
     
     /**
@@ -2097,14 +2164,24 @@ open func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWat
      * view has succeeded, call `login_with_oidc_callback` with the callback it
      * returns. If a failure occurs and a callback isn't available, make sure
      * to call `abort_oidc_auth` to inform the client of this.
+     *
+     * # Arguments
+     *
+     * * `oidc_configuration` - The configuration used to load the credentials
+     * of the client if it is already registered with the authorization
+     * server, or register the client and store its credentials if it isn't.
+     *
+     * * `prompt` - The desired user experience in the web UI. No value means
+     * that the user wishes to login into an existing account, and a value of
+     * `Create` means that the user wishes to register a new account.
      */
-open func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt)async throws  -> OidcAuthorizationData {
+open func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?)async throws  -> OidcAuthorizationData {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_url_for_oidc(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeOidcConfiguration.lower(oidcConfiguration),FfiConverterTypeOidcPrompt.lower(prompt)
+                    FfiConverterTypeOidcConfiguration.lower(oidcConfiguration),FfiConverterOptionTypeOidcPrompt.lower(prompt)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
@@ -5219,6 +5296,8 @@ public protocol RoomProtocol : AnyObject {
      */
     func enableSendQueue(enable: Bool) 
     
+    func encryptionState()  -> EncryptionState
+    
     /**
      * Forget this room.
      *
@@ -5278,15 +5357,7 @@ public protocol RoomProtocol : AnyObject {
     
     func invitedMembersCount()  -> UInt64
     
-    /**
-     * For rooms one is invited to, retrieves the room member information for
-     * the user who invited the logged-in user to a room.
-     */
-    func inviter() async  -> RoomMember?
-    
-    func isDirect()  -> Bool
-    
-    func isEncrypted() throws  -> Bool
+    func isDirect() async  -> Bool
     
     func isPublic()  -> Bool
     
@@ -5310,6 +5381,8 @@ public protocol RoomProtocol : AnyObject {
     func joinedMembersCount()  -> UInt64
     
     func kickUser(userId: String, reason: String?) async throws 
+    
+    func latestEncryptionState() async throws  -> EncryptionState
     
     /**
      * Leave this room.
@@ -6013,6 +6086,13 @@ open func enableSendQueue(enable: Bool) {try! rustCall() {
 }
 }
     
+open func encryptionState() -> EncryptionState {
+    return try!  FfiConverterTypeEncryptionState_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_room_encryption_state(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
     /**
      * Forget this room.
      *
@@ -6182,40 +6262,22 @@ open func invitedMembersCount() -> UInt64 {
 })
 }
     
-    /**
-     * For rooms one is invited to, retrieves the room member information for
-     * the user who invited the logged-in user to a room.
-     */
-open func inviter()async  -> RoomMember? {
+open func isDirect()async  -> Bool {
     return
         try!  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_inviter(
+                uniffi_matrix_sdk_ffi_fn_method_room_is_direct(
                     self.uniffiClonePointer()
                     
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterOptionTypeRoomMember.lift,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
             errorHandler: nil
             
         )
-}
-    
-open func isDirect() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_room_is_direct(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func isEncrypted()throws  -> Bool {
-    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
-    uniffi_matrix_sdk_ffi_fn_method_room_is_encrypted(self.uniffiClonePointer(),$0
-    )
-})
 }
     
 open func isPublic() -> Bool {
@@ -6292,6 +6354,23 @@ open func kickUser(userId: String, reason: String?)async throws  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+open func latestEncryptionState()async throws  -> EncryptionState {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_latest_encryption_state(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeEncryptionState_lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -7985,18 +8064,7 @@ public protocol RoomListItemProtocol : AnyObject {
      */
     func initTimeline(eventTypeFilter: TimelineEventTypeFilter?, internalIdPrefix: String?) async throws 
     
-    /**
-     * Builds a `Room` FFI from an invited room without initializing its
-     * internal timeline.
-     *
-     * An error will be returned if the room is a state different than invited.
-     *
-     * ⚠️ Holding on to this room instance after it has been joined is not
-     * safe. Use `full_room` instead.
-     */
-    func invitedRoom() throws  -> Room
-    
-    func isDirect()  -> Bool
+    func isDirect() async  -> Bool
     
     /**
      * Checks whether the room is encrypted or not.
@@ -8142,27 +8210,22 @@ open func initTimeline(eventTypeFilter: TimelineEventTypeFilter?, internalIdPref
         )
 }
     
-    /**
-     * Builds a `Room` FFI from an invited room without initializing its
-     * internal timeline.
-     *
-     * An error will be returned if the room is a state different than invited.
-     *
-     * ⚠️ Holding on to this room instance after it has been joined is not
-     * safe. Use `full_room` instead.
-     */
-open func invitedRoom()throws  -> Room {
-    return try  FfiConverterTypeRoom.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_invited_room(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func isDirect() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_is_direct(self.uniffiClonePointer(),$0
-    )
-})
+open func isDirect()async  -> Bool {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_roomlistitem_is_direct(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: nil
+            
+        )
 }
     
     /**
@@ -8706,6 +8769,9 @@ public protocol RoomPreviewProtocol : AnyObject {
      * Leave the room if the room preview state is either joined, invited or
      * knocked.
      *
+     * If rejecting an invite then also forget it as an extra layer of
+     * protection against spam attacks.
+     *
      * Will return an error otherwise.
      */
     func leave() async throws 
@@ -8816,6 +8882,9 @@ open func inviter()async  -> RoomMember? {
     /**
      * Leave the room if the room preview state is either joined, invited or
      * knocked.
+     *
+     * If rejecting an invite then also forget it as an extra layer of
+     * protection against spam attacks.
      *
      * Will return an error otherwise.
      */
@@ -15613,6 +15682,7 @@ public func FfiConverterTypeRoomHero_lower(_ value: RoomHero) -> RustBuffer {
 
 public struct RoomInfo {
     public var id: String
+    public var encryptionState: EncryptionState
     public var creator: String?
     /**
      * The room's name from the room state event if received from sync, or one
@@ -15685,7 +15755,7 @@ public struct RoomInfo {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, creator: String?, 
+    public init(id: String, encryptionState: EncryptionState, creator: String?, 
         /**
          * The room's name from the room state event if received from sync, or one
          * that's been computed otherwise.
@@ -15725,6 +15795,7 @@ public struct RoomInfo {
          * The history visibility for this room, if known.
          */historyVisibility: RoomHistoryVisibility) {
         self.id = id
+        self.encryptionState = encryptionState
         self.creator = creator
         self.displayName = displayName
         self.rawName = rawName
@@ -15764,6 +15835,9 @@ public struct RoomInfo {
 extension RoomInfo: Equatable, Hashable {
     public static func ==(lhs: RoomInfo, rhs: RoomInfo) -> Bool {
         if lhs.id != rhs.id {
+            return false
+        }
+        if lhs.encryptionState != rhs.encryptionState {
             return false
         }
         if lhs.creator != rhs.creator {
@@ -15864,6 +15938,7 @@ extension RoomInfo: Equatable, Hashable {
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+        hasher.combine(encryptionState)
         hasher.combine(creator)
         hasher.combine(displayName)
         hasher.combine(rawName)
@@ -15904,6 +15979,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         return
             try RoomInfo(
                 id: FfiConverterString.read(from: &buf), 
+                encryptionState: FfiConverterTypeEncryptionState.read(from: &buf), 
                 creator: FfiConverterOptionString.read(from: &buf), 
                 displayName: FfiConverterOptionString.read(from: &buf), 
                 rawName: FfiConverterOptionString.read(from: &buf), 
@@ -15940,6 +16016,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
 
     public static func write(_ value: RoomInfo, into buf: inout [UInt8]) {
         FfiConverterString.write(value.id, into: &buf)
+        FfiConverterTypeEncryptionState.write(value.encryptionState, into: &buf)
         FfiConverterOptionString.write(value.creator, into: &buf)
         FfiConverterOptionString.write(value.displayName, into: &buf)
         FfiConverterOptionString.write(value.rawName, into: &buf)
@@ -22656,30 +22733,6 @@ extension OidcError: Foundation.LocalizedError {
 public enum OidcPrompt {
     
     /**
-     * The Authorization Server must not display any authentication or consent
-     * user interface pages.
-     */
-    case none
-    /**
-     * The Authorization Server should prompt the End-User for
-     * reauthentication.
-     */
-    case login
-    /**
-     * The Authorization Server should prompt the End-User for consent before
-     * returning information to the Client.
-     */
-    case consent
-    /**
-     * The Authorization Server should prompt the End-User to select a user
-     * account.
-     *
-     * This enables an End-User who has multiple accounts at the Authorization
-     * Server to select amongst the multiple accounts that they might have
-     * current sessions for.
-     */
-    case selectAccount
-    /**
      * The Authorization Server should prompt the End-User to create a user
      * account.
      *
@@ -22701,17 +22754,9 @@ public struct FfiConverterTypeOidcPrompt: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .none
+        case 1: return .create
         
-        case 2: return .login
-        
-        case 3: return .consent
-        
-        case 4: return .selectAccount
-        
-        case 5: return .create
-        
-        case 6: return .unknown(value: try FfiConverterString.read(from: &buf)
+        case 2: return .unknown(value: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -22722,28 +22767,12 @@ public struct FfiConverterTypeOidcPrompt: FfiConverterRustBuffer {
         switch value {
         
         
-        case .none:
+        case .create:
             writeInt(&buf, Int32(1))
         
         
-        case .login:
-            writeInt(&buf, Int32(2))
-        
-        
-        case .consent:
-            writeInt(&buf, Int32(3))
-        
-        
-        case .selectAccount:
-            writeInt(&buf, Int32(4))
-        
-        
-        case .create:
-            writeInt(&buf, Int32(5))
-        
-        
         case let .unknown(value):
-            writeInt(&buf, Int32(6))
+            writeInt(&buf, Int32(2))
             FfiConverterString.write(value, into: &buf)
             
         }
@@ -30523,6 +30552,27 @@ fileprivate struct FfiConverterOptionTypeMembershipChange: FfiConverterRustBuffe
     }
 }
 
+fileprivate struct FfiConverterOptionTypeOidcPrompt: FfiConverterRustBuffer {
+    typealias SwiftType = OidcPrompt?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeOidcPrompt.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeOidcPrompt.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypePublicRoomJoinRule: FfiConverterRustBuffer {
     typealias SwiftType = PublicRoomJoinRule?
 
@@ -31681,6 +31731,8 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
 
 
 
+
+
 /**
  * Typealias from the type name used in the UDL file to the builtin type.  This
  * is needed because the UDL type name is used in function/method signatures.
@@ -31998,6 +32050,15 @@ public func sdkGitSha() -> String {
     )
 })
 }
+/**
+ * Set up a lightweight tokio runtime, for processes that have memory
+ * limitations (like the NSE process on iOS).
+ */
+public func setupLightweightTokioRuntime() {try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_func_setup_lightweight_tokio_runtime($0
+    )
+}
+}
 public func setupTracing(config: TracingConfiguration) {try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_func_setup_tracing(
         FfiConverterTypeTracingConfiguration.lower(config),$0
@@ -32094,6 +32155,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_sdk_git_sha() != 4038) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_func_setup_lightweight_tokio_runtime() != 61680) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_func_setup_tracing() != 45018) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -32124,7 +32188,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_await_room_remote_echo() != 18126) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_cached_avatar_url() != 58990) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_cached_avatar_url() != 50226) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_can_deactivate_account() != 39890) {
@@ -32169,13 +32233,16 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_thumbnail() != 52601) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_notification_settings() != 6359) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_notification_settings() != 49769) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_profile() != 60062) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recently_visited_rooms() != 22399) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_room() != 30376) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_room_preview_from_room_alias() != 7674) {
@@ -32301,7 +32368,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_upload_media() != 51195) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc() != 30079) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc() != 22103) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_user_id() != 40531) {
@@ -32643,6 +32710,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_enable_send_queue() != 23914) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_encryption_state() != 9101) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_forget() != 37840) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -32673,13 +32743,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_invited_members_count() != 1023) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_inviter() != 49874) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_is_direct() != 16947) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_is_encrypted() != 55158) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_is_direct() != 10462) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_is_public() != 7336) {
@@ -32701,6 +32765,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_kick_user() != 28600) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_latest_encryption_state() != 16843) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_leave() != 63688) {
@@ -32916,10 +32983,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_init_timeline() != 61817) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_invited_room() != 44344) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_direct() != 46873) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_direct() != 53352) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_encrypted() != 65150) {
@@ -32970,7 +33034,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_inviter() != 1297) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_leave() != 5096) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_leave() != 21886) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_own_membership_details() != 1443) {

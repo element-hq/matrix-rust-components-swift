@@ -640,6 +640,81 @@ public func FfiConverterTypeMediaRetentionPolicy_lower(_ value: MediaRetentionPo
     return FfiConverterTypeMediaRetentionPolicy.lower(value)
 }
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Represents the state of a room encryption.
+ */
+
+public enum EncryptionState {
+    
+    /**
+     * The room is encrypted.
+     */
+    case encrypted
+    /**
+     * The room is not encrypted.
+     */
+    case notEncrypted
+    /**
+     * The state of the room encryption is unknown, probably because the
+     * `/sync` did not provide all data needed to decide.
+     */
+    case unknown
+}
+
+
+public struct FfiConverterTypeEncryptionState: FfiConverterRustBuffer {
+    typealias SwiftType = EncryptionState
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EncryptionState {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .encrypted
+        
+        case 2: return .notEncrypted
+        
+        case 3: return .unknown
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: EncryptionState, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .encrypted:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .notEncrypted:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .unknown:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeEncryptionState_lift(_ buf: RustBuffer) throws -> EncryptionState {
+    return try FfiConverterTypeEncryptionState.lift(buf)
+}
+
+public func FfiConverterTypeEncryptionState_lower(_ value: EncryptionState) -> RustBuffer {
+    return FfiConverterTypeEncryptionState.lower(value)
+}
+
+
+
+extension EncryptionState: Equatable, Hashable {}
+
+
+
 fileprivate struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
     typealias SwiftType = UInt64?
 
