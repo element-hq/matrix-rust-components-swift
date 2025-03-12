@@ -31890,6 +31890,21 @@ public func getElementCallRequiredPermissions(ownUserId: String, ownDeviceId: St
 })
 }
 /**
+ * Sets up logs and the tokio runtime for the current application.
+ *
+ * If `use_lightweight_tokio_runtime` is set to true, this will set up a
+ * lightweight tokio runtime, for processes that have memory limitations (like
+ * the NSE process on iOS). Otherwise, this can remain false, in which case a
+ * multithreaded tokio runtime will be set up.
+ */
+public func initPlatform(config: TracingConfiguration, useLightweightTokioRuntime: Bool) {try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_func_init_platform(
+        FfiConverterTypeTracingConfiguration.lower(config),
+        FfiConverterBool.lower(useLightweightTokioRuntime),$0
+    )
+}
+}
+/**
  * Verifies the passed `String` matches the expected room alias format:
  *
  * This means it's lowercase, with no whitespace chars, has a single leading
@@ -32050,21 +32065,6 @@ public func sdkGitSha() -> String {
     )
 })
 }
-/**
- * Set up a lightweight tokio runtime, for processes that have memory
- * limitations (like the NSE process on iOS).
- */
-public func setupLightweightTokioRuntime() {try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_func_setup_lightweight_tokio_runtime($0
-    )
-}
-}
-public func setupTracing(config: TracingConfiguration) {try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_func_setup_tracing(
-        FfiConverterTypeTracingConfiguration.lower(config),$0
-    )
-}
-}
 public func suggestedPowerLevelForRole(role: RoomMemberRole) -> Int64 {
     return try!  FfiConverterInt64.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_func_suggested_power_level_for_role(
@@ -32110,6 +32110,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_get_element_call_required_permissions() != 30181) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_func_init_platform() != 35062) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_func_is_room_alias_format_valid() != 54845) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -32153,12 +32156,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_sdk_git_sha() != 4038) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_func_setup_lightweight_tokio_runtime() != 61680) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_func_setup_tracing() != 45018) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_suggested_power_level_for_role() != 61777) {
