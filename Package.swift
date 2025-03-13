@@ -1,8 +1,8 @@
 // swift-tools-version:5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 import PackageDescription
-let checksum = "7307a8093e16a02481c7c0b32e53aaa6b790cd04fc38de57c2f76bcc7f3c1880"
-let version = "25.03.12"
+let checksum = "850d08f429464c580b93edb84010f907b6523ae5596a0baaabed7522bcf4306d"
+let version = "25.03.13"
 let url = "https://github.com/element-hq/matrix-rust-components-swift/releases/download/\(version)/MatrixSDKFFI.xcframework.zip"
 let package = Package(
     name: "MatrixRustSDK",

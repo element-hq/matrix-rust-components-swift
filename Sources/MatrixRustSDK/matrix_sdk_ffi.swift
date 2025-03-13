@@ -22740,6 +22740,16 @@ public enum OidcPrompt {
      */
     case create
     /**
+     * The Authorization Server should prompt the End-User for
+     * reauthentication.
+     */
+    case login
+    /**
+     * The Authorization Server should prompt the End-User for consent before
+     * returning information to the Client.
+     */
+    case consent
+    /**
      * An unknown value.
      */
     case unknown(value: String
@@ -22756,7 +22766,11 @@ public struct FfiConverterTypeOidcPrompt: FfiConverterRustBuffer {
         
         case 1: return .create
         
-        case 2: return .unknown(value: try FfiConverterString.read(from: &buf)
+        case 2: return .login
+        
+        case 3: return .consent
+        
+        case 4: return .unknown(value: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -22771,8 +22785,16 @@ public struct FfiConverterTypeOidcPrompt: FfiConverterRustBuffer {
             writeInt(&buf, Int32(1))
         
         
-        case let .unknown(value):
+        case .login:
             writeInt(&buf, Int32(2))
+        
+        
+        case .consent:
+            writeInt(&buf, Int32(3))
+        
+        
+        case let .unknown(value):
+            writeInt(&buf, Int32(4))
             FfiConverterString.write(value, into: &buf)
             
         }
