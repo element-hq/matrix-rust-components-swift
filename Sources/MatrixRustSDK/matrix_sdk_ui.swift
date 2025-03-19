@@ -440,6 +440,10 @@ public enum EventItemOrigin {
      * The event came from pagination.
      */
     case pagination
+    /**
+     * The event came from a cache.
+     */
+    case cache
 }
 
 
@@ -455,6 +459,8 @@ public struct FfiConverterTypeEventItemOrigin: FfiConverterRustBuffer {
         case 2: return .sync
         
         case 3: return .pagination
+        
+        case 4: return .cache
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -474,6 +480,10 @@ public struct FfiConverterTypeEventItemOrigin: FfiConverterRustBuffer {
         
         case .pagination:
             writeInt(&buf, Int32(3))
+        
+        
+        case .cache:
+            writeInt(&buf, Int32(4))
         
         }
     }

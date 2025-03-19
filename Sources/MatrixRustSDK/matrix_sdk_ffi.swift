@@ -581,7 +581,7 @@ public protocol ClientProtocol : AnyObject {
      * Aborts an existing OIDC login operation that might have been cancelled,
      * failed etc.
      */
-    func abortOidcAuth(authorizationData: OidcAuthorizationData) async 
+    func abortOidcAuth(authorizationData: OAuthAuthorizationData) async 
     
     /**
      * Get the content of the event of the given type out of the account data
@@ -798,7 +798,7 @@ public protocol ClientProtocol : AnyObject {
     /**
      * Completes the OIDC login process.
      */
-    func loginWithOidcCallback(authorizationData: OidcAuthorizationData, callbackUrl: String) async throws 
+    func loginWithOidcCallback(authorizationData: OAuthAuthorizationData, callbackUrl: String) async throws 
     
     /**
      * Log the current user out.
@@ -925,7 +925,7 @@ public protocol ClientProtocol : AnyObject {
      * that the user wishes to login into an existing account, and a value of
      * `Create` means that the user wishes to register a new account.
      */
-    func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?) async throws  -> OidcAuthorizationData
+    func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?) async throws  -> OAuthAuthorizationData
     
     func userId() throws  -> String
     
@@ -981,13 +981,13 @@ open class Client:
      * Aborts an existing OIDC login operation that might have been cancelled,
      * failed etc.
      */
-open func abortOidcAuth(authorizationData: OidcAuthorizationData)async  {
+open func abortOidcAuth(authorizationData: OAuthAuthorizationData)async  {
     return
         try!  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_abort_oidc_auth(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeOidcAuthorizationData_lower(authorizationData)
+                    FfiConverterTypeOAuthAuthorizationData_lower(authorizationData)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -1730,13 +1730,13 @@ open func loginWithEmail(email: String, password: String, initialDeviceName: Str
     /**
      * Completes the OIDC login process.
      */
-open func loginWithOidcCallback(authorizationData: OidcAuthorizationData, callbackUrl: String)async throws  {
+open func loginWithOidcCallback(authorizationData: OAuthAuthorizationData, callbackUrl: String)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_login_with_oidc_callback(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeOidcAuthorizationData_lower(authorizationData),FfiConverterString.lower(callbackUrl)
+                    FfiConverterTypeOAuthAuthorizationData_lower(authorizationData),FfiConverterString.lower(callbackUrl)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -2175,7 +2175,7 @@ open func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWat
      * that the user wishes to login into an existing account, and a value of
      * `Create` means that the user wishes to register a new account.
      */
-open func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?)async throws  -> OidcAuthorizationData {
+open func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?)async throws  -> OAuthAuthorizationData {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -2187,7 +2187,7 @@ open func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?)a
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeOidcAuthorizationData_lift,
+            liftFunc: FfiConverterTypeOAuthAuthorizationData_lift,
             errorHandler: FfiConverterTypeOidcError.lift
         )
 }
@@ -14594,7 +14594,7 @@ public struct OidcConfiguration {
     /**
      * A URI that contains information about the client.
      */
-    public var clientUri: String?
+    public var clientUri: String
     /**
      * A URI that contains the client's logo.
      */
@@ -14635,7 +14635,7 @@ public struct OidcConfiguration {
          */redirectUri: String, 
         /**
          * A URI that contains information about the client.
-         */clientUri: String?, 
+         */clientUri: String, 
         /**
          * A URI that contains the client's logo.
          */logoUri: String?, 
@@ -14723,7 +14723,7 @@ public struct FfiConverterTypeOidcConfiguration: FfiConverterRustBuffer {
             try OidcConfiguration(
                 clientName: FfiConverterOptionString.read(from: &buf), 
                 redirectUri: FfiConverterString.read(from: &buf), 
-                clientUri: FfiConverterOptionString.read(from: &buf), 
+                clientUri: FfiConverterString.read(from: &buf), 
                 logoUri: FfiConverterOptionString.read(from: &buf), 
                 tosUri: FfiConverterOptionString.read(from: &buf), 
                 policyUri: FfiConverterOptionString.read(from: &buf), 
@@ -14736,7 +14736,7 @@ public struct FfiConverterTypeOidcConfiguration: FfiConverterRustBuffer {
     public static func write(_ value: OidcConfiguration, into buf: inout [UInt8]) {
         FfiConverterOptionString.write(value.clientName, into: &buf)
         FfiConverterString.write(value.redirectUri, into: &buf)
-        FfiConverterOptionString.write(value.clientUri, into: &buf)
+        FfiConverterString.write(value.clientUri, into: &buf)
         FfiConverterOptionString.write(value.logoUri, into: &buf)
         FfiConverterOptionString.write(value.tosUri, into: &buf)
         FfiConverterOptionString.write(value.policyUri, into: &buf)
@@ -18258,7 +18258,7 @@ public struct VirtualElementCallWidgetOptions {
     /**
      * The url to the app.
      *
-     * E.g. <https://call.element.io>, <https://call.element.dev>
+     * E.g. <https://call.element.io>, <https://call.element.dev>, <https://call.element.dev/room>
      */
     public var elementCallUrl: String
     /**
@@ -18308,12 +18308,6 @@ public struct VirtualElementCallWidgetOptions {
      */
     public var appPrompt: Bool?
     /**
-     * Don't show the lobby and join the call immediately.
-     *
-     * Default: `false`
-     */
-    public var skipLobby: Bool?
-    /**
      * Make it not possible to get to the calls list in the webview.
      *
      * Default: `true`
@@ -18324,15 +18318,45 @@ public struct VirtualElementCallWidgetOptions {
      */
     public var font: String?
     /**
-     * Can be used to pass a PostHog id to element call.
-     */
-    public var analyticsId: String?
-    /**
      * The encryption system to use.
      *
      * Use `EncryptionSystem::Unencrypted` to disable encryption.
      */
     public var encryption: EncryptionSystem
+    /**
+     * The intent of showing the call.
+     * If the user wants to start a call or join an existing one.
+     * Controls if the lobby is skipped or not.
+     */
+    public var intent: Intent?
+    /**
+     * Do not show the screenshare button.
+     */
+    public var hideScreensharing: Bool
+    /**
+     * Can be used to pass a PostHog id to element call.
+     */
+    public var posthogUserId: String?
+    /**
+     * The host of the posthog api.
+     */
+    public var posthogApiHost: String?
+    /**
+     * The key for the posthog api.
+     */
+    public var posthogApiKey: String?
+    /**
+     * The url to use for submitting rageshakes.
+     */
+    public var rageshakeSubmitUrl: String?
+    /**
+     * Sentry [DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/)
+     */
+    public var sentryDsn: String?
+    /**
+     * Sentry [environment](https://docs.sentry.io/concepts/key-terms/key-terms/)
+     */
+    public var sentryEnvironment: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -18340,7 +18364,7 @@ public struct VirtualElementCallWidgetOptions {
         /**
          * The url to the app.
          *
-         * E.g. <https://call.element.io>, <https://call.element.dev>
+         * E.g. <https://call.element.io>, <https://call.element.dev>, <https://call.element.dev/room>
          */elementCallUrl: String, 
         /**
          * The widget id.
@@ -18383,11 +18407,6 @@ public struct VirtualElementCallWidgetOptions {
          * Default: `false`
          */appPrompt: Bool?, 
         /**
-         * Don't show the lobby and join the call immediately.
-         *
-         * Default: `false`
-         */skipLobby: Bool?, 
-        /**
          * Make it not possible to get to the calls list in the webview.
          *
          * Default: `true`
@@ -18396,13 +18415,36 @@ public struct VirtualElementCallWidgetOptions {
          * The font to use, to adapt to the system font.
          */font: String?, 
         /**
-         * Can be used to pass a PostHog id to element call.
-         */analyticsId: String?, 
-        /**
          * The encryption system to use.
          *
          * Use `EncryptionSystem::Unencrypted` to disable encryption.
-         */encryption: EncryptionSystem) {
+         */encryption: EncryptionSystem, 
+        /**
+         * The intent of showing the call.
+         * If the user wants to start a call or join an existing one.
+         * Controls if the lobby is skipped or not.
+         */intent: Intent?, 
+        /**
+         * Do not show the screenshare button.
+         */hideScreensharing: Bool, 
+        /**
+         * Can be used to pass a PostHog id to element call.
+         */posthogUserId: String?, 
+        /**
+         * The host of the posthog api.
+         */posthogApiHost: String?, 
+        /**
+         * The key for the posthog api.
+         */posthogApiKey: String?, 
+        /**
+         * The url to use for submitting rageshakes.
+         */rageshakeSubmitUrl: String?, 
+        /**
+         * Sentry [DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/)
+         */sentryDsn: String?, 
+        /**
+         * Sentry [environment](https://docs.sentry.io/concepts/key-terms/key-terms/)
+         */sentryEnvironment: String?) {
         self.elementCallUrl = elementCallUrl
         self.widgetId = widgetId
         self.parentUrl = parentUrl
@@ -18410,11 +18452,17 @@ public struct VirtualElementCallWidgetOptions {
         self.preload = preload
         self.fontScale = fontScale
         self.appPrompt = appPrompt
-        self.skipLobby = skipLobby
         self.confineToRoom = confineToRoom
         self.font = font
-        self.analyticsId = analyticsId
         self.encryption = encryption
+        self.intent = intent
+        self.hideScreensharing = hideScreensharing
+        self.posthogUserId = posthogUserId
+        self.posthogApiHost = posthogApiHost
+        self.posthogApiKey = posthogApiKey
+        self.rageshakeSubmitUrl = rageshakeSubmitUrl
+        self.sentryDsn = sentryDsn
+        self.sentryEnvironment = sentryEnvironment
     }
 }
 
@@ -18443,19 +18491,37 @@ extension VirtualElementCallWidgetOptions: Equatable, Hashable {
         if lhs.appPrompt != rhs.appPrompt {
             return false
         }
-        if lhs.skipLobby != rhs.skipLobby {
-            return false
-        }
         if lhs.confineToRoom != rhs.confineToRoom {
             return false
         }
         if lhs.font != rhs.font {
             return false
         }
-        if lhs.analyticsId != rhs.analyticsId {
+        if lhs.encryption != rhs.encryption {
             return false
         }
-        if lhs.encryption != rhs.encryption {
+        if lhs.intent != rhs.intent {
+            return false
+        }
+        if lhs.hideScreensharing != rhs.hideScreensharing {
+            return false
+        }
+        if lhs.posthogUserId != rhs.posthogUserId {
+            return false
+        }
+        if lhs.posthogApiHost != rhs.posthogApiHost {
+            return false
+        }
+        if lhs.posthogApiKey != rhs.posthogApiKey {
+            return false
+        }
+        if lhs.rageshakeSubmitUrl != rhs.rageshakeSubmitUrl {
+            return false
+        }
+        if lhs.sentryDsn != rhs.sentryDsn {
+            return false
+        }
+        if lhs.sentryEnvironment != rhs.sentryEnvironment {
             return false
         }
         return true
@@ -18469,11 +18535,17 @@ extension VirtualElementCallWidgetOptions: Equatable, Hashable {
         hasher.combine(preload)
         hasher.combine(fontScale)
         hasher.combine(appPrompt)
-        hasher.combine(skipLobby)
         hasher.combine(confineToRoom)
         hasher.combine(font)
-        hasher.combine(analyticsId)
         hasher.combine(encryption)
+        hasher.combine(intent)
+        hasher.combine(hideScreensharing)
+        hasher.combine(posthogUserId)
+        hasher.combine(posthogApiHost)
+        hasher.combine(posthogApiKey)
+        hasher.combine(rageshakeSubmitUrl)
+        hasher.combine(sentryDsn)
+        hasher.combine(sentryEnvironment)
     }
 }
 
@@ -18489,11 +18561,17 @@ public struct FfiConverterTypeVirtualElementCallWidgetOptions: FfiConverterRustB
                 preload: FfiConverterOptionBool.read(from: &buf), 
                 fontScale: FfiConverterOptionDouble.read(from: &buf), 
                 appPrompt: FfiConverterOptionBool.read(from: &buf), 
-                skipLobby: FfiConverterOptionBool.read(from: &buf), 
                 confineToRoom: FfiConverterOptionBool.read(from: &buf), 
                 font: FfiConverterOptionString.read(from: &buf), 
-                analyticsId: FfiConverterOptionString.read(from: &buf), 
-                encryption: FfiConverterTypeEncryptionSystem.read(from: &buf)
+                encryption: FfiConverterTypeEncryptionSystem.read(from: &buf), 
+                intent: FfiConverterOptionTypeIntent.read(from: &buf), 
+                hideScreensharing: FfiConverterBool.read(from: &buf), 
+                posthogUserId: FfiConverterOptionString.read(from: &buf), 
+                posthogApiHost: FfiConverterOptionString.read(from: &buf), 
+                posthogApiKey: FfiConverterOptionString.read(from: &buf), 
+                rageshakeSubmitUrl: FfiConverterOptionString.read(from: &buf), 
+                sentryDsn: FfiConverterOptionString.read(from: &buf), 
+                sentryEnvironment: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -18505,11 +18583,17 @@ public struct FfiConverterTypeVirtualElementCallWidgetOptions: FfiConverterRustB
         FfiConverterOptionBool.write(value.preload, into: &buf)
         FfiConverterOptionDouble.write(value.fontScale, into: &buf)
         FfiConverterOptionBool.write(value.appPrompt, into: &buf)
-        FfiConverterOptionBool.write(value.skipLobby, into: &buf)
         FfiConverterOptionBool.write(value.confineToRoom, into: &buf)
         FfiConverterOptionString.write(value.font, into: &buf)
-        FfiConverterOptionString.write(value.analyticsId, into: &buf)
         FfiConverterTypeEncryptionSystem.write(value.encryption, into: &buf)
+        FfiConverterOptionTypeIntent.write(value.intent, into: &buf)
+        FfiConverterBool.write(value.hideScreensharing, into: &buf)
+        FfiConverterOptionString.write(value.posthogUserId, into: &buf)
+        FfiConverterOptionString.write(value.posthogApiHost, into: &buf)
+        FfiConverterOptionString.write(value.posthogApiKey, into: &buf)
+        FfiConverterOptionString.write(value.rageshakeSubmitUrl, into: &buf)
+        FfiConverterOptionString.write(value.sentryDsn, into: &buf)
+        FfiConverterOptionString.write(value.sentryEnvironment, into: &buf)
     }
 }
 
@@ -21064,6 +21148,72 @@ extension HumanQrLoginError: Foundation.LocalizedError {
         String(reflecting: self)
     }
 }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Defines the intent of showing the call.
+ *
+ * This controls whether to show or skip the lobby.
+ */
+
+public enum Intent {
+    
+    /**
+     * The user wants to start a call.
+     */
+    case startCall
+    /**
+     * The user wants to join an existing call.
+     */
+    case joinExisting
+}
+
+
+public struct FfiConverterTypeIntent: FfiConverterRustBuffer {
+    typealias SwiftType = Intent
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Intent {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .startCall
+        
+        case 2: return .joinExisting
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: Intent, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .startCall:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .joinExisting:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeIntent_lift(_ buf: RustBuffer) throws -> Intent {
+    return try FfiConverterTypeIntent.lift(buf)
+}
+
+public func FfiConverterTypeIntent_lower(_ value: Intent) -> RustBuffer {
+    return FfiConverterTypeIntent.lower(value)
+}
+
+
+
+extension Intent: Equatable, Hashable {}
+
+
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -30511,6 +30661,27 @@ fileprivate struct FfiConverterOptionTypeEventSendState: FfiConverterRustBuffer 
     }
 }
 
+fileprivate struct FfiConverterOptionTypeIntent: FfiConverterRustBuffer {
+    typealias SwiftType = Intent?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeIntent.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeIntent.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeJoinRule: FfiConverterRustBuffer {
     typealias SwiftType = JoinRule?
 
@@ -32189,7 +32360,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roommessageeventcontentwithoutrelation_with_mentions() != 8867) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_abort_oidc_auth() != 6754) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_abort_oidc_auth() != 53440) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_account_data() != 50433) {
@@ -32306,7 +32477,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_email() != 11789) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_oidc_callback() != 35005) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_oidc_callback() != 37848) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_logout() != 42911) {
@@ -32387,7 +32558,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_upload_media() != 51195) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc() != 22103) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc() != 35004) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_user_id() != 40531) {
