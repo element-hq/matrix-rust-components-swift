@@ -4523,6 +4523,11 @@ public protocol NotificationSettingsProtocol : AnyObject {
     func setCallEnabled(enabled: Bool) async throws 
     
     /**
+     * Sets a custom push rule with the given actions and conditions.
+     */
+    func setCustomPushRule(ruleId: String, ruleKind: RuleKind, actions: [Action], conditions: [PushCondition]) async throws 
+    
+    /**
      * Set the default room notification mode
      *
      * # Arguments
@@ -4886,6 +4891,26 @@ open func setCallEnabled(enabled: Bool)async throws  {
                 uniffi_matrix_sdk_ffi_fn_method_notificationsettings_set_call_enabled(
                     self.uniffiClonePointer(),
                     FfiConverterBool.lower(enabled)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeNotificationSettingsError.lift
+        )
+}
+    
+    /**
+     * Sets a custom push rule with the given actions and conditions.
+     */
+open func setCustomPushRule(ruleId: String, ruleKind: RuleKind, actions: [Action], conditions: [PushCondition])async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_notificationsettings_set_custom_push_rule(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(ruleId),FfiConverterTypeRuleKind.lower(ruleKind),FfiConverterSequenceTypeAction.lower(actions),FfiConverterSequenceTypePushCondition.lower(conditions)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -18258,7 +18283,7 @@ public struct VirtualElementCallWidgetOptions {
     /**
      * The url to the app.
      *
-     * E.g. <https://call.element.io>, <https://call.element.dev>, <https://call.element.dev/room>
+     * E.g. <https://call.element.io>, <https://call.element.dev>
      */
     public var elementCallUrl: String
     /**
@@ -18308,6 +18333,12 @@ public struct VirtualElementCallWidgetOptions {
      */
     public var appPrompt: Bool?
     /**
+     * Don't show the lobby and join the call immediately.
+     *
+     * Default: `false`
+     */
+    public var skipLobby: Bool?
+    /**
      * Make it not possible to get to the calls list in the webview.
      *
      * Default: `true`
@@ -18318,45 +18349,15 @@ public struct VirtualElementCallWidgetOptions {
      */
     public var font: String?
     /**
+     * Can be used to pass a PostHog id to element call.
+     */
+    public var analyticsId: String?
+    /**
      * The encryption system to use.
      *
      * Use `EncryptionSystem::Unencrypted` to disable encryption.
      */
     public var encryption: EncryptionSystem
-    /**
-     * The intent of showing the call.
-     * If the user wants to start a call or join an existing one.
-     * Controls if the lobby is skipped or not.
-     */
-    public var intent: Intent?
-    /**
-     * Do not show the screenshare button.
-     */
-    public var hideScreensharing: Bool
-    /**
-     * Can be used to pass a PostHog id to element call.
-     */
-    public var posthogUserId: String?
-    /**
-     * The host of the posthog api.
-     */
-    public var posthogApiHost: String?
-    /**
-     * The key for the posthog api.
-     */
-    public var posthogApiKey: String?
-    /**
-     * The url to use for submitting rageshakes.
-     */
-    public var rageshakeSubmitUrl: String?
-    /**
-     * Sentry [DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/)
-     */
-    public var sentryDsn: String?
-    /**
-     * Sentry [environment](https://docs.sentry.io/concepts/key-terms/key-terms/)
-     */
-    public var sentryEnvironment: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -18364,7 +18365,7 @@ public struct VirtualElementCallWidgetOptions {
         /**
          * The url to the app.
          *
-         * E.g. <https://call.element.io>, <https://call.element.dev>, <https://call.element.dev/room>
+         * E.g. <https://call.element.io>, <https://call.element.dev>
          */elementCallUrl: String, 
         /**
          * The widget id.
@@ -18407,6 +18408,11 @@ public struct VirtualElementCallWidgetOptions {
          * Default: `false`
          */appPrompt: Bool?, 
         /**
+         * Don't show the lobby and join the call immediately.
+         *
+         * Default: `false`
+         */skipLobby: Bool?, 
+        /**
          * Make it not possible to get to the calls list in the webview.
          *
          * Default: `true`
@@ -18415,36 +18421,13 @@ public struct VirtualElementCallWidgetOptions {
          * The font to use, to adapt to the system font.
          */font: String?, 
         /**
+         * Can be used to pass a PostHog id to element call.
+         */analyticsId: String?, 
+        /**
          * The encryption system to use.
          *
          * Use `EncryptionSystem::Unencrypted` to disable encryption.
-         */encryption: EncryptionSystem, 
-        /**
-         * The intent of showing the call.
-         * If the user wants to start a call or join an existing one.
-         * Controls if the lobby is skipped or not.
-         */intent: Intent?, 
-        /**
-         * Do not show the screenshare button.
-         */hideScreensharing: Bool, 
-        /**
-         * Can be used to pass a PostHog id to element call.
-         */posthogUserId: String?, 
-        /**
-         * The host of the posthog api.
-         */posthogApiHost: String?, 
-        /**
-         * The key for the posthog api.
-         */posthogApiKey: String?, 
-        /**
-         * The url to use for submitting rageshakes.
-         */rageshakeSubmitUrl: String?, 
-        /**
-         * Sentry [DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/)
-         */sentryDsn: String?, 
-        /**
-         * Sentry [environment](https://docs.sentry.io/concepts/key-terms/key-terms/)
-         */sentryEnvironment: String?) {
+         */encryption: EncryptionSystem) {
         self.elementCallUrl = elementCallUrl
         self.widgetId = widgetId
         self.parentUrl = parentUrl
@@ -18452,17 +18435,11 @@ public struct VirtualElementCallWidgetOptions {
         self.preload = preload
         self.fontScale = fontScale
         self.appPrompt = appPrompt
+        self.skipLobby = skipLobby
         self.confineToRoom = confineToRoom
         self.font = font
+        self.analyticsId = analyticsId
         self.encryption = encryption
-        self.intent = intent
-        self.hideScreensharing = hideScreensharing
-        self.posthogUserId = posthogUserId
-        self.posthogApiHost = posthogApiHost
-        self.posthogApiKey = posthogApiKey
-        self.rageshakeSubmitUrl = rageshakeSubmitUrl
-        self.sentryDsn = sentryDsn
-        self.sentryEnvironment = sentryEnvironment
     }
 }
 
@@ -18491,37 +18468,19 @@ extension VirtualElementCallWidgetOptions: Equatable, Hashable {
         if lhs.appPrompt != rhs.appPrompt {
             return false
         }
+        if lhs.skipLobby != rhs.skipLobby {
+            return false
+        }
         if lhs.confineToRoom != rhs.confineToRoom {
             return false
         }
         if lhs.font != rhs.font {
             return false
         }
+        if lhs.analyticsId != rhs.analyticsId {
+            return false
+        }
         if lhs.encryption != rhs.encryption {
-            return false
-        }
-        if lhs.intent != rhs.intent {
-            return false
-        }
-        if lhs.hideScreensharing != rhs.hideScreensharing {
-            return false
-        }
-        if lhs.posthogUserId != rhs.posthogUserId {
-            return false
-        }
-        if lhs.posthogApiHost != rhs.posthogApiHost {
-            return false
-        }
-        if lhs.posthogApiKey != rhs.posthogApiKey {
-            return false
-        }
-        if lhs.rageshakeSubmitUrl != rhs.rageshakeSubmitUrl {
-            return false
-        }
-        if lhs.sentryDsn != rhs.sentryDsn {
-            return false
-        }
-        if lhs.sentryEnvironment != rhs.sentryEnvironment {
             return false
         }
         return true
@@ -18535,17 +18494,11 @@ extension VirtualElementCallWidgetOptions: Equatable, Hashable {
         hasher.combine(preload)
         hasher.combine(fontScale)
         hasher.combine(appPrompt)
+        hasher.combine(skipLobby)
         hasher.combine(confineToRoom)
         hasher.combine(font)
+        hasher.combine(analyticsId)
         hasher.combine(encryption)
-        hasher.combine(intent)
-        hasher.combine(hideScreensharing)
-        hasher.combine(posthogUserId)
-        hasher.combine(posthogApiHost)
-        hasher.combine(posthogApiKey)
-        hasher.combine(rageshakeSubmitUrl)
-        hasher.combine(sentryDsn)
-        hasher.combine(sentryEnvironment)
     }
 }
 
@@ -18561,17 +18514,11 @@ public struct FfiConverterTypeVirtualElementCallWidgetOptions: FfiConverterRustB
                 preload: FfiConverterOptionBool.read(from: &buf), 
                 fontScale: FfiConverterOptionDouble.read(from: &buf), 
                 appPrompt: FfiConverterOptionBool.read(from: &buf), 
+                skipLobby: FfiConverterOptionBool.read(from: &buf), 
                 confineToRoom: FfiConverterOptionBool.read(from: &buf), 
                 font: FfiConverterOptionString.read(from: &buf), 
-                encryption: FfiConverterTypeEncryptionSystem.read(from: &buf), 
-                intent: FfiConverterOptionTypeIntent.read(from: &buf), 
-                hideScreensharing: FfiConverterBool.read(from: &buf), 
-                posthogUserId: FfiConverterOptionString.read(from: &buf), 
-                posthogApiHost: FfiConverterOptionString.read(from: &buf), 
-                posthogApiKey: FfiConverterOptionString.read(from: &buf), 
-                rageshakeSubmitUrl: FfiConverterOptionString.read(from: &buf), 
-                sentryDsn: FfiConverterOptionString.read(from: &buf), 
-                sentryEnvironment: FfiConverterOptionString.read(from: &buf)
+                analyticsId: FfiConverterOptionString.read(from: &buf), 
+                encryption: FfiConverterTypeEncryptionSystem.read(from: &buf)
         )
     }
 
@@ -18583,17 +18530,11 @@ public struct FfiConverterTypeVirtualElementCallWidgetOptions: FfiConverterRustB
         FfiConverterOptionBool.write(value.preload, into: &buf)
         FfiConverterOptionDouble.write(value.fontScale, into: &buf)
         FfiConverterOptionBool.write(value.appPrompt, into: &buf)
+        FfiConverterOptionBool.write(value.skipLobby, into: &buf)
         FfiConverterOptionBool.write(value.confineToRoom, into: &buf)
         FfiConverterOptionString.write(value.font, into: &buf)
+        FfiConverterOptionString.write(value.analyticsId, into: &buf)
         FfiConverterTypeEncryptionSystem.write(value.encryption, into: &buf)
-        FfiConverterOptionTypeIntent.write(value.intent, into: &buf)
-        FfiConverterBool.write(value.hideScreensharing, into: &buf)
-        FfiConverterOptionString.write(value.posthogUserId, into: &buf)
-        FfiConverterOptionString.write(value.posthogApiHost, into: &buf)
-        FfiConverterOptionString.write(value.posthogApiKey, into: &buf)
-        FfiConverterOptionString.write(value.rageshakeSubmitUrl, into: &buf)
-        FfiConverterOptionString.write(value.sentryDsn, into: &buf)
-        FfiConverterOptionString.write(value.sentryEnvironment, into: &buf)
     }
 }
 
@@ -18959,6 +18900,73 @@ public func FfiConverterTypeAccountManagementAction_lower(_ value: AccountManage
 
 
 extension AccountManagementAction: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Enum representing the push notification actions for a rule.
+ */
+
+public enum Action {
+    
+    /**
+     * Causes matching events to generate a notification.
+     */
+    case notify
+    /**
+     * Sets an entry in the 'tweaks' dictionary sent to the push gateway.
+     */
+    case setTweak(value: Tweak
+    )
+}
+
+
+public struct FfiConverterTypeAction: FfiConverterRustBuffer {
+    typealias SwiftType = Action
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Action {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .notify
+        
+        case 2: return .setTweak(value: try FfiConverterTypeTweak.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: Action, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .notify:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .setTweak(value):
+            writeInt(&buf, Int32(2))
+            FfiConverterTypeTweak.write(value, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeAction_lift(_ buf: RustBuffer) throws -> Action {
+    return try FfiConverterTypeAction.lift(buf)
+}
+
+public func FfiConverterTypeAction_lower(_ value: Action) -> RustBuffer {
+    return FfiConverterTypeAction.lower(value)
+}
+
+
+
+extension Action: Equatable, Hashable {}
 
 
 
@@ -19487,6 +19495,97 @@ extension ClientError: Foundation.LocalizedError {
         String(reflecting: self)
     }
 }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum ComparisonOperator {
+    
+    /**
+     * Equals
+     */
+    case eq
+    /**
+     * Less than
+     */
+    case lt
+    /**
+     * Greater than
+     */
+    case gt
+    /**
+     * Greater or equal
+     */
+    case ge
+    /**
+     * Less or equal
+     */
+    case le
+}
+
+
+public struct FfiConverterTypeComparisonOperator: FfiConverterRustBuffer {
+    typealias SwiftType = ComparisonOperator
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ComparisonOperator {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .eq
+        
+        case 2: return .lt
+        
+        case 3: return .gt
+        
+        case 4: return .ge
+        
+        case 5: return .le
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ComparisonOperator, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .eq:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .lt:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .gt:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .ge:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .le:
+            writeInt(&buf, Int32(5))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeComparisonOperator_lift(_ buf: RustBuffer) throws -> ComparisonOperator {
+    return try FfiConverterTypeComparisonOperator.lift(buf)
+}
+
+public func FfiConverterTypeComparisonOperator_lower(_ value: ComparisonOperator) -> RustBuffer {
+    return FfiConverterTypeComparisonOperator.lower(value)
+}
+
+
+
+extension ComparisonOperator: Equatable, Hashable {}
+
+
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -21152,72 +21251,6 @@ extension HumanQrLoginError: Foundation.LocalizedError {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
- * Defines the intent of showing the call.
- *
- * This controls whether to show or skip the lobby.
- */
-
-public enum Intent {
-    
-    /**
-     * The user wants to start a call.
-     */
-    case startCall
-    /**
-     * The user wants to join an existing call.
-     */
-    case joinExisting
-}
-
-
-public struct FfiConverterTypeIntent: FfiConverterRustBuffer {
-    typealias SwiftType = Intent
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Intent {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .startCall
-        
-        case 2: return .joinExisting
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: Intent, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case .startCall:
-            writeInt(&buf, Int32(1))
-        
-        
-        case .joinExisting:
-            writeInt(&buf, Int32(2))
-        
-        }
-    }
-}
-
-
-public func FfiConverterTypeIntent_lift(_ buf: RustBuffer) throws -> Intent {
-    return try FfiConverterTypeIntent.lift(buf)
-}
-
-public func FfiConverterTypeIntent_lower(_ value: Intent) -> RustBuffer {
-    return FfiConverterTypeIntent.lower(value)
-}
-
-
-
-extension Intent: Equatable, Hashable {}
-
-
-
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
-/**
  * The rule used for users wishing to join this room.
  */
 
@@ -21345,6 +21378,96 @@ public func FfiConverterTypeJoinRule_lower(_ value: JoinRule) -> RustBuffer {
 
 
 extension JoinRule: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum JsonValue {
+    
+    /**
+     * Represents a `null` value.
+     */
+    case null
+    /**
+     * Represents a boolean.
+     */
+    case bool(value: Bool
+    )
+    /**
+     * Represents an integer.
+     */
+    case integer(value: Int64
+    )
+    /**
+     * Represents a string.
+     */
+    case string(value: String
+    )
+}
+
+
+public struct FfiConverterTypeJsonValue: FfiConverterRustBuffer {
+    typealias SwiftType = JsonValue
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> JsonValue {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .null
+        
+        case 2: return .bool(value: try FfiConverterBool.read(from: &buf)
+        )
+        
+        case 3: return .integer(value: try FfiConverterInt64.read(from: &buf)
+        )
+        
+        case 4: return .string(value: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: JsonValue, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .null:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .bool(value):
+            writeInt(&buf, Int32(2))
+            FfiConverterBool.write(value, into: &buf)
+            
+        
+        case let .integer(value):
+            writeInt(&buf, Int32(3))
+            FfiConverterInt64.write(value, into: &buf)
+            
+        
+        case let .string(value):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(value, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeJsonValue_lift(_ buf: RustBuffer) throws -> JsonValue {
+    return try FfiConverterTypeJsonValue.lift(buf)
+}
+
+public func FfiConverterTypeJsonValue_lower(_ value: JsonValue) -> RustBuffer {
+    return FfiConverterTypeJsonValue.lower(value)
+}
+
+
+
+extension JsonValue: Equatable, Hashable {}
 
 
 
@@ -23492,6 +23615,163 @@ public func FfiConverterTypePublicRoomJoinRule_lower(_ value: PublicRoomJoinRule
 
 
 extension PublicRoomJoinRule: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum PushCondition {
+    
+    /**
+     * A glob pattern match on a field of the event.
+     */
+    case eventMatch(
+        /**
+         * The [dot-separated path] of the property of the event to match.
+         *
+         * [dot-separated path]: https://spec.matrix.org/latest/appendices/#dot-separated-property-paths
+         */key: String, 
+        /**
+         * The glob-style pattern to match against.
+         *
+         * Patterns with no special glob characters should be treated as having
+         * asterisks prepended and appended when testing the condition.
+         */pattern: String
+    )
+    /**
+     * Matches unencrypted messages where `content.body` contains the owner's
+     * display name in that room.
+     */
+    case containsDisplayName
+    /**
+     * Matches the current number of members in the room.
+     */
+    case roomMemberCount(prefix: ComparisonOperator, count: UInt64
+    )
+    /**
+     * Takes into account the current power levels in the room, ensuring the
+     * sender of the event has high enough power to trigger the
+     * notification.
+     */
+    case senderNotificationPermission(
+        /**
+         * The field in the power level event the user needs a minimum power
+         * level for.
+         *
+         * Fields must be specified under the `notifications` property in the
+         * power level event's `content`.
+         */key: String
+    )
+    /**
+     * Exact value match on a property of the event.
+     */
+    case eventPropertyIs(
+        /**
+         * The [dot-separated path] of the property of the event to match.
+         *
+         * [dot-separated path]: https://spec.matrix.org/latest/appendices/#dot-separated-property-paths
+         */key: String, 
+        /**
+         * The value to match against.
+         */value: JsonValue
+    )
+    /**
+     * Exact value match on a value in an array property of the event.
+     */
+    case eventPropertyContains(
+        /**
+         * The [dot-separated path] of the property of the event to match.
+         *
+         * [dot-separated path]: https://spec.matrix.org/latest/appendices/#dot-separated-property-paths
+         */key: String, 
+        /**
+         * The value to match against.
+         */value: JsonValue
+    )
+}
+
+
+public struct FfiConverterTypePushCondition: FfiConverterRustBuffer {
+    typealias SwiftType = PushCondition
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PushCondition {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .eventMatch(key: try FfiConverterString.read(from: &buf), pattern: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .containsDisplayName
+        
+        case 3: return .roomMemberCount(prefix: try FfiConverterTypeComparisonOperator.read(from: &buf), count: try FfiConverterUInt64.read(from: &buf)
+        )
+        
+        case 4: return .senderNotificationPermission(key: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 5: return .eventPropertyIs(key: try FfiConverterString.read(from: &buf), value: try FfiConverterTypeJsonValue.read(from: &buf)
+        )
+        
+        case 6: return .eventPropertyContains(key: try FfiConverterString.read(from: &buf), value: try FfiConverterTypeJsonValue.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: PushCondition, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .eventMatch(key,pattern):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(key, into: &buf)
+            FfiConverterString.write(pattern, into: &buf)
+            
+        
+        case .containsDisplayName:
+            writeInt(&buf, Int32(2))
+        
+        
+        case let .roomMemberCount(prefix,count):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeComparisonOperator.write(prefix, into: &buf)
+            FfiConverterUInt64.write(count, into: &buf)
+            
+        
+        case let .senderNotificationPermission(key):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(key, into: &buf)
+            
+        
+        case let .eventPropertyIs(key,value):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(key, into: &buf)
+            FfiConverterTypeJsonValue.write(value, into: &buf)
+            
+        
+        case let .eventPropertyContains(key,value):
+            writeInt(&buf, Int32(6))
+            FfiConverterString.write(key, into: &buf)
+            FfiConverterTypeJsonValue.write(value, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypePushCondition_lift(_ buf: RustBuffer) throws -> PushCondition {
+    return try FfiConverterTypePushCondition.lift(buf)
+}
+
+public func FfiConverterTypePushCondition_lower(_ value: PushCondition) -> RustBuffer {
+    return FfiConverterTypePushCondition.lower(value)
+}
+
+
+
+extension PushCondition: Equatable, Hashable {}
 
 
 
@@ -25650,6 +25930,107 @@ extension RtcApplicationType: Equatable, Hashable {}
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
+public enum RuleKind {
+    
+    /**
+     * User-configured rules that override all other kinds.
+     */
+    case override
+    /**
+     * Lowest priority user-defined rules.
+     */
+    case underride
+    /**
+     * Sender-specific rules.
+     */
+    case sender
+    /**
+     * Room-specific rules.
+     */
+    case room
+    /**
+     * Content-specific rules.
+     */
+    case content
+    case custom(value: String
+    )
+}
+
+
+public struct FfiConverterTypeRuleKind: FfiConverterRustBuffer {
+    typealias SwiftType = RuleKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RuleKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .override
+        
+        case 2: return .underride
+        
+        case 3: return .sender
+        
+        case 4: return .room
+        
+        case 5: return .content
+        
+        case 6: return .custom(value: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RuleKind, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .override:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .underride:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .sender:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .room:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .content:
+            writeInt(&buf, Int32(5))
+        
+        
+        case let .custom(value):
+            writeInt(&buf, Int32(6))
+            FfiConverterString.write(value, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeRuleKind_lift(_ buf: RustBuffer) throws -> RuleKind {
+    return try FfiConverterTypeRuleKind.lift(buf)
+}
+
+public func FfiConverterTypeRuleKind_lower(_ value: RuleKind) -> RustBuffer {
+    return FfiConverterTypeRuleKind.lower(value)
+}
+
+
+
+extension RuleKind: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 public enum SessionVerificationData {
     
     case emojis(emojis: [SessionVerificationEmoji], indices: Data
@@ -26995,6 +27376,101 @@ public func FfiConverterTypeTimelineItemContent_lower(_ value: TimelineItemConte
     return FfiConverterTypeTimelineItemContent.lower(value)
 }
 
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Enum representing the push notification tweaks for a rule.
+ */
+
+public enum Tweak {
+    
+    /**
+     * A string representing the sound to be played when this notification
+     * arrives.
+     *
+     * A value of "default" means to play a default sound. A device may choose
+     * to alert the user by some other means if appropriate, eg. vibration.
+     */
+    case sound(value: String
+    )
+    /**
+     * A boolean representing whether or not this message should be highlighted
+     * in the UI.
+     */
+    case highlight(value: Bool
+    )
+    /**
+     * A custom tweak
+     */
+    case custom(
+        /**
+         * The name of the custom tweak (`set_tweak` field)
+         */name: String, 
+        /**
+         * The value of the custom tweak as an encoded JSON string
+         */value: String
+    )
+}
+
+
+public struct FfiConverterTypeTweak: FfiConverterRustBuffer {
+    typealias SwiftType = Tweak
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Tweak {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .sound(value: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .highlight(value: try FfiConverterBool.read(from: &buf)
+        )
+        
+        case 3: return .custom(name: try FfiConverterString.read(from: &buf), value: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: Tweak, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .sound(value):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(value, into: &buf)
+            
+        
+        case let .highlight(value):
+            writeInt(&buf, Int32(2))
+            FfiConverterBool.write(value, into: &buf)
+            
+        
+        case let .custom(name,value):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(name, into: &buf)
+            FfiConverterString.write(value, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeTweak_lift(_ buf: RustBuffer) throws -> Tweak {
+    return try FfiConverterTypeTweak.lift(buf)
+}
+
+public func FfiConverterTypeTweak_lower(_ value: Tweak) -> RustBuffer {
+    return FfiConverterTypeTweak.lower(value)
+}
+
+
+
+extension Tweak: Equatable, Hashable {}
 
 
 
@@ -30661,27 +31137,6 @@ fileprivate struct FfiConverterOptionTypeEventSendState: FfiConverterRustBuffer 
     }
 }
 
-fileprivate struct FfiConverterOptionTypeIntent: FfiConverterRustBuffer {
-    typealias SwiftType = Intent?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeIntent.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeIntent.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeJoinRule: FfiConverterRustBuffer {
     typealias SwiftType = JoinRule?
 
@@ -31562,6 +32017,28 @@ fileprivate struct FfiConverterSequenceTypeUserProfile: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeAction: FfiConverterRustBuffer {
+    typealias SwiftType = [Action]
+
+    public static func write(_ value: [Action], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeAction.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Action] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Action]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeAction.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypeAllowRule: FfiConverterRustBuffer {
     typealias SwiftType = [AllowRule]
 
@@ -31645,6 +32122,28 @@ fileprivate struct FfiConverterSequenceTypeOidcPrompt: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeOidcPrompt.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+fileprivate struct FfiConverterSequenceTypePushCondition: FfiConverterRustBuffer {
+    typealias SwiftType = [PushCondition]
+
+    public static func write(_ value: [PushCondition], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypePushCondition.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [PushCondition] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [PushCondition]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypePushCondition.read(from: &buf))
         }
         return seq
     }
@@ -32808,6 +33307,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettings_set_call_enabled() != 16823) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettings_set_custom_push_rule() != 465) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettings_set_default_room_notification_mode() != 9426) {
