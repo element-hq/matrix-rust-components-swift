@@ -17394,14 +17394,21 @@ public func FfiConverterTypeTimelineUniqueId_lower(_ value: TimelineUniqueId) ->
 
 public struct TracingConfiguration {
     /**
-     * The desired log level
+     * The desired log level.
      */
     public var logLevel: LogLevel
     /**
-     * Additional targets that the FFI client would like to use e.g.
-     * the target names for created [`crate::tracing::Span`]
+     * All the log packs, that will be set to `TRACE` when they're enabled.
      */
-    public var extraTargets: [String]?
+    public var traceLogPacks: [TraceLogPacks]
+    /**
+     * Additional targets that the FFI client would like to use.
+     *
+     * This can include, for instance, the target names for created
+     * [`crate::tracing::Span`]. These targets will use the global log level by
+     * default.
+     */
+    public var extraTargets: [String]
     /**
      * Whether to log to stdout, or in the logcat on Android.
      */
@@ -17415,12 +17422,18 @@ public struct TracingConfiguration {
     // declare one manually.
     public init(
         /**
-         * The desired log level
+         * The desired log level.
          */logLevel: LogLevel, 
         /**
-         * Additional targets that the FFI client would like to use e.g.
-         * the target names for created [`crate::tracing::Span`]
-         */extraTargets: [String]?, 
+         * All the log packs, that will be set to `TRACE` when they're enabled.
+         */traceLogPacks: [TraceLogPacks], 
+        /**
+         * Additional targets that the FFI client would like to use.
+         *
+         * This can include, for instance, the target names for created
+         * [`crate::tracing::Span`]. These targets will use the global log level by
+         * default.
+         */extraTargets: [String], 
         /**
          * Whether to log to stdout, or in the logcat on Android.
          */writeToStdoutOrSystem: Bool, 
@@ -17428,6 +17441,7 @@ public struct TracingConfiguration {
          * If set, configures rotated log files where to write additional logs.
          */writeToFiles: TracingFileConfiguration?) {
         self.logLevel = logLevel
+        self.traceLogPacks = traceLogPacks
         self.extraTargets = extraTargets
         self.writeToStdoutOrSystem = writeToStdoutOrSystem
         self.writeToFiles = writeToFiles
@@ -17439,6 +17453,9 @@ public struct TracingConfiguration {
 extension TracingConfiguration: Equatable, Hashable {
     public static func ==(lhs: TracingConfiguration, rhs: TracingConfiguration) -> Bool {
         if lhs.logLevel != rhs.logLevel {
+            return false
+        }
+        if lhs.traceLogPacks != rhs.traceLogPacks {
             return false
         }
         if lhs.extraTargets != rhs.extraTargets {
@@ -17455,6 +17472,7 @@ extension TracingConfiguration: Equatable, Hashable {
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(logLevel)
+        hasher.combine(traceLogPacks)
         hasher.combine(extraTargets)
         hasher.combine(writeToStdoutOrSystem)
         hasher.combine(writeToFiles)
@@ -17467,7 +17485,8 @@ public struct FfiConverterTypeTracingConfiguration: FfiConverterRustBuffer {
         return
             try TracingConfiguration(
                 logLevel: FfiConverterTypeLogLevel.read(from: &buf), 
-                extraTargets: FfiConverterOptionSequenceString.read(from: &buf), 
+                traceLogPacks: FfiConverterSequenceTypeTraceLogPacks.read(from: &buf), 
+                extraTargets: FfiConverterSequenceString.read(from: &buf), 
                 writeToStdoutOrSystem: FfiConverterBool.read(from: &buf), 
                 writeToFiles: FfiConverterOptionTypeTracingFileConfiguration.read(from: &buf)
         )
@@ -17475,7 +17494,8 @@ public struct FfiConverterTypeTracingConfiguration: FfiConverterRustBuffer {
 
     public static func write(_ value: TracingConfiguration, into buf: inout [UInt8]) {
         FfiConverterTypeLogLevel.write(value.logLevel, into: &buf)
-        FfiConverterOptionSequenceString.write(value.extraTargets, into: &buf)
+        FfiConverterSequenceTypeTraceLogPacks.write(value.traceLogPacks, into: &buf)
+        FfiConverterSequenceString.write(value.extraTargets, into: &buf)
         FfiConverterBool.write(value.writeToStdoutOrSystem, into: &buf)
         FfiConverterOptionTypeTracingFileConfiguration.write(value.writeToFiles, into: &buf)
     }
@@ -18281,9 +18301,9 @@ public func FfiConverterTypeVideoMessageContent_lower(_ value: VideoMessageConte
  */
 public struct VirtualElementCallWidgetOptions {
     /**
-     * The url to the app.
+     * The url to the Element Call app including any `/room` path if required.
      *
-     * E.g. <https://call.element.io>, <https://call.element.dev>
+     * E.g. <https://call.element.io>, <https://call.element.dev>, <https://call.element.dev/room>
      */
     public var elementCallUrl: String
     /**
@@ -18333,12 +18353,6 @@ public struct VirtualElementCallWidgetOptions {
      */
     public var appPrompt: Bool?
     /**
-     * Don't show the lobby and join the call immediately.
-     *
-     * Default: `false`
-     */
-    public var skipLobby: Bool?
-    /**
      * Make it not possible to get to the calls list in the webview.
      *
      * Default: `true`
@@ -18349,23 +18363,58 @@ public struct VirtualElementCallWidgetOptions {
      */
     public var font: String?
     /**
-     * Can be used to pass a PostHog id to element call.
-     */
-    public var analyticsId: String?
-    /**
      * The encryption system to use.
      *
      * Use `EncryptionSystem::Unencrypted` to disable encryption.
      */
     public var encryption: EncryptionSystem
+    /**
+     * The intent of showing the call.
+     * If the user wants to start a call or join an existing one.
+     * Controls if the lobby is skipped or not.
+     */
+    public var intent: Intent?
+    /**
+     * Do not show the screenshare button.
+     */
+    public var hideScreensharing: Bool
+    /**
+     * Can be used to pass a PostHog id to element call.
+     */
+    public var posthogUserId: String?
+    /**
+     * The host of the posthog api.
+     * Supported since Element Call v0.9.0. Only used by the embedded package.
+     */
+    public var posthogApiHost: String?
+    /**
+     * The key for the posthog api.
+     * Supported since Element Call v0.9.0. Only used by the embedded package.
+     */
+    public var posthogApiKey: String?
+    /**
+     * The url to use for submitting rageshakes.
+     * Supported since Element Call v0.9.0. Only used by the embedded package.
+     */
+    public var rageshakeSubmitUrl: String?
+    /**
+     * Sentry [DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/)
+     * Supported since Element Call v0.9.0. Only used by the embedded package.
+     */
+    public var sentryDsn: String?
+    /**
+     * Sentry [environment](https://docs.sentry.io/concepts/key-terms/key-terms/)
+     * Supported since Element Call v0.9.0. Only used by the embedded package.
+     */
+    public var sentryEnvironment: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         /**
-         * The url to the app.
+         * The url to the Element Call app including any `/room` path if required.
          *
-         * E.g. <https://call.element.io>, <https://call.element.dev>
+         * E.g. <https://call.element.io>, <https://call.element.dev>, <https://call.element.dev/room>
          */elementCallUrl: String, 
         /**
          * The widget id.
@@ -18408,11 +18457,6 @@ public struct VirtualElementCallWidgetOptions {
          * Default: `false`
          */appPrompt: Bool?, 
         /**
-         * Don't show the lobby and join the call immediately.
-         *
-         * Default: `false`
-         */skipLobby: Bool?, 
-        /**
          * Make it not possible to get to the calls list in the webview.
          *
          * Default: `true`
@@ -18421,13 +18465,41 @@ public struct VirtualElementCallWidgetOptions {
          * The font to use, to adapt to the system font.
          */font: String?, 
         /**
-         * Can be used to pass a PostHog id to element call.
-         */analyticsId: String?, 
-        /**
          * The encryption system to use.
          *
          * Use `EncryptionSystem::Unencrypted` to disable encryption.
-         */encryption: EncryptionSystem) {
+         */encryption: EncryptionSystem, 
+        /**
+         * The intent of showing the call.
+         * If the user wants to start a call or join an existing one.
+         * Controls if the lobby is skipped or not.
+         */intent: Intent?, 
+        /**
+         * Do not show the screenshare button.
+         */hideScreensharing: Bool, 
+        /**
+         * Can be used to pass a PostHog id to element call.
+         */posthogUserId: String?, 
+        /**
+         * The host of the posthog api.
+         * Supported since Element Call v0.9.0. Only used by the embedded package.
+         */posthogApiHost: String?, 
+        /**
+         * The key for the posthog api.
+         * Supported since Element Call v0.9.0. Only used by the embedded package.
+         */posthogApiKey: String?, 
+        /**
+         * The url to use for submitting rageshakes.
+         * Supported since Element Call v0.9.0. Only used by the embedded package.
+         */rageshakeSubmitUrl: String?, 
+        /**
+         * Sentry [DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/)
+         * Supported since Element Call v0.9.0. Only used by the embedded package.
+         */sentryDsn: String?, 
+        /**
+         * Sentry [environment](https://docs.sentry.io/concepts/key-terms/key-terms/)
+         * Supported since Element Call v0.9.0. Only used by the embedded package.
+         */sentryEnvironment: String?) {
         self.elementCallUrl = elementCallUrl
         self.widgetId = widgetId
         self.parentUrl = parentUrl
@@ -18435,11 +18507,17 @@ public struct VirtualElementCallWidgetOptions {
         self.preload = preload
         self.fontScale = fontScale
         self.appPrompt = appPrompt
-        self.skipLobby = skipLobby
         self.confineToRoom = confineToRoom
         self.font = font
-        self.analyticsId = analyticsId
         self.encryption = encryption
+        self.intent = intent
+        self.hideScreensharing = hideScreensharing
+        self.posthogUserId = posthogUserId
+        self.posthogApiHost = posthogApiHost
+        self.posthogApiKey = posthogApiKey
+        self.rageshakeSubmitUrl = rageshakeSubmitUrl
+        self.sentryDsn = sentryDsn
+        self.sentryEnvironment = sentryEnvironment
     }
 }
 
@@ -18468,19 +18546,37 @@ extension VirtualElementCallWidgetOptions: Equatable, Hashable {
         if lhs.appPrompt != rhs.appPrompt {
             return false
         }
-        if lhs.skipLobby != rhs.skipLobby {
-            return false
-        }
         if lhs.confineToRoom != rhs.confineToRoom {
             return false
         }
         if lhs.font != rhs.font {
             return false
         }
-        if lhs.analyticsId != rhs.analyticsId {
+        if lhs.encryption != rhs.encryption {
             return false
         }
-        if lhs.encryption != rhs.encryption {
+        if lhs.intent != rhs.intent {
+            return false
+        }
+        if lhs.hideScreensharing != rhs.hideScreensharing {
+            return false
+        }
+        if lhs.posthogUserId != rhs.posthogUserId {
+            return false
+        }
+        if lhs.posthogApiHost != rhs.posthogApiHost {
+            return false
+        }
+        if lhs.posthogApiKey != rhs.posthogApiKey {
+            return false
+        }
+        if lhs.rageshakeSubmitUrl != rhs.rageshakeSubmitUrl {
+            return false
+        }
+        if lhs.sentryDsn != rhs.sentryDsn {
+            return false
+        }
+        if lhs.sentryEnvironment != rhs.sentryEnvironment {
             return false
         }
         return true
@@ -18494,11 +18590,17 @@ extension VirtualElementCallWidgetOptions: Equatable, Hashable {
         hasher.combine(preload)
         hasher.combine(fontScale)
         hasher.combine(appPrompt)
-        hasher.combine(skipLobby)
         hasher.combine(confineToRoom)
         hasher.combine(font)
-        hasher.combine(analyticsId)
         hasher.combine(encryption)
+        hasher.combine(intent)
+        hasher.combine(hideScreensharing)
+        hasher.combine(posthogUserId)
+        hasher.combine(posthogApiHost)
+        hasher.combine(posthogApiKey)
+        hasher.combine(rageshakeSubmitUrl)
+        hasher.combine(sentryDsn)
+        hasher.combine(sentryEnvironment)
     }
 }
 
@@ -18514,11 +18616,17 @@ public struct FfiConverterTypeVirtualElementCallWidgetOptions: FfiConverterRustB
                 preload: FfiConverterOptionBool.read(from: &buf), 
                 fontScale: FfiConverterOptionDouble.read(from: &buf), 
                 appPrompt: FfiConverterOptionBool.read(from: &buf), 
-                skipLobby: FfiConverterOptionBool.read(from: &buf), 
                 confineToRoom: FfiConverterOptionBool.read(from: &buf), 
                 font: FfiConverterOptionString.read(from: &buf), 
-                analyticsId: FfiConverterOptionString.read(from: &buf), 
-                encryption: FfiConverterTypeEncryptionSystem.read(from: &buf)
+                encryption: FfiConverterTypeEncryptionSystem.read(from: &buf), 
+                intent: FfiConverterOptionTypeIntent.read(from: &buf), 
+                hideScreensharing: FfiConverterBool.read(from: &buf), 
+                posthogUserId: FfiConverterOptionString.read(from: &buf), 
+                posthogApiHost: FfiConverterOptionString.read(from: &buf), 
+                posthogApiKey: FfiConverterOptionString.read(from: &buf), 
+                rageshakeSubmitUrl: FfiConverterOptionString.read(from: &buf), 
+                sentryDsn: FfiConverterOptionString.read(from: &buf), 
+                sentryEnvironment: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -18530,11 +18638,17 @@ public struct FfiConverterTypeVirtualElementCallWidgetOptions: FfiConverterRustB
         FfiConverterOptionBool.write(value.preload, into: &buf)
         FfiConverterOptionDouble.write(value.fontScale, into: &buf)
         FfiConverterOptionBool.write(value.appPrompt, into: &buf)
-        FfiConverterOptionBool.write(value.skipLobby, into: &buf)
         FfiConverterOptionBool.write(value.confineToRoom, into: &buf)
         FfiConverterOptionString.write(value.font, into: &buf)
-        FfiConverterOptionString.write(value.analyticsId, into: &buf)
         FfiConverterTypeEncryptionSystem.write(value.encryption, into: &buf)
+        FfiConverterOptionTypeIntent.write(value.intent, into: &buf)
+        FfiConverterBool.write(value.hideScreensharing, into: &buf)
+        FfiConverterOptionString.write(value.posthogUserId, into: &buf)
+        FfiConverterOptionString.write(value.posthogApiHost, into: &buf)
+        FfiConverterOptionString.write(value.posthogApiKey, into: &buf)
+        FfiConverterOptionString.write(value.rageshakeSubmitUrl, into: &buf)
+        FfiConverterOptionString.write(value.sentryDsn, into: &buf)
+        FfiConverterOptionString.write(value.sentryEnvironment, into: &buf)
     }
 }
 
@@ -21247,6 +21361,72 @@ extension HumanQrLoginError: Foundation.LocalizedError {
         String(reflecting: self)
     }
 }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Defines the intent of showing the call.
+ *
+ * This controls whether to show or skip the lobby.
+ */
+
+public enum Intent {
+    
+    /**
+     * The user wants to start a call.
+     */
+    case startCall
+    /**
+     * The user wants to join an existing call.
+     */
+    case joinExisting
+}
+
+
+public struct FfiConverterTypeIntent: FfiConverterRustBuffer {
+    typealias SwiftType = Intent
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Intent {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .startCall
+        
+        case 2: return .joinExisting
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: Intent, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .startCall:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .joinExisting:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeIntent_lift(_ buf: RustBuffer) throws -> Intent {
+    return try FfiConverterTypeIntent.lift(buf)
+}
+
+public func FfiConverterTypeIntent_lower(_ value: Intent) -> RustBuffer {
+    return FfiConverterTypeIntent.lower(value)
+}
+
+
+
+extension Intent: Equatable, Hashable {}
+
+
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -27382,6 +27562,81 @@ public func FfiConverterTypeTimelineItemContent_lower(_ value: TimelineItemConte
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * A log pack can be used to set the trace log level for a group of multiple
+ * log targets at once, for debugging purposes.
+ */
+
+public enum TraceLogPacks {
+    
+    /**
+     * Enables all the logs relevant to the event cache.
+     */
+    case eventCache
+    /**
+     * Enables all the logs relevant to the send queue.
+     */
+    case sendQueue
+    /**
+     * Enables all the logs relevant to the timeline.
+     */
+    case timeline
+}
+
+
+public struct FfiConverterTypeTraceLogPacks: FfiConverterRustBuffer {
+    typealias SwiftType = TraceLogPacks
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TraceLogPacks {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .eventCache
+        
+        case 2: return .sendQueue
+        
+        case 3: return .timeline
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: TraceLogPacks, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .eventCache:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .sendQueue:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .timeline:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeTraceLogPacks_lift(_ buf: RustBuffer) throws -> TraceLogPacks {
+    return try FfiConverterTypeTraceLogPacks.lift(buf)
+}
+
+public func FfiConverterTypeTraceLogPacks_lower(_ value: TraceLogPacks) -> RustBuffer {
+    return FfiConverterTypeTraceLogPacks.lower(value)
+}
+
+
+
+extension TraceLogPacks: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * Enum representing the push notification tweaks for a rule.
  */
 
@@ -31137,6 +31392,27 @@ fileprivate struct FfiConverterOptionTypeEventSendState: FfiConverterRustBuffer 
     }
 }
 
+fileprivate struct FfiConverterOptionTypeIntent: FfiConverterRustBuffer {
+    typealias SwiftType = Intent?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeIntent.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeIntent.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeJoinRule: FfiConverterRustBuffer {
     typealias SwiftType = JoinRule?
 
@@ -32254,6 +32530,28 @@ fileprivate struct FfiConverterSequenceTypeSlidingSyncVersion: FfiConverterRustB
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeSlidingSyncVersion.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+fileprivate struct FfiConverterSequenceTypeTraceLogPacks: FfiConverterRustBuffer {
+    typealias SwiftType = [TraceLogPacks]
+
+    public static func write(_ value: [TraceLogPacks], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeTraceLogPacks.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [TraceLogPacks] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [TraceLogPacks]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeTraceLogPacks.read(from: &buf))
         }
         return seq
     }
