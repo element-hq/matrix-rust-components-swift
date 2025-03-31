@@ -5607,7 +5607,7 @@ public protocol RoomProtocol : AnyObject {
      */
     func stopLiveLocationShare() async throws 
     
-    func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener)  -> TaskHandle
+    func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener) async throws  -> TaskHandle
     
     /**
      * Subscribes to requests to join this room (knock member events), using a
@@ -7078,12 +7078,21 @@ open func stopLiveLocationShare()async throws  {
         )
 }
     
-open func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener) -> TaskHandle {
-    return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_identity_status_changes(self.uniffiClonePointer(),
-        FfiConverterCallbackInterfaceIdentityStatusChangeListener.lower(listener),$0
-    )
-})
+open func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener)async throws  -> TaskHandle {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_identity_status_changes(
+                    self.uniffiClonePointer(),
+                    FfiConverterCallbackInterfaceIdentityStatusChangeListener.lower(listener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeTaskHandle.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
     /**
@@ -10507,7 +10516,7 @@ public protocol TimelineProtocol : AnyObject {
      */
     func edit(eventOrTransactionId: EventOrTransactionId, newContent: EditedContent) async throws 
     
-    func endPoll(pollStartEventId: String, text: String) throws 
+    func endPoll(pollStartEventId: String, text: String) async throws 
     
     func fetchDetailsForEvent(eventId: String) async throws 
     
@@ -10602,7 +10611,30 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendReadReceipt(receiptType: ReceiptType, eventId: String) async throws 
     
+    /**
+     * Send a reply.
+     *
+     * If the replied to event has a thread relation, it is forwarded on the
+     * reply so that clients that support threads can render the reply
+     * inside the thread.
+     */
     func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String) async throws 
+    
+    /**
+     * Send a message on a thread.
+     *
+     * If the replied to event does not have a thread relation, it becomes the
+     * root of a new thread.
+     *
+     * # Arguments
+     *
+     * * `msg` - Message content to send
+     *
+     * * `event_id` - ID of the event to reply to
+     *
+     * * `is_reply` - Whether the message is a reply on a thread
+     */
+    func sendThreadReply(msg: RoomMessageEventContentWithoutRelation, eventId: String, isReply: Bool) async throws 
     
     func sendVideo(params: UploadParameters, thumbnailPath: String?, videoInfo: VideoInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
     
@@ -10747,12 +10779,21 @@ open func edit(eventOrTransactionId: EventOrTransactionId, newContent: EditedCon
         )
 }
     
-open func endPoll(pollStartEventId: String, text: String)throws  {try rustCallWithError(FfiConverterTypeClientError.lift) {
-    uniffi_matrix_sdk_ffi_fn_method_timeline_end_poll(self.uniffiClonePointer(),
-        FfiConverterString.lower(pollStartEventId),
-        FfiConverterString.lower(text),$0
-    )
-}
+open func endPoll(pollStartEventId: String, text: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_end_poll(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(pollStartEventId),FfiConverterString.lower(text)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func fetchDetailsForEvent(eventId: String)async throws  {
@@ -11075,6 +11116,13 @@ open func sendReadReceipt(receiptType: ReceiptType, eventId: String)async throws
         )
 }
     
+    /**
+     * Send a reply.
+     *
+     * If the replied to event has a thread relation, it is forwarded on the
+     * reply so that clients that support threads can render the reply
+     * inside the thread.
+     */
 open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String)async throws  {
     return
         try  await uniffiRustCallAsync(
@@ -11082,6 +11130,37 @@ open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String
                 uniffi_matrix_sdk_ffi_fn_method_timeline_send_reply(
                     self.uniffiClonePointer(),
                     FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(msg),FfiConverterString.lower(eventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Send a message on a thread.
+     *
+     * If the replied to event does not have a thread relation, it becomes the
+     * root of a new thread.
+     *
+     * # Arguments
+     *
+     * * `msg` - Message content to send
+     *
+     * * `event_id` - ID of the event to reply to
+     *
+     * * `is_reply` - Whether the message is a reply on a thread
+     */
+open func sendThreadReply(msg: RoomMessageEventContentWithoutRelation, eventId: String, isReply: Bool)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_send_thread_reply(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(msg),FfiConverterString.lower(eventId),FfiConverterBool.lower(isReply)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -27813,6 +27892,10 @@ public enum VirtualTimelineItem {
      * The user's own read marker.
      */
     case readMarker
+    /**
+     * The timeline start, that is, the *oldest* event in time for that room.
+     */
+    case timelineStart
 }
 
 
@@ -27827,6 +27910,8 @@ public struct FfiConverterTypeVirtualTimelineItem: FfiConverterRustBuffer {
         )
         
         case 2: return .readMarker
+        
+        case 3: return .timelineStart
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -27843,6 +27928,10 @@ public struct FfiConverterTypeVirtualTimelineItem: FfiConverterRustBuffer {
         
         case .readMarker:
             writeInt(&buf, Int32(2))
+        
+        
+        case .timelineStart:
+            writeInt(&buf, Int32(3))
         
         }
     }
@@ -33862,7 +33951,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_stop_live_location_share() != 19983) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_identity_status_changes() != 14290) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_identity_status_changes() != 8526) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_knock_requests() != 30649) {
@@ -34132,7 +34221,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 42189) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_end_poll() != 61329) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_end_poll() != 32659) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_fetch_details_for_event() != 54068) {
@@ -34186,7 +34275,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_read_receipt() != 37532) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 64747) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 11149) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_thread_reply() != 62758) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 1445) {
