@@ -826,8 +826,20 @@ public protocol ClientProtocol : AnyObject {
     
     /**
      * Restores the client from a `Session`.
+     *
+     * It reloads the entire set of rooms from the previous session.
+     *
+     * If you want to control the amount of rooms to reloads, check
+     * [`Client::restore_session_with`].
      */
     func restoreSession(session: Session) async throws 
+    
+    /**
+     * Restores the client from a `Session`.
+     *
+     * It reloads a set of rooms controlled by [`RoomLoadSettings`].
+     */
+    func restoreSessionWith(session: Session, roomLoadSettings: RoomLoadSettings) async throws 
     
     /**
      * Checks if a room alias exists in the current homeserver.
@@ -1848,6 +1860,11 @@ open func resolveRoomAlias(roomAlias: String)async throws  -> ResolvedRoomAlias?
     
     /**
      * Restores the client from a `Session`.
+     *
+     * It reloads the entire set of rooms from the previous session.
+     *
+     * If you want to control the amount of rooms to reloads, check
+     * [`Client::restore_session_with`].
      */
 open func restoreSession(session: Session)async throws  {
     return
@@ -1856,6 +1873,28 @@ open func restoreSession(session: Session)async throws  {
                 uniffi_matrix_sdk_ffi_fn_method_client_restore_session(
                     self.uniffiClonePointer(),
                     FfiConverterTypeSession.lower(session)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Restores the client from a `Session`.
+     *
+     * It reloads a set of rooms controlled by [`RoomLoadSettings`].
+     */
+open func restoreSessionWith(session: Session, roomLoadSettings: RoomLoadSettings)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_restore_session_with(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeSession.lower(session),FfiConverterTypeRoomLoadSettings.lower(roomLoadSettings)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -2311,8 +2350,6 @@ public protocol ClientBuilderProtocol : AnyObject {
     
     func homeserverUrl(url: String)  -> ClientBuilder
     
-    func passphrase(passphrase: String?)  -> ClientBuilder
-    
     func proxy(url: String)  -> ClientBuilder
     
     /**
@@ -2336,6 +2373,39 @@ public protocol ClientBuilderProtocol : AnyObject {
     func serverNameOrHomeserverUrl(serverNameOrUrl: String)  -> ClientBuilder
     
     /**
+     * Set the cache size for the SQLite stores given to
+     * [`ClientBuilder::session_paths`].
+     *
+     * Each store exposes a SQLite connection. This method controls the cache
+     * size, in **bytes (!)**.
+     *
+     * The cache represents data SQLite holds in memory at once per open
+     * database file. The default cache implementation does not allocate the
+     * full amount of cache memory all at once. Cache memory is allocated
+     * in smaller chunks on an as-needed basis.
+     *
+     * See [`SqliteStoreConfig::cache_size`] to learn more.
+     */
+    func sessionCacheSize(cacheSize: UInt32?)  -> ClientBuilder
+    
+    /**
+     * Set the size limit for the SQLite WAL files of stores given to
+     * [`ClientBuilder::session_paths`].
+     *
+     * Each store uses the WAL journal mode. This method controls the size
+     * limit of the WAL files, in **bytes (!)**.
+     *
+     * See [`SqliteStoreConfig::journal_size_limit`] to learn more.
+     */
+    func sessionJournalSizeLimit(limit: UInt32?)  -> ClientBuilder
+    
+    /**
+     * Set the passphrase for the stores given to
+     * [`ClientBuilder::session_paths`].
+     */
+    func sessionPassphrase(passphrase: String?)  -> ClientBuilder
+    
+    /**
      * Sets the paths that the client will use to store its data and caches.
      * Both paths **must** be unique per session as the SDK stores aren't
      * capable of handling multiple users, however it is valid to use the
@@ -2344,6 +2414,19 @@ public protocol ClientBuilderProtocol : AnyObject {
      * Leaving this unset tells the client to use an in-memory data store.
      */
     func sessionPaths(dataPath: String, cachePath: String)  -> ClientBuilder
+    
+    /**
+     * Set the pool max size for the SQLite stores given to
+     * [`ClientBuilder::session_paths`].
+     *
+     * Each store exposes an async pool of connections. This method controls
+     * the size of the pool. The larger the pool is, the more memory is
+     * consumed, but also the more the app is reactive because it doesn't need
+     * to wait on a pool to be available to run queries.
+     *
+     * See [`SqliteStoreConfig::pool_max_size`] to learn more.
+     */
+    func sessionPoolMaxSize(poolMaxSize: UInt32?)  -> ClientBuilder
     
     func setSessionDelegate(sessionDelegate: ClientSessionDelegate)  -> ClientBuilder
     
@@ -2556,14 +2639,6 @@ open func homeserverUrl(url: String) -> ClientBuilder {
 })
 }
     
-open func passphrase(passphrase: String?) -> ClientBuilder {
-    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_passphrase(self.uniffiClonePointer(),
-        FfiConverterOptionString.lower(passphrase),$0
-    )
-})
-}
-    
 open func proxy(url: String) -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_proxy(self.uniffiClonePointer(),
@@ -2623,6 +2698,57 @@ open func serverNameOrHomeserverUrl(serverNameOrUrl: String) -> ClientBuilder {
 }
     
     /**
+     * Set the cache size for the SQLite stores given to
+     * [`ClientBuilder::session_paths`].
+     *
+     * Each store exposes a SQLite connection. This method controls the cache
+     * size, in **bytes (!)**.
+     *
+     * The cache represents data SQLite holds in memory at once per open
+     * database file. The default cache implementation does not allocate the
+     * full amount of cache memory all at once. Cache memory is allocated
+     * in smaller chunks on an as-needed basis.
+     *
+     * See [`SqliteStoreConfig::cache_size`] to learn more.
+     */
+open func sessionCacheSize(cacheSize: UInt32?) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_session_cache_size(self.uniffiClonePointer(),
+        FfiConverterOptionUInt32.lower(cacheSize),$0
+    )
+})
+}
+    
+    /**
+     * Set the size limit for the SQLite WAL files of stores given to
+     * [`ClientBuilder::session_paths`].
+     *
+     * Each store uses the WAL journal mode. This method controls the size
+     * limit of the WAL files, in **bytes (!)**.
+     *
+     * See [`SqliteStoreConfig::journal_size_limit`] to learn more.
+     */
+open func sessionJournalSizeLimit(limit: UInt32?) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_session_journal_size_limit(self.uniffiClonePointer(),
+        FfiConverterOptionUInt32.lower(limit),$0
+    )
+})
+}
+    
+    /**
+     * Set the passphrase for the stores given to
+     * [`ClientBuilder::session_paths`].
+     */
+open func sessionPassphrase(passphrase: String?) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_session_passphrase(self.uniffiClonePointer(),
+        FfiConverterOptionString.lower(passphrase),$0
+    )
+})
+}
+    
+    /**
      * Sets the paths that the client will use to store its data and caches.
      * Both paths **must** be unique per session as the SDK stores aren't
      * capable of handling multiple users, however it is valid to use the
@@ -2635,6 +2761,25 @@ open func sessionPaths(dataPath: String, cachePath: String) -> ClientBuilder {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_session_paths(self.uniffiClonePointer(),
         FfiConverterString.lower(dataPath),
         FfiConverterString.lower(cachePath),$0
+    )
+})
+}
+    
+    /**
+     * Set the pool max size for the SQLite stores given to
+     * [`ClientBuilder::session_paths`].
+     *
+     * Each store exposes an async pool of connections. This method controls
+     * the size of the pool. The larger the pool is, the more memory is
+     * consumed, but also the more the app is reactive because it doesn't need
+     * to wait on a pool to be available to run queries.
+     *
+     * See [`SqliteStoreConfig::pool_max_size`] to learn more.
+     */
+open func sessionPoolMaxSize(poolMaxSize: UInt32?) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_session_pool_max_size(self.uniffiClonePointer(),
+        FfiConverterOptionUInt32.lower(poolMaxSize),$0
     )
 })
 }
@@ -15386,6 +15531,91 @@ public func FfiConverterTypeReceipt_lower(_ value: Receipt) -> RustBuffer {
 }
 
 
+public struct ReplyParameters {
+    /**
+     * The ID of the event to reply to.
+     */
+    public var eventId: String
+    /**
+     * Whether to enforce a thread relation.
+     */
+    public var enforceThread: Bool
+    /**
+     * If enforcing a threaded relation, whether the message is a reply on a
+     * thread.
+     */
+    public var replyWithinThread: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The ID of the event to reply to.
+         */eventId: String, 
+        /**
+         * Whether to enforce a thread relation.
+         */enforceThread: Bool, 
+        /**
+         * If enforcing a threaded relation, whether the message is a reply on a
+         * thread.
+         */replyWithinThread: Bool) {
+        self.eventId = eventId
+        self.enforceThread = enforceThread
+        self.replyWithinThread = replyWithinThread
+    }
+}
+
+
+
+extension ReplyParameters: Equatable, Hashable {
+    public static func ==(lhs: ReplyParameters, rhs: ReplyParameters) -> Bool {
+        if lhs.eventId != rhs.eventId {
+            return false
+        }
+        if lhs.enforceThread != rhs.enforceThread {
+            return false
+        }
+        if lhs.replyWithinThread != rhs.replyWithinThread {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(eventId)
+        hasher.combine(enforceThread)
+        hasher.combine(replyWithinThread)
+    }
+}
+
+
+public struct FfiConverterTypeReplyParameters: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ReplyParameters {
+        return
+            try ReplyParameters(
+                eventId: FfiConverterString.read(from: &buf), 
+                enforceThread: FfiConverterBool.read(from: &buf), 
+                replyWithinThread: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ReplyParameters, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.eventId, into: &buf)
+        FfiConverterBool.write(value.enforceThread, into: &buf)
+        FfiConverterBool.write(value.replyWithinThread, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeReplyParameters_lift(_ buf: RustBuffer) throws -> ReplyParameters {
+    return try FfiConverterTypeReplyParameters.lift(buf)
+}
+
+public func FfiConverterTypeReplyParameters_lower(_ value: ReplyParameters) -> RustBuffer {
+    return FfiConverterTypeReplyParameters.lower(value)
+}
+
+
 /**
  * The config to use for HTTP requests by default in this client.
  */
@@ -18022,7 +18252,14 @@ public struct UploadParameters {
      * Optional HTML-formatted caption, for clients that support it.
      */
     public var formattedCaption: FormattedBody?
+    /**
+     * Optional intentional mentions to be sent with the media.
+     */
     public var mentions: Mentions?
+    /**
+     * Optional parameters for sending the media as (threaded) reply.
+     */
+    public var replyParams: ReplyParameters?
     /**
      * Should the media be sent with the send queue, or synchronously?
      *
@@ -18041,7 +18278,13 @@ public struct UploadParameters {
          */caption: String?, 
         /**
          * Optional HTML-formatted caption, for clients that support it.
-         */formattedCaption: FormattedBody?, mentions: Mentions?, 
+         */formattedCaption: FormattedBody?, 
+        /**
+         * Optional intentional mentions to be sent with the media.
+         */mentions: Mentions?, 
+        /**
+         * Optional parameters for sending the media as (threaded) reply.
+         */replyParams: ReplyParameters?, 
         /**
          * Should the media be sent with the send queue, or synchronously?
          *
@@ -18051,6 +18294,7 @@ public struct UploadParameters {
         self.caption = caption
         self.formattedCaption = formattedCaption
         self.mentions = mentions
+        self.replyParams = replyParams
         self.useSendQueue = useSendQueue
     }
 }
@@ -18071,6 +18315,9 @@ extension UploadParameters: Equatable, Hashable {
         if lhs.mentions != rhs.mentions {
             return false
         }
+        if lhs.replyParams != rhs.replyParams {
+            return false
+        }
         if lhs.useSendQueue != rhs.useSendQueue {
             return false
         }
@@ -18082,6 +18329,7 @@ extension UploadParameters: Equatable, Hashable {
         hasher.combine(caption)
         hasher.combine(formattedCaption)
         hasher.combine(mentions)
+        hasher.combine(replyParams)
         hasher.combine(useSendQueue)
     }
 }
@@ -18095,6 +18343,7 @@ public struct FfiConverterTypeUploadParameters: FfiConverterRustBuffer {
                 caption: FfiConverterOptionString.read(from: &buf), 
                 formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
                 mentions: FfiConverterOptionTypeMentions.read(from: &buf), 
+                replyParams: FfiConverterOptionTypeReplyParameters.read(from: &buf), 
                 useSendQueue: FfiConverterBool.read(from: &buf)
         )
     }
@@ -18104,6 +18353,7 @@ public struct FfiConverterTypeUploadParameters: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.caption, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
         FfiConverterOptionTypeMentions.write(value.mentions, into: &buf)
+        FfiConverterOptionTypeReplyParameters.write(value.replyParams, into: &buf)
         FfiConverterBool.write(value.useSendQueue, into: &buf)
     }
 }
@@ -24873,6 +25123,8 @@ public enum RoomError {
     
     case InvalidThumbnailData(message: String)
     
+    case InvalidRepliedToEventId(message: String)
+    
     case FailedSendingAttachment(message: String)
     
 }
@@ -24908,7 +25160,11 @@ public struct FfiConverterTypeRoomError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 6: return .FailedSendingAttachment(
+        case 6: return .InvalidRepliedToEventId(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 7: return .FailedSendingAttachment(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -24933,8 +25189,10 @@ public struct FfiConverterTypeRoomError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(4))
         case .InvalidThumbnailData(_ /* message is ignored*/):
             writeInt(&buf, Int32(5))
-        case .FailedSendingAttachment(_ /* message is ignored*/):
+        case .InvalidRepliedToEventId(_ /* message is ignored*/):
             writeInt(&buf, Int32(6))
+        case .FailedSendingAttachment(_ /* message is ignored*/):
+            writeInt(&buf, Int32(7))
 
         
         }
@@ -25718,6 +25976,82 @@ public func FfiConverterTypeRoomListServiceSyncIndicator_lower(_ value: RoomList
 
 
 extension RoomListServiceSyncIndicator: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Configure how many rooms will be restored when restoring the session with
+ * [`Client::restore_session_with`].
+ *
+ * Please, see the documentation of [`matrix_sdk::store::RoomLoadSettings`] to
+ * learn more.
+ */
+
+public enum RoomLoadSettings {
+    
+    /**
+     * Load all rooms from the `StateStore` into the in-memory state store
+     * `BaseStateStore`.
+     */
+    case all
+    /**
+     * Load a single room from the `StateStore` into the in-memory state
+     * store `BaseStateStore`.
+     *
+     * Please, be careful with this option. Read the documentation of
+     * [`RoomLoadSettings`].
+     */
+    case one(roomId: String
+    )
+}
+
+
+public struct FfiConverterTypeRoomLoadSettings: FfiConverterRustBuffer {
+    typealias SwiftType = RoomLoadSettings
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomLoadSettings {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .all
+        
+        case 2: return .one(roomId: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RoomLoadSettings, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .all:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .one(roomId):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(roomId, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeRoomLoadSettings_lift(_ buf: RustBuffer) throws -> RoomLoadSettings {
+    return try FfiConverterTypeRoomLoadSettings.lift(buf)
+}
+
+public func FfiConverterTypeRoomLoadSettings_lower(_ value: RoomLoadSettings) -> RustBuffer {
+    return FfiConverterTypeRoomLoadSettings.lower(value)
+}
+
+
+
+extension RoomLoadSettings: Equatable, Hashable {}
 
 
 
@@ -31208,6 +31542,27 @@ fileprivate struct FfiConverterOptionTypePowerLevels: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeReplyParameters: FfiConverterRustBuffer {
+    typealias SwiftType = ReplyParameters?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeReplyParameters.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeReplyParameters.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeResolvedRoomAlias: FfiConverterRustBuffer {
     typealias SwiftType = ResolvedRoomAlias?
 
@@ -33381,7 +33736,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_resolve_room_alias() != 3551) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_restore_session() != 40455) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_restore_session() != 56125) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_restore_session_with() != 20927) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_room_alias_exists() != 20359) {
@@ -33489,9 +33847,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_homeserver_url() != 28347) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_passphrase() != 14286) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_proxy() != 5659) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -33510,7 +33865,19 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name_or_homeserver_url() != 30022) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_session_cache_size() != 32604) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_session_journal_size_limit() != 21378) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_session_passphrase() != 55403) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_session_paths() != 54230) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_session_pool_max_size() != 6011) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_set_session_delegate() != 8576) {
