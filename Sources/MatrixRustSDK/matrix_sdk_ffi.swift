@@ -2433,6 +2433,17 @@ public protocol ClientBuilderProtocol : AnyObject {
     func slidingSyncVersionBuilder(versionBuilder: SlidingSyncVersionBuilder)  -> ClientBuilder
     
     /**
+     * Tell the client that the system is memory constrained, like in a push
+     * notification process for example.
+     *
+     * So far, at the time of writing (2025-04-07), it changes the defaults of
+     * [`SqliteStoreConfig`], so one might not need to call
+     * [`ClientBuilder::session_cache_size`] and siblings for example. Please
+     * check [`SqliteStoreConfig::with_low_memory_config`].
+     */
+    func systemIsMemoryConstrained()  -> ClientBuilder
+    
+    /**
      * Whether to use the event cache persistent storage or not.
      *
      * This is a temporary feature flag, for testing the event cache's
@@ -2796,6 +2807,22 @@ open func slidingSyncVersionBuilder(versionBuilder: SlidingSyncVersionBuilder) -
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_sliding_sync_version_builder(self.uniffiClonePointer(),
         FfiConverterTypeSlidingSyncVersionBuilder.lower(versionBuilder),$0
+    )
+})
+}
+    
+    /**
+     * Tell the client that the system is memory constrained, like in a push
+     * notification process for example.
+     *
+     * So far, at the time of writing (2025-04-07), it changes the defaults of
+     * [`SqliteStoreConfig`], so one might not need to call
+     * [`ClientBuilder::session_cache_size`] and siblings for example. Please
+     * check [`SqliteStoreConfig::with_low_memory_config`].
+     */
+open func systemIsMemoryConstrained() -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_system_is_memory_constrained(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -10763,23 +10790,7 @@ public protocol TimelineProtocol : AnyObject {
      * reply so that clients that support threads can render the reply
      * inside the thread.
      */
-    func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String) async throws 
-    
-    /**
-     * Send a message on a thread.
-     *
-     * If the replied to event does not have a thread relation, it becomes the
-     * root of a new thread.
-     *
-     * # Arguments
-     *
-     * * `msg` - Message content to send
-     *
-     * * `event_id` - ID of the event to reply to
-     *
-     * * `is_reply` - Whether the message is a reply on a thread
-     */
-    func sendThreadReply(msg: RoomMessageEventContentWithoutRelation, eventId: String, isReply: Bool) async throws 
+    func sendReply(msg: RoomMessageEventContentWithoutRelation, replyParams: ReplyParameters) async throws 
     
     func sendVideo(params: UploadParameters, thumbnailPath: String?, videoInfo: VideoInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
     
@@ -11268,44 +11279,13 @@ open func sendReadReceipt(receiptType: ReceiptType, eventId: String)async throws
      * reply so that clients that support threads can render the reply
      * inside the thread.
      */
-open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String)async throws  {
+open func sendReply(msg: RoomMessageEventContentWithoutRelation, replyParams: ReplyParameters)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_send_reply(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(msg),FfiConverterString.lower(eventId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-    /**
-     * Send a message on a thread.
-     *
-     * If the replied to event does not have a thread relation, it becomes the
-     * root of a new thread.
-     *
-     * # Arguments
-     *
-     * * `msg` - Message content to send
-     *
-     * * `event_id` - ID of the event to reply to
-     *
-     * * `is_reply` - Whether the message is a reply on a thread
-     */
-open func sendThreadReply(msg: RoomMessageEventContentWithoutRelation, eventId: String, isReply: Bool)async throws  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_timeline_send_thread_reply(
-                    self.uniffiClonePointer(),
-                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(msg),FfiConverterString.lower(eventId),FfiConverterBool.lower(isReply)
+                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(msg),FfiConverterTypeReplyParameters.lower(replyParams)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -14861,16 +14841,13 @@ public struct OidcConfiguration {
      */
     public var contacts: [String]?
     /**
-     * Pre-configured registrations for use with issuers that don't support
+     * Pre-configured registrations for use with homeservers that don't support
      * dynamic client registration.
+     *
+     * The keys of the map should be the URLs of the homeservers, but keys
+     * using `issuer` URLs are also supported.
      */
     public var staticRegistrations: [String: String]
-    /**
-     * A file path where any dynamic registrations should be stored.
-     *
-     * Suggested value: `{base_path}/oidc/registrations.json`
-     */
-    public var dynamicRegistrationsFile: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -14898,14 +14875,12 @@ public struct OidcConfiguration {
          * An array of e-mail addresses of people responsible for this client.
          */contacts: [String]?, 
         /**
-         * Pre-configured registrations for use with issuers that don't support
+         * Pre-configured registrations for use with homeservers that don't support
          * dynamic client registration.
-         */staticRegistrations: [String: String], 
-        /**
-         * A file path where any dynamic registrations should be stored.
          *
-         * Suggested value: `{base_path}/oidc/registrations.json`
-         */dynamicRegistrationsFile: String) {
+         * The keys of the map should be the URLs of the homeservers, but keys
+         * using `issuer` URLs are also supported.
+         */staticRegistrations: [String: String]) {
         self.clientName = clientName
         self.redirectUri = redirectUri
         self.clientUri = clientUri
@@ -14914,7 +14889,6 @@ public struct OidcConfiguration {
         self.policyUri = policyUri
         self.contacts = contacts
         self.staticRegistrations = staticRegistrations
-        self.dynamicRegistrationsFile = dynamicRegistrationsFile
     }
 }
 
@@ -14946,9 +14920,6 @@ extension OidcConfiguration: Equatable, Hashable {
         if lhs.staticRegistrations != rhs.staticRegistrations {
             return false
         }
-        if lhs.dynamicRegistrationsFile != rhs.dynamicRegistrationsFile {
-            return false
-        }
         return true
     }
 
@@ -14961,7 +14932,6 @@ extension OidcConfiguration: Equatable, Hashable {
         hasher.combine(policyUri)
         hasher.combine(contacts)
         hasher.combine(staticRegistrations)
-        hasher.combine(dynamicRegistrationsFile)
     }
 }
 
@@ -14977,8 +14947,7 @@ public struct FfiConverterTypeOidcConfiguration: FfiConverterRustBuffer {
                 tosUri: FfiConverterOptionString.read(from: &buf), 
                 policyUri: FfiConverterOptionString.read(from: &buf), 
                 contacts: FfiConverterOptionSequenceString.read(from: &buf), 
-                staticRegistrations: FfiConverterDictionaryStringString.read(from: &buf), 
-                dynamicRegistrationsFile: FfiConverterString.read(from: &buf)
+                staticRegistrations: FfiConverterDictionaryStringString.read(from: &buf)
         )
     }
 
@@ -14991,7 +14960,6 @@ public struct FfiConverterTypeOidcConfiguration: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.policyUri, into: &buf)
         FfiConverterOptionSequenceString.write(value.contacts, into: &buf)
         FfiConverterDictionaryStringString.write(value.staticRegistrations, into: &buf)
-        FfiConverterString.write(value.dynamicRegistrationsFile, into: &buf)
     }
 }
 
@@ -23426,8 +23394,6 @@ public enum OidcError {
     
     case MetadataInvalid(message: String)
     
-    case RegistrationsPathInvalid(message: String)
-    
     case CallbackUrlInvalid(message: String)
     
     case Cancelled(message: String)
@@ -23455,19 +23421,15 @@ public struct FfiConverterTypeOidcError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 3: return .RegistrationsPathInvalid(
+        case 3: return .CallbackUrlInvalid(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 4: return .CallbackUrlInvalid(
+        case 4: return .Cancelled(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 5: return .Cancelled(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 6: return .Generic(
+        case 5: return .Generic(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -23486,14 +23448,12 @@ public struct FfiConverterTypeOidcError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(1))
         case .MetadataInvalid(_ /* message is ignored*/):
             writeInt(&buf, Int32(2))
-        case .RegistrationsPathInvalid(_ /* message is ignored*/):
-            writeInt(&buf, Int32(3))
         case .CallbackUrlInvalid(_ /* message is ignored*/):
-            writeInt(&buf, Int32(4))
+            writeInt(&buf, Int32(3))
         case .Cancelled(_ /* message is ignored*/):
-            writeInt(&buf, Int32(5))
+            writeInt(&buf, Int32(4))
         case .Generic(_ /* message is ignored*/):
-            writeInt(&buf, Int32(6))
+            writeInt(&buf, Int32(5))
 
         
         }
@@ -33886,6 +33846,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_sliding_sync_version_builder() != 39381) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_system_is_memory_constrained() != 6898) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_use_event_cache_persistent_storage() != 58836) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -34642,10 +34605,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_read_receipt() != 37532) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 11149) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_thread_reply() != 62758) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 31468) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 1445) {
