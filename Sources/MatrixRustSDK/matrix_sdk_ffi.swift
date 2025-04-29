@@ -751,6 +751,11 @@ public protocol ClientProtocol : AnyObject {
     func ignoredUsers() async throws  -> [String]
     
     /**
+     * Checks if the server supports the report room API.
+     */
+    func isReportRoomApiSupported() async throws  -> Bool
+    
+    /**
      * Checks if a room alias is not in use yet.
      *
      * Returns:
@@ -1600,6 +1605,26 @@ open func ignoredUsers()async throws  -> [String] {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterSequenceString.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Checks if the server supports the report room API.
+     */
+open func isReportRoomApiSupported()async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_is_report_room_api_supported(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -15060,10 +15085,6 @@ public struct OidcConfiguration {
      */
     public var policyUri: String?
     /**
-     * An array of e-mail addresses of people responsible for this client.
-     */
-    public var contacts: [String]?
-    /**
      * Pre-configured registrations for use with homeservers that don't support
      * dynamic client registration.
      *
@@ -15095,9 +15116,6 @@ public struct OidcConfiguration {
          * A URI that contains the client's privacy policy.
          */policyUri: String?, 
         /**
-         * An array of e-mail addresses of people responsible for this client.
-         */contacts: [String]?, 
-        /**
          * Pre-configured registrations for use with homeservers that don't support
          * dynamic client registration.
          *
@@ -15110,7 +15128,6 @@ public struct OidcConfiguration {
         self.logoUri = logoUri
         self.tosUri = tosUri
         self.policyUri = policyUri
-        self.contacts = contacts
         self.staticRegistrations = staticRegistrations
     }
 }
@@ -15137,9 +15154,6 @@ extension OidcConfiguration: Equatable, Hashable {
         if lhs.policyUri != rhs.policyUri {
             return false
         }
-        if lhs.contacts != rhs.contacts {
-            return false
-        }
         if lhs.staticRegistrations != rhs.staticRegistrations {
             return false
         }
@@ -15153,7 +15167,6 @@ extension OidcConfiguration: Equatable, Hashable {
         hasher.combine(logoUri)
         hasher.combine(tosUri)
         hasher.combine(policyUri)
-        hasher.combine(contacts)
         hasher.combine(staticRegistrations)
     }
 }
@@ -15169,7 +15182,6 @@ public struct FfiConverterTypeOidcConfiguration: FfiConverterRustBuffer {
                 logoUri: FfiConverterOptionString.read(from: &buf), 
                 tosUri: FfiConverterOptionString.read(from: &buf), 
                 policyUri: FfiConverterOptionString.read(from: &buf), 
-                contacts: FfiConverterOptionSequenceString.read(from: &buf), 
                 staticRegistrations: FfiConverterDictionaryStringString.read(from: &buf)
         )
     }
@@ -15181,7 +15193,6 @@ public struct FfiConverterTypeOidcConfiguration: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.logoUri, into: &buf)
         FfiConverterOptionString.write(value.tosUri, into: &buf)
         FfiConverterOptionString.write(value.policyUri, into: &buf)
-        FfiConverterOptionSequenceString.write(value.contacts, into: &buf)
         FfiConverterDictionaryStringString.write(value.staticRegistrations, into: &buf)
     }
 }
@@ -28655,6 +28666,11 @@ public enum WidgetEventFilter {
      */
     case stateWithTypeAndStateKey(eventType: String, stateKey: String
     )
+    /**
+     * Matches ToDevice events with the given `type`.
+     */
+    case toDeviceWithType(eventType: String
+    )
 }
 
 
@@ -28675,6 +28691,9 @@ public struct FfiConverterTypeWidgetEventFilter: FfiConverterRustBuffer {
         )
         
         case 4: return .stateWithTypeAndStateKey(eventType: try FfiConverterString.read(from: &buf), stateKey: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 5: return .toDeviceWithType(eventType: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -28704,6 +28723,11 @@ public struct FfiConverterTypeWidgetEventFilter: FfiConverterRustBuffer {
             writeInt(&buf, Int32(4))
             FfiConverterString.write(eventType, into: &buf)
             FfiConverterString.write(stateKey, into: &buf)
+            
+        
+        case let .toDeviceWithType(eventType):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(eventType, into: &buf)
             
         }
     }
@@ -34060,6 +34084,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_ignored_users() != 49620) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_report_room_api_supported() != 17934) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_is_room_alias_available() != 23322) {
