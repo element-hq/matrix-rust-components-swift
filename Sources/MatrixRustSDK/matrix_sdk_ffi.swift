@@ -18457,9 +18457,9 @@ public func FfiConverterTypeUnstableVoiceContent_lower(_ value: UnstableVoiceCon
 
 public struct UploadParameters {
     /**
-     * Filename (previously called "url") for the media to be sent.
+     * Source from which to upload data
      */
-    public var filename: String
+    public var source: UploadSource
     /**
      * Optional non-formatted caption, for clients that support it.
      */
@@ -18487,8 +18487,8 @@ public struct UploadParameters {
     // declare one manually.
     public init(
         /**
-         * Filename (previously called "url") for the media to be sent.
-         */filename: String, 
+         * Source from which to upload data
+         */source: UploadSource, 
         /**
          * Optional non-formatted caption, for clients that support it.
          */caption: String?, 
@@ -18506,7 +18506,7 @@ public struct UploadParameters {
          *
          * Watching progress only works with the synchronous method, at the moment.
          */useSendQueue: Bool) {
-        self.filename = filename
+        self.source = source
         self.caption = caption
         self.formattedCaption = formattedCaption
         self.mentions = mentions
@@ -18519,7 +18519,7 @@ public struct UploadParameters {
 
 extension UploadParameters: Equatable, Hashable {
     public static func ==(lhs: UploadParameters, rhs: UploadParameters) -> Bool {
-        if lhs.filename != rhs.filename {
+        if lhs.source != rhs.source {
             return false
         }
         if lhs.caption != rhs.caption {
@@ -18541,7 +18541,7 @@ extension UploadParameters: Equatable, Hashable {
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(filename)
+        hasher.combine(source)
         hasher.combine(caption)
         hasher.combine(formattedCaption)
         hasher.combine(mentions)
@@ -18555,7 +18555,7 @@ public struct FfiConverterTypeUploadParameters: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UploadParameters {
         return
             try UploadParameters(
-                filename: FfiConverterString.read(from: &buf), 
+                source: FfiConverterTypeUploadSource.read(from: &buf), 
                 caption: FfiConverterOptionString.read(from: &buf), 
                 formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
                 mentions: FfiConverterOptionTypeMentions.read(from: &buf), 
@@ -18565,7 +18565,7 @@ public struct FfiConverterTypeUploadParameters: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: UploadParameters, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.filename, into: &buf)
+        FfiConverterTypeUploadSource.write(value.source, into: &buf)
         FfiConverterOptionString.write(value.caption, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
         FfiConverterOptionTypeMentions.write(value.mentions, into: &buf)
@@ -28496,6 +28496,86 @@ extension Tweak: Equatable, Hashable {}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * A source for uploading a file
+ */
+
+public enum UploadSource {
+    
+    /**
+     * Upload source is a file on disk
+     */
+    case file(
+        /**
+         * Path to file
+         */filename: String
+    )
+    /**
+     * Upload source is data in memory
+     */
+    case data(
+        /**
+         * Bytes being uploaded
+         */bytes: Data, 
+        /**
+         * Filename to associate with bytes
+         */filename: String
+    )
+}
+
+
+public struct FfiConverterTypeUploadSource: FfiConverterRustBuffer {
+    typealias SwiftType = UploadSource
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UploadSource {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .file(filename: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .data(bytes: try FfiConverterData.read(from: &buf), filename: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: UploadSource, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .file(filename):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(filename, into: &buf)
+            
+        
+        case let .data(bytes,filename):
+            writeInt(&buf, Int32(2))
+            FfiConverterData.write(bytes, into: &buf)
+            FfiConverterString.write(filename, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeUploadSource_lift(_ buf: RustBuffer) throws -> UploadSource {
+    return try FfiConverterTypeUploadSource.lift(buf)
+}
+
+public func FfiConverterTypeUploadSource_lower(_ value: UploadSource) -> RustBuffer {
+    return FfiConverterTypeUploadSource.lower(value)
+}
+
+
+
+extension UploadSource: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum VerificationState {
     
@@ -28666,11 +28746,6 @@ public enum WidgetEventFilter {
      */
     case stateWithTypeAndStateKey(eventType: String, stateKey: String
     )
-    /**
-     * Matches ToDevice events with the given `type`.
-     */
-    case toDeviceWithType(eventType: String
-    )
 }
 
 
@@ -28691,9 +28766,6 @@ public struct FfiConverterTypeWidgetEventFilter: FfiConverterRustBuffer {
         )
         
         case 4: return .stateWithTypeAndStateKey(eventType: try FfiConverterString.read(from: &buf), stateKey: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 5: return .toDeviceWithType(eventType: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -28723,11 +28795,6 @@ public struct FfiConverterTypeWidgetEventFilter: FfiConverterRustBuffer {
             writeInt(&buf, Int32(4))
             FfiConverterString.write(eventType, into: &buf)
             FfiConverterString.write(stateKey, into: &buf)
-            
-        
-        case let .toDeviceWithType(eventType):
-            writeInt(&buf, Int32(5))
-            FfiConverterString.write(eventType, into: &buf)
             
         }
     }
