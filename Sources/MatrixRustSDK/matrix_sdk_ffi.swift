@@ -28768,6 +28768,11 @@ public enum WidgetEventFilter {
      */
     case stateWithTypeAndStateKey(eventType: String, stateKey: String
     )
+    /**
+     * Matches to-device events with the given `event_type`.
+     */
+    case toDevice(eventType: String
+    )
 }
 
 
@@ -28788,6 +28793,9 @@ public struct FfiConverterTypeWidgetEventFilter: FfiConverterRustBuffer {
         )
         
         case 4: return .stateWithTypeAndStateKey(eventType: try FfiConverterString.read(from: &buf), stateKey: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 5: return .toDevice(eventType: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -28817,6 +28825,11 @@ public struct FfiConverterTypeWidgetEventFilter: FfiConverterRustBuffer {
             writeInt(&buf, Int32(4))
             FfiConverterString.write(eventType, into: &buf)
             FfiConverterString.write(stateKey, into: &buf)
+            
+        
+        case let .toDevice(eventType):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(eventType, into: &buf)
             
         }
     }
