@@ -4520,6 +4520,14 @@ public protocol NotificationClientProtocol : AnyObject {
      */
     func getNotification(roomId: String, eventId: String) async throws  -> NotificationItem?
     
+    /**
+     * Fetches a room by its ID using the in-memory state store backed client.
+     *
+     * Useful to retrieve room information after running the limited
+     * notification client sliding sync loop.
+     */
+    func getRoom(roomId: String) throws  -> Room?
+    
 }
 
 open class NotificationClient:
@@ -4582,6 +4590,20 @@ open func getNotification(roomId: String, eventId: String)async throws  -> Notif
             liftFunc: FfiConverterOptionTypeNotificationItem.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
+}
+    
+    /**
+     * Fetches a room by its ID using the in-memory state store backed client.
+     *
+     * Useful to retrieve room information after running the limited
+     * notification client sliding sync loop.
+     */
+open func getRoom(roomId: String)throws  -> Room? {
+    return try  FfiConverterOptionTypeRoom.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_notificationclient_get_room(self.uniffiClonePointer(),
+        FfiConverterString.lower(roomId),$0
+    )
+})
 }
     
 
@@ -34481,6 +34503,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_notification() != 2524) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_room() != 26581) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettings_can_homeserver_push_encrypted_event_to_device() != 37323) {
