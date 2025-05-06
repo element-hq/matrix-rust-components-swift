@@ -4,10 +4,10 @@ import Foundation
 
 @main
 struct Release: AsyncParsableCommand {
-    @Option(help: "The version of the package that is being released.")
+    @Option(help: "An optional build number that will be appended to the generated version (e.g. 25.12.31-123). This option is ignored when a custom version is specified.")
     var buildNumber: Int? = nil
     
-    @Option(help: "A custom version to use instead of generating a calendar version.")
+    @Option(help: "A custom version to use instead of generating a calendar version. This option takes precedence over --build-number.")
     var customVersion: String? = nil
     
     var version: String {
