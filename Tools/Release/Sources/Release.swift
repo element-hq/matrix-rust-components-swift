@@ -5,7 +5,14 @@ import Foundation
 @main
 struct Release: AsyncParsableCommand {
     @Option(help: "The version of the package that is being released.")
-    var version: String
+    var buildNumber: Int? = nil
+    
+    @Option(help: "A custom version to use instead of generating a calendar version.")
+    var customVersion: String? = nil
+    
+    var version: String {
+        customVersion ?? Date.now.calendarVersion(buildNumber: buildNumber)
+    }
     
     @Flag(help: "Prevents the run from pushing anything to GitHub.")
     var localOnly = false
