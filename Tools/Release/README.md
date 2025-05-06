@@ -5,7 +5,7 @@ Creates a Github release from a matrix-rust-sdk repository.
 
 Usage:
 ```
-swift run release    # e.g. version 25.12.31
+swift run release    # will use a generated calver e.g. 25.12.31
 ```
 
 For help (including how to customise the version): `swift run release --help`
