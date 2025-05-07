@@ -5337,6 +5337,15 @@ public func FfiConverterTypeNotificationSettings_lower(_ value: NotificationSett
  */
 public protocol QrCodeDataProtocol : AnyObject {
     
+    /**
+     * The server name contained within the scanned QR code data.
+     *
+     * Note: This value is only present when scanning a QR code the belongs to
+     * a logged in client. The mode where the new client shows the QR code
+     * will return `None`.
+     */
+    func serverName()  -> String?
+    
 }
 
 /**
@@ -5398,6 +5407,20 @@ public static func fromBytes(bytes: Data)throws  -> QrCodeData {
 }
     
 
+    
+    /**
+     * The server name contained within the scanned QR code data.
+     *
+     * Note: This value is only present when scanning a QR code the belongs to
+     * a logged in client. The mode where the new client shows the QR code
+     * will return `None`.
+     */
+open func serverName() -> String? {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_qrcodedata_server_name(self.uniffiClonePointer(),$0
+    )
+})
+}
     
 
 }
@@ -28768,11 +28791,6 @@ public enum WidgetEventFilter {
      */
     case stateWithTypeAndStateKey(eventType: String, stateKey: String
     )
-    /**
-     * Matches to-device events with the given `event_type`.
-     */
-    case toDevice(eventType: String
-    )
 }
 
 
@@ -28793,9 +28811,6 @@ public struct FfiConverterTypeWidgetEventFilter: FfiConverterRustBuffer {
         )
         
         case 4: return .stateWithTypeAndStateKey(eventType: try FfiConverterString.read(from: &buf), stateKey: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 5: return .toDevice(eventType: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -28825,11 +28840,6 @@ public struct FfiConverterTypeWidgetEventFilter: FfiConverterRustBuffer {
             writeInt(&buf, Int32(4))
             FfiConverterString.write(eventType, into: &buf)
             FfiConverterString.write(stateKey, into: &buf)
-            
-        
-        case let .toDevice(eventType):
-            writeInt(&buf, Int32(5))
-            FfiConverterString.write(eventType, into: &buf)
             
         }
     }
@@ -34582,6 +34592,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettings_unmute_room() != 47580) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_qrcodedata_server_name() != 30173) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_active_members_count() != 61905) {
