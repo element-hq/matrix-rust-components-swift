@@ -941,8 +941,15 @@ public protocol ClientProtocol : AnyObject {
      * * `prompt` - The desired user experience in the web UI. No value means
      * that the user wishes to login into an existing account, and a value of
      * `Create` means that the user wishes to register a new account.
+     *
+     * * `login_hint` - A generic login hint that an identity provider can use
+     * to pre-fill the login form. The format of this hint is not restricted
+     * by the spec as external providers all have their own way to handle the hint.
+     * However, it should be noted that when providing a user ID as a hint
+     * for MAS (with no upstream provider), then the format to use is defined
+     * by [MSC4198]: https://github.com/matrix-org/matrix-spec-proposals/pull/4198
      */
-    func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?) async throws  -> OAuthAuthorizationData
+    func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?, loginHint: String?) async throws  -> OAuthAuthorizationData
     
     func userId() throws  -> String
     
@@ -2238,14 +2245,21 @@ open func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWat
      * * `prompt` - The desired user experience in the web UI. No value means
      * that the user wishes to login into an existing account, and a value of
      * `Create` means that the user wishes to register a new account.
+     *
+     * * `login_hint` - A generic login hint that an identity provider can use
+     * to pre-fill the login form. The format of this hint is not restricted
+     * by the spec as external providers all have their own way to handle the hint.
+     * However, it should be noted that when providing a user ID as a hint
+     * for MAS (with no upstream provider), then the format to use is defined
+     * by [MSC4198]: https://github.com/matrix-org/matrix-spec-proposals/pull/4198
      */
-open func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?)async throws  -> OAuthAuthorizationData {
+open func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?, loginHint: String?)async throws  -> OAuthAuthorizationData {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_url_for_oidc(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeOidcConfiguration.lower(oidcConfiguration),FfiConverterOptionTypeOidcPrompt.lower(prompt)
+                    FfiConverterTypeOidcConfiguration.lower(oidcConfiguration),FfiConverterOptionTypeOidcPrompt.lower(prompt),FfiConverterOptionString.lower(loginHint)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
@@ -34303,7 +34317,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_upload_media() != 51195) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc() != 35004) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc() != 28386) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_user_id() != 40531) {
