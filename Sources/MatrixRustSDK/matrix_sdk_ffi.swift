@@ -904,6 +904,16 @@ public protocol ClientProtocol : AnyObject {
     func setDisplayName(name: String) async throws 
     
     /**
+     * Get the media previews timeline display policy
+     */
+    func setInviteAvatarsDisplayPolicy(policy: InviteAvatars) async throws 
+    
+    /**
+     * Set the media previews timeline display policy
+     */
+    func setMediaPreviewDisplayPolicy(policy: MediaPreviews) async throws 
+    
+    /**
      * Set the media retention policy.
      */
     func setMediaRetentionPolicy(policy: MediaRetentionPolicy) async throws 
@@ -924,6 +934,11 @@ public protocol ClientProtocol : AnyObject {
     func startSsoLogin(redirectUrl: String, idpId: String?) async throws  -> SsoHandler
     
     func subscribeToIgnoredUsers(listener: IgnoredUsersListener)  -> TaskHandle
+    
+    /**
+     * Subscribe to changes in the media preview configuration.
+     */
+    func subscribeToMediaPreviewConfig(listener: MediaPreviewConfigListener) async throws  -> TaskHandle
     
     /**
      * Subscribe to the global enablement status of the send queue, at the
@@ -2114,6 +2129,46 @@ open func setDisplayName(name: String)async throws  {
 }
     
     /**
+     * Get the media previews timeline display policy
+     */
+open func setInviteAvatarsDisplayPolicy(policy: InviteAvatars)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_set_invite_avatars_display_policy(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeInviteAvatars.lower(policy)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Set the media previews timeline display policy
+     */
+open func setMediaPreviewDisplayPolicy(policy: MediaPreviews)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_set_media_preview_display_policy(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeMediaPreviews.lower(policy)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
      * Set the media retention policy.
      */
 open func setMediaRetentionPolicy(policy: MediaRetentionPolicy)async throws  {
@@ -2189,6 +2244,26 @@ open func subscribeToIgnoredUsers(listener: IgnoredUsersListener) -> TaskHandle 
         FfiConverterCallbackInterfaceIgnoredUsersListener.lower(listener),$0
     )
 })
+}
+    
+    /**
+     * Subscribe to changes in the media preview configuration.
+     */
+open func subscribeToMediaPreviewConfig(listener: MediaPreviewConfigListener)async throws  -> TaskHandle {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_media_preview_config(
+                    self.uniffiClonePointer(),
+                    FfiConverterCallbackInterfaceMediaPreviewConfigListener.lower(listener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeTaskHandle.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
     /**
@@ -14812,6 +14887,81 @@ public func FfiConverterTypeMatrixEntity_lower(_ value: MatrixEntity) -> RustBuf
 }
 
 
+/**
+ * The content of an `m.media_preview_config` event.
+ *
+ * Is also the content of the unstable
+ * `io.element.msc4278.media_preview_config`.
+ */
+public struct MediaPreviewConfig {
+    /**
+     * The media previews setting for the user.
+     */
+    public var mediaPreviews: MediaPreviews
+    /**
+     * The invite avatars setting for the user.
+     */
+    public var inviteAvatars: InviteAvatars
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The media previews setting for the user.
+         */mediaPreviews: MediaPreviews, 
+        /**
+         * The invite avatars setting for the user.
+         */inviteAvatars: InviteAvatars) {
+        self.mediaPreviews = mediaPreviews
+        self.inviteAvatars = inviteAvatars
+    }
+}
+
+
+
+extension MediaPreviewConfig: Equatable, Hashable {
+    public static func ==(lhs: MediaPreviewConfig, rhs: MediaPreviewConfig) -> Bool {
+        if lhs.mediaPreviews != rhs.mediaPreviews {
+            return false
+        }
+        if lhs.inviteAvatars != rhs.inviteAvatars {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(mediaPreviews)
+        hasher.combine(inviteAvatars)
+    }
+}
+
+
+public struct FfiConverterTypeMediaPreviewConfig: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MediaPreviewConfig {
+        return
+            try MediaPreviewConfig(
+                mediaPreviews: FfiConverterTypeMediaPreviews.read(from: &buf), 
+                inviteAvatars: FfiConverterTypeInviteAvatars.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MediaPreviewConfig, into buf: inout [UInt8]) {
+        FfiConverterTypeMediaPreviews.write(value.mediaPreviews, into: &buf)
+        FfiConverterTypeInviteAvatars.write(value.inviteAvatars, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeMediaPreviewConfig_lift(_ buf: RustBuffer) throws -> MediaPreviewConfig {
+    return try FfiConverterTypeMediaPreviewConfig.lift(buf)
+}
+
+public func FfiConverterTypeMediaPreviewConfig_lower(_ value: MediaPreviewConfig) -> RustBuffer {
+    return FfiConverterTypeMediaPreviewConfig.lower(value)
+}
+
+
 public struct Mentions {
     public var userIds: [String]
     public var room: Bool
@@ -19995,6 +20145,11 @@ public struct VirtualElementCallWidgetOptions {
      * Supported since Element Call v0.9.0. Only used by the embedded package.
      */
     public var sentryEnvironment: String?
+    /**
+     * - `false`: the webview shows a a list of devices injected by the
+     * client. (used on ios & android)
+     */
+    public var controlledMediaDevices: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -20087,7 +20242,11 @@ public struct VirtualElementCallWidgetOptions {
         /**
          * Sentry [environment](https://docs.sentry.io/concepts/key-terms/key-terms/)
          * Supported since Element Call v0.9.0. Only used by the embedded package.
-         */sentryEnvironment: String?) {
+         */sentryEnvironment: String?, 
+        /**
+         * - `false`: the webview shows a a list of devices injected by the
+         * client. (used on ios & android)
+         */controlledMediaDevices: Bool) {
         self.elementCallUrl = elementCallUrl
         self.widgetId = widgetId
         self.parentUrl = parentUrl
@@ -20106,6 +20265,7 @@ public struct VirtualElementCallWidgetOptions {
         self.rageshakeSubmitUrl = rageshakeSubmitUrl
         self.sentryDsn = sentryDsn
         self.sentryEnvironment = sentryEnvironment
+        self.controlledMediaDevices = controlledMediaDevices
     }
 }
 
@@ -20167,6 +20327,9 @@ extension VirtualElementCallWidgetOptions: Equatable, Hashable {
         if lhs.sentryEnvironment != rhs.sentryEnvironment {
             return false
         }
+        if lhs.controlledMediaDevices != rhs.controlledMediaDevices {
+            return false
+        }
         return true
     }
 
@@ -20189,6 +20352,7 @@ extension VirtualElementCallWidgetOptions: Equatable, Hashable {
         hasher.combine(rageshakeSubmitUrl)
         hasher.combine(sentryDsn)
         hasher.combine(sentryEnvironment)
+        hasher.combine(controlledMediaDevices)
     }
 }
 
@@ -20214,7 +20378,8 @@ public struct FfiConverterTypeVirtualElementCallWidgetOptions: FfiConverterRustB
                 posthogApiKey: FfiConverterOptionString.read(from: &buf), 
                 rageshakeSubmitUrl: FfiConverterOptionString.read(from: &buf), 
                 sentryDsn: FfiConverterOptionString.read(from: &buf), 
-                sentryEnvironment: FfiConverterOptionString.read(from: &buf)
+                sentryEnvironment: FfiConverterOptionString.read(from: &buf), 
+                controlledMediaDevices: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -20237,6 +20402,7 @@ public struct FfiConverterTypeVirtualElementCallWidgetOptions: FfiConverterRustB
         FfiConverterOptionString.write(value.rageshakeSubmitUrl, into: &buf)
         FfiConverterOptionString.write(value.sentryDsn, into: &buf)
         FfiConverterOptionString.write(value.sentryEnvironment, into: &buf)
+        FfiConverterBool.write(value.controlledMediaDevices, into: &buf)
     }
 }
 
@@ -23286,6 +23452,70 @@ extension Intent: Equatable, Hashable {}
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * The policy that decides if avatars should be shown in invite requests.
+ */
+
+public enum InviteAvatars {
+    
+    /**
+     * Always show avatars in invite requests.
+     */
+    case on
+    /**
+     * Never show avatars in invite requests.
+     */
+    case off
+}
+
+
+public struct FfiConverterTypeInviteAvatars: FfiConverterRustBuffer {
+    typealias SwiftType = InviteAvatars
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> InviteAvatars {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .on
+        
+        case 2: return .off
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: InviteAvatars, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .on:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .off:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeInviteAvatars_lift(_ buf: RustBuffer) throws -> InviteAvatars {
+    return try FfiConverterTypeInviteAvatars.lift(buf)
+}
+
+public func FfiConverterTypeInviteAvatars_lower(_ value: InviteAvatars) -> RustBuffer {
+    return FfiConverterTypeInviteAvatars.lower(value)
+}
+
+
+
+extension InviteAvatars: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * The rule used for users wishing to join this room.
  */
 
@@ -23791,6 +24021,80 @@ extension MediaInfoError: Foundation.LocalizedError {
         String(reflecting: self)
     }
 }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The policy that decides if media previews should be shown in the timeline.
+ */
+
+public enum MediaPreviews {
+    
+    /**
+     * Always show media previews in the timeline.
+     */
+    case on
+    /**
+     * Show media previews in the timeline only if the room is private.
+     */
+    case `private`
+    /**
+     * Never show media previews in the timeline.
+     */
+    case off
+}
+
+
+public struct FfiConverterTypeMediaPreviews: FfiConverterRustBuffer {
+    typealias SwiftType = MediaPreviews
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MediaPreviews {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .on
+        
+        case 2: return .`private`
+        
+        case 3: return .off
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MediaPreviews, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .on:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .`private`:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .off:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeMediaPreviews_lift(_ buf: RustBuffer) throws -> MediaPreviews {
+    return try FfiConverterTypeMediaPreviews.lift(buf)
+}
+
+public func FfiConverterTypeMediaPreviews_lower(_ value: MediaPreviews) -> RustBuffer {
+    return FfiConverterTypeMediaPreviews.lower(value)
+}
+
+
+
+extension MediaPreviews: Equatable, Hashable {}
+
+
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -31405,6 +31709,87 @@ extension FfiConverterCallbackInterfaceLiveLocationShareListener : FfiConverter 
 
 
 
+public protocol MediaPreviewConfigListener : AnyObject {
+    
+    func onChange(mediaPreviewConfig: MediaPreviewConfig) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceMediaPreviewConfigListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceMediaPreviewConfigListener = UniffiVTableCallbackInterfaceMediaPreviewConfigListener(
+        onChange: { (
+            uniffiHandle: UInt64,
+            mediaPreviewConfig: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceMediaPreviewConfigListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onChange(
+                     mediaPreviewConfig: try FfiConverterTypeMediaPreviewConfig.lift(mediaPreviewConfig)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceMediaPreviewConfigListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface MediaPreviewConfigListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitMediaPreviewConfigListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_mediapreviewconfiglistener(&UniffiCallbackInterfaceMediaPreviewConfigListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceMediaPreviewConfigListener {
+    fileprivate static var handleMap = UniffiHandleMap<MediaPreviewConfigListener>()
+}
+
+extension FfiConverterCallbackInterfaceMediaPreviewConfigListener : FfiConverter {
+    typealias SwiftType = MediaPreviewConfigListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
 /**
  * Delegate to notify of changes in push rules
  */
@@ -36314,6 +36699,12 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_display_name() != 15292) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_invite_avatars_display_policy() != 56691) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_media_preview_display_policy() != 24080) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_media_retention_policy() != 2414) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -36327,6 +36718,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_ignored_users() != 23285) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_media_preview_config() != 47047) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_send_queue_status() != 57403) {
@@ -37367,6 +37761,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_livelocationsharelistener_call() != 34519) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_mediapreviewconfiglistener_on_change() != 42142) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettingsdelegate_settings_did_change() != 51708) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -37456,6 +37853,7 @@ private var initializationResult: InitializationResult = {
     uniffiCallbackInitIgnoredUsersListener()
     uniffiCallbackInitKnockRequestsListener()
     uniffiCallbackInitLiveLocationShareListener()
+    uniffiCallbackInitMediaPreviewConfigListener()
     uniffiCallbackInitNotificationSettingsDelegate()
     uniffiCallbackInitPaginationStatusListener()
     uniffiCallbackInitProgressWatcher()
