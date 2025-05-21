@@ -687,9 +687,21 @@ public protocol ClientProtocol : AnyObject {
     
     func getDmRoom(userId: String) throws  -> Room?
     
+    /**
+     * Get the invite request avatars display policy
+     * currently stored in the cache.
+     */
+    func getInviteAvatarsDisplayPolicy() async throws  -> InviteAvatars
+    
     func getMediaContent(mediaSource: MediaSource) async throws  -> Data
     
     func getMediaFile(mediaSource: MediaSource, filename: String?, mimeType: String, useCache: Bool, tempDir: String?) async throws  -> MediaFileHandle
+    
+    /**
+     * Get the media previews timeline display policy
+     * currently stored in the cache.
+     */
+    func getMediaPreviewDisplayPolicy() async throws  -> MediaPreviews
     
     func getMediaThumbnail(mediaSource: MediaSource, width: UInt64, height: UInt64) async throws  -> Data
     
@@ -899,12 +911,16 @@ public protocol ClientProtocol : AnyObject {
      */
     func setAccountData(eventType: String, content: String) async throws 
     
-    func setDelegate(delegate: ClientDelegate?)  -> TaskHandle?
+    /**
+     * Sets the [ClientDelegate] which will inform about authentication errors.
+     * Returns an error if the delegate was already set.
+     */
+    func setDelegate(delegate: ClientDelegate?) throws  -> TaskHandle?
     
     func setDisplayName(name: String) async throws 
     
     /**
-     * Get the media previews timeline display policy
+     * Set the invite request avatars display policy
      */
     func setInviteAvatarsDisplayPolicy(policy: InviteAvatars) async throws 
     
@@ -922,6 +938,12 @@ public protocol ClientProtocol : AnyObject {
      * Registers a pusher with given parameters
      */
     func setPusher(identifiers: PusherIdentifiers, kind: PusherKind, appDisplayName: String, deviceDisplayName: String, profileTag: String?, lang: String) async throws 
+    
+    /**
+     * Sets the [UnableToDecryptDelegate] which will inform about UTDs.
+     * Returns an error if the delegate was already set.
+     */
+    func setUtdDelegate(utdDelegate: UnableToDecryptDelegate) async throws 
     
     /**
      * The sliding sync version.
@@ -1378,6 +1400,27 @@ open func getDmRoom(userId: String)throws  -> Room? {
 })
 }
     
+    /**
+     * Get the invite request avatars display policy
+     * currently stored in the cache.
+     */
+open func getInviteAvatarsDisplayPolicy()async throws  -> InviteAvatars {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_get_invite_avatars_display_policy(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeInviteAvatars.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
 open func getMediaContent(mediaSource: MediaSource)async throws  -> Data {
     return
         try  await uniffiRustCallAsync(
@@ -1408,6 +1451,27 @@ open func getMediaFile(mediaSource: MediaSource, filename: String?, mimeType: St
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
             liftFunc: FfiConverterTypeMediaFileHandle.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Get the media previews timeline display policy
+     * currently stored in the cache.
+     */
+open func getMediaPreviewDisplayPolicy()async throws  -> MediaPreviews {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_get_media_preview_display_policy(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeMediaPreviews.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -2103,8 +2167,12 @@ open func setAccountData(eventType: String, content: String)async throws  {
         )
 }
     
-open func setDelegate(delegate: ClientDelegate?) -> TaskHandle? {
-    return try!  FfiConverterOptionTypeTaskHandle.lift(try! rustCall() {
+    /**
+     * Sets the [ClientDelegate] which will inform about authentication errors.
+     * Returns an error if the delegate was already set.
+     */
+open func setDelegate(delegate: ClientDelegate?)throws  -> TaskHandle? {
+    return try  FfiConverterOptionTypeTaskHandle.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_client_set_delegate(self.uniffiClonePointer(),
         FfiConverterOptionCallbackInterfaceClientDelegate.lower(delegate),$0
     )
@@ -2129,7 +2197,7 @@ open func setDisplayName(name: String)async throws  {
 }
     
     /**
-     * Get the media previews timeline display policy
+     * Set the invite request avatars display policy
      */
 open func setInviteAvatarsDisplayPolicy(policy: InviteAvatars)async throws  {
     return
@@ -2198,6 +2266,27 @@ open func setPusher(identifiers: PusherIdentifiers, kind: PusherKind, appDisplay
                 uniffi_matrix_sdk_ffi_fn_method_client_set_pusher(
                     self.uniffiClonePointer(),
                     FfiConverterTypePusherIdentifiers.lower(identifiers),FfiConverterTypePusherKind.lower(kind),FfiConverterString.lower(appDisplayName),FfiConverterString.lower(deviceDisplayName),FfiConverterOptionString.lower(profileTag),FfiConverterString.lower(lang)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Sets the [UnableToDecryptDelegate] which will inform about UTDs.
+     * Returns an error if the delegate was already set.
+     */
+open func setUtdDelegate(utdDelegate: UnableToDecryptDelegate)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_set_utd_delegate(
+                    self.uniffiClonePointer(),
+                    FfiConverterCallbackInterfaceUnableToDecryptDelegate.lower(utdDelegate)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -5806,7 +5895,7 @@ public protocol RoomProtocol : AnyObject {
      * Mark a room as read, by attaching a read receipt on the latest event.
      *
      * Note: this does NOT unset the unread flag; it's the caller's
-     * responsibility to do so, if needs be.
+     * responsibility to do so, if need be.
      */
     func markAsRead(receiptType: ReceiptType) async throws 
     
@@ -6839,7 +6928,7 @@ open func loadComposerDraft()async throws  -> ComposerDraft? {
      * Mark a room as read, by attaching a read receipt on the latest event.
      *
      * Note: this does NOT unset the unread flag; it's the caller's
-     * responsibility to do so, if needs be.
+     * responsibility to do so, if need be.
      */
 open func markAsRead(receiptType: ReceiptType)async throws  {
     return
@@ -8496,27 +8585,7 @@ public protocol RoomListItemProtocol : AnyObject {
      */
     func displayName()  -> String?
     
-    /**
-     * Build a full `Room` FFI object, filling its associated timeline.
-     *
-     * An error will be returned if the room is a state different than joined
-     * or if its internal timeline hasn't been initialized.
-     */
-    func fullRoom() throws  -> Room
-    
     func id()  -> String
-    
-    /**
-     * Initializes the timeline for this room using the provided parameters.
-     *
-     * * `event_type_filter` - An optional [`TimelineEventTypeFilter`] to be
-     * used to filter timeline events besides the default timeline filter. If
-     * `None` is passed, only the default timeline filter will be used.
-     * * `internal_id_prefix` - An optional String that will be prepended to
-     * all the timeline item's internal IDs, making it possible to
-     * distinguish different timeline instances from each other.
-     */
-    func initTimeline(eventTypeFilter: TimelineEventTypeFilter?, internalIdPrefix: String?) async throws 
     
     func isDirect() async  -> Bool
     
@@ -8527,11 +8596,6 @@ public protocol RoomListItemProtocol : AnyObject {
      * `m.room.encryption` as required state.
      */
     func isEncrypted() async  -> Bool
-    
-    /**
-     * Checks whether the Room's timeline has been initialized before.
-     */
-    func isTimelineInitialized()  -> Bool
     
     func latestEvent() async  -> EventTimelineItem?
     
@@ -8617,51 +8681,11 @@ open func displayName() -> String? {
 })
 }
     
-    /**
-     * Build a full `Room` FFI object, filling its associated timeline.
-     *
-     * An error will be returned if the room is a state different than joined
-     * or if its internal timeline hasn't been initialized.
-     */
-open func fullRoom()throws  -> Room {
-    return try  FfiConverterTypeRoom.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_full_room(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
 open func id() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_roomlistitem_id(self.uniffiClonePointer(),$0
     )
 })
-}
-    
-    /**
-     * Initializes the timeline for this room using the provided parameters.
-     *
-     * * `event_type_filter` - An optional [`TimelineEventTypeFilter`] to be
-     * used to filter timeline events besides the default timeline filter. If
-     * `None` is passed, only the default timeline filter will be used.
-     * * `internal_id_prefix` - An optional String that will be prepended to
-     * all the timeline item's internal IDs, making it possible to
-     * distinguish different timeline instances from each other.
-     */
-open func initTimeline(eventTypeFilter: TimelineEventTypeFilter?, internalIdPrefix: String?)async throws  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_roomlistitem_init_timeline(
-                    self.uniffiClonePointer(),
-                    FfiConverterOptionTypeTimelineEventTypeFilter.lower(eventTypeFilter),FfiConverterOptionString.lower(internalIdPrefix)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
-            errorHandler: FfiConverterTypeRoomListError.lift
-        )
 }
     
 open func isDirect()async  -> Bool {
@@ -8704,16 +8728,6 @@ open func isEncrypted()async  -> Bool {
             errorHandler: nil
             
         )
-}
-    
-    /**
-     * Checks whether the Room's timeline has been initialized before.
-     */
-open func isTimelineInitialized() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_is_timeline_initialized(self.uniffiClonePointer(),$0
-    )
-})
 }
     
 open func latestEvent()async  -> EventTimelineItem? {
@@ -10643,8 +10657,6 @@ public protocol SyncServiceBuilderProtocol : AnyObject {
      */
     func withOfflineMode()  -> SyncServiceBuilder
     
-    func withUtdHook(delegate: UnableToDecryptDelegate) async  -> SyncServiceBuilder
-    
 }
 
 open class SyncServiceBuilder:
@@ -10720,24 +10732,6 @@ open func withOfflineMode() -> SyncServiceBuilder {
     uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_offline_mode(self.uniffiClonePointer(),$0
     )
 })
-}
-    
-open func withUtdHook(delegate: UnableToDecryptDelegate)async  -> SyncServiceBuilder {
-    return
-        try!  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_utd_hook(
-                    self.uniffiClonePointer(),
-                    FfiConverterCallbackInterfaceUnableToDecryptDelegate.lower(delegate)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeSyncServiceBuilder.lift,
-            errorHandler: nil
-            
-        )
 }
     
 
@@ -18943,6 +18937,11 @@ public struct TimelineConfiguration {
      * only when you need it.
      */
     public var trackReadReceipts: Bool
+    /**
+     * Whether this timeline instance should report UTDs through the client's
+     * delegate.
+     */
+    public var reportUtds: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -18967,12 +18966,17 @@ public struct TimelineConfiguration {
          *
          * As this has a non negligible performance impact, make sure to enable it
          * only when you need it.
-         */trackReadReceipts: Bool) {
+         */trackReadReceipts: Bool, 
+        /**
+         * Whether this timeline instance should report UTDs through the client's
+         * delegate.
+         */reportUtds: Bool) {
         self.focus = focus
         self.filter = filter
         self.internalIdPrefix = internalIdPrefix
         self.dateDividerMode = dateDividerMode
         self.trackReadReceipts = trackReadReceipts
+        self.reportUtds = reportUtds
     }
 }
 
@@ -18986,7 +18990,8 @@ public struct FfiConverterTypeTimelineConfiguration: FfiConverterRustBuffer {
                 filter: FfiConverterTypeTimelineFilter.read(from: &buf), 
                 internalIdPrefix: FfiConverterOptionString.read(from: &buf), 
                 dateDividerMode: FfiConverterTypeDateDividerMode.read(from: &buf), 
-                trackReadReceipts: FfiConverterBool.read(from: &buf)
+                trackReadReceipts: FfiConverterBool.read(from: &buf), 
+                reportUtds: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -18996,6 +19001,7 @@ public struct FfiConverterTypeTimelineConfiguration: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.internalIdPrefix, into: &buf)
         FfiConverterTypeDateDividerMode.write(value.dateDividerMode, into: &buf)
         FfiConverterBool.write(value.trackReadReceipts, into: &buf)
+        FfiConverterBool.write(value.reportUtds, into: &buf)
     }
 }
 
@@ -27775,12 +27781,6 @@ public enum RoomListError {
     )
     case InvalidRoomId(error: String
     )
-    case TimelineAlreadyExists(roomName: String
-    )
-    case TimelineNotInitialized(roomName: String
-    )
-    case InitializingTimeline(error: String
-    )
     case EventCache(error: String
     )
     case IncorrectRoomMembership(expected: [Membership], actual: Membership
@@ -27811,19 +27811,10 @@ public struct FfiConverterTypeRoomListError: FfiConverterRustBuffer {
         case 5: return .InvalidRoomId(
             error: try FfiConverterString.read(from: &buf)
             )
-        case 6: return .TimelineAlreadyExists(
-            roomName: try FfiConverterString.read(from: &buf)
-            )
-        case 7: return .TimelineNotInitialized(
-            roomName: try FfiConverterString.read(from: &buf)
-            )
-        case 8: return .InitializingTimeline(
+        case 6: return .EventCache(
             error: try FfiConverterString.read(from: &buf)
             )
-        case 9: return .EventCache(
-            error: try FfiConverterString.read(from: &buf)
-            )
-        case 10: return .IncorrectRoomMembership(
+        case 7: return .IncorrectRoomMembership(
             expected: try FfiConverterSequenceTypeMembership.read(from: &buf), 
             actual: try FfiConverterTypeMembership.read(from: &buf)
             )
@@ -27863,28 +27854,13 @@ public struct FfiConverterTypeRoomListError: FfiConverterRustBuffer {
             FfiConverterString.write(error, into: &buf)
             
         
-        case let .TimelineAlreadyExists(roomName):
-            writeInt(&buf, Int32(6))
-            FfiConverterString.write(roomName, into: &buf)
-            
-        
-        case let .TimelineNotInitialized(roomName):
-            writeInt(&buf, Int32(7))
-            FfiConverterString.write(roomName, into: &buf)
-            
-        
-        case let .InitializingTimeline(error):
-            writeInt(&buf, Int32(8))
-            FfiConverterString.write(error, into: &buf)
-            
-        
         case let .EventCache(error):
-            writeInt(&buf, Int32(9))
+            writeInt(&buf, Int32(6))
             FfiConverterString.write(error, into: &buf)
             
         
         case let .IncorrectRoomMembership(expected,actual):
-            writeInt(&buf, Int32(10))
+            writeInt(&buf, Int32(7))
             FfiConverterSequenceTypeMembership.write(expected, into: &buf)
             FfiConverterTypeMembership.write(actual, into: &buf)
             
@@ -31089,8 +31065,6 @@ public protocol ClientDelegate : AnyObject {
     
     func didReceiveAuthError(isSoftLogout: Bool) 
     
-    func didRefreshTokens() 
-    
 }
 
 
@@ -31114,28 +31088,6 @@ fileprivate struct UniffiCallbackInterfaceClientDelegate {
                 }
                 return uniffiObj.didReceiveAuthError(
                      isSoftLogout: try FfiConverterBool.lift(isSoftLogout)
-                )
-            }
-
-            
-            let writeReturn = { () }
-            uniffiTraitInterfaceCall(
-                callStatus: uniffiCallStatus,
-                makeCall: makeCall,
-                writeReturn: writeReturn
-            )
-        },
-        didRefreshTokens: { (
-            uniffiHandle: UInt64,
-            uniffiOutReturn: UnsafeMutableRawPointer,
-            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
-        ) in
-            let makeCall = {
-                () throws -> () in
-                guard let uniffiObj = try? FfiConverterCallbackInterfaceClientDelegate.handleMap.get(handle: uniffiHandle) else {
-                    throw UniffiInternalError.unexpectedStaleHandle
-                }
-                return uniffiObj.didRefreshTokens(
                 )
             }
 
@@ -33928,27 +33880,6 @@ fileprivate struct FfiConverterOptionTypeThreadSummary: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionTypeTimelineEventTypeFilter: FfiConverterRustBuffer {
-    typealias SwiftType = TimelineEventTypeFilter?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeTimelineEventTypeFilter.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeTimelineEventTypeFilter.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeTimelineItem: FfiConverterRustBuffer {
     typealias SwiftType = TimelineItem?
 
@@ -36576,10 +36507,16 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_dm_room() != 5137) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_invite_avatars_display_policy() != 3997) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_content() != 40308) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_file() != 52604) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_preview_display_policy() != 55631) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_thumbnail() != 52601) {
@@ -36693,13 +36630,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_account_data() != 18256) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_delegate() != 59796) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_delegate() != 46437) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_display_name() != 15292) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_invite_avatars_display_policy() != 56691) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_invite_avatars_display_policy() != 48457) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_media_preview_display_policy() != 24080) {
@@ -36709,6 +36646,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_pusher() != 41975) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_utd_delegate() != 37720) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_sliding_sync_version() != 4957) {
@@ -37170,7 +37110,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_load_composer_draft() != 38115) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_mark_as_read() != 16004) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_mark_as_read() != 57806) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_matrix_to_event_permalink() != 36705) {
@@ -37371,22 +37311,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_display_name() != 8651) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_full_room() != 17298) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_id() != 41176) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_init_timeline() != 61817) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_direct() != 53352) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_encrypted() != 65150) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_timeline_initialized() != 46855) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_latest_event() != 38259) {
@@ -37516,9 +37447,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_offline_mode() != 16958) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_utd_hook() != 9029) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_taskhandle_cancel() != 9124) {
@@ -37735,9 +37663,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientdelegate_did_receive_auth_error() != 26350) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientdelegate_did_refresh_tokens() != 16325) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientsessiondelegate_retrieve_session_from_keychain() != 43954) {
