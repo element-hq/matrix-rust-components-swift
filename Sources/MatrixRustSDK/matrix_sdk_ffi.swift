@@ -19089,6 +19089,10 @@ public struct TracingConfiguration {
      * If set, configures rotated log files where to write additional logs.
      */
     public var writeToFiles: TracingFileConfiguration?
+    /**
+     * If set, the Sentry DSN to use for error reporting.
+     */
+    public var sentryDsn: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -19111,12 +19115,16 @@ public struct TracingConfiguration {
          */writeToStdoutOrSystem: Bool, 
         /**
          * If set, configures rotated log files where to write additional logs.
-         */writeToFiles: TracingFileConfiguration?) {
+         */writeToFiles: TracingFileConfiguration?, 
+        /**
+         * If set, the Sentry DSN to use for error reporting.
+         */sentryDsn: String?) {
         self.logLevel = logLevel
         self.traceLogPacks = traceLogPacks
         self.extraTargets = extraTargets
         self.writeToStdoutOrSystem = writeToStdoutOrSystem
         self.writeToFiles = writeToFiles
+        self.sentryDsn = sentryDsn
     }
 }
 
@@ -19139,6 +19147,9 @@ extension TracingConfiguration: Equatable, Hashable {
         if lhs.writeToFiles != rhs.writeToFiles {
             return false
         }
+        if lhs.sentryDsn != rhs.sentryDsn {
+            return false
+        }
         return true
     }
 
@@ -19148,6 +19159,7 @@ extension TracingConfiguration: Equatable, Hashable {
         hasher.combine(extraTargets)
         hasher.combine(writeToStdoutOrSystem)
         hasher.combine(writeToFiles)
+        hasher.combine(sentryDsn)
     }
 }
 
@@ -19160,7 +19172,8 @@ public struct FfiConverterTypeTracingConfiguration: FfiConverterRustBuffer {
                 traceLogPacks: FfiConverterSequenceTypeTraceLogPacks.read(from: &buf), 
                 extraTargets: FfiConverterSequenceString.read(from: &buf), 
                 writeToStdoutOrSystem: FfiConverterBool.read(from: &buf), 
-                writeToFiles: FfiConverterOptionTypeTracingFileConfiguration.read(from: &buf)
+                writeToFiles: FfiConverterOptionTypeTracingFileConfiguration.read(from: &buf), 
+                sentryDsn: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -19170,6 +19183,7 @@ public struct FfiConverterTypeTracingConfiguration: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.extraTargets, into: &buf)
         FfiConverterBool.write(value.writeToStdoutOrSystem, into: &buf)
         FfiConverterOptionTypeTracingFileConfiguration.write(value.writeToFiles, into: &buf)
+        FfiConverterOptionString.write(value.sentryDsn, into: &buf)
     }
 }
 
@@ -30734,6 +30748,11 @@ public enum WidgetEventFilter {
      */
     case stateWithTypeAndStateKey(eventType: String, stateKey: String
     )
+    /**
+     * Matches to-device events with the given `event_type`.
+     */
+    case toDevice(eventType: String
+    )
 }
 
 
@@ -30754,6 +30773,9 @@ public struct FfiConverterTypeWidgetEventFilter: FfiConverterRustBuffer {
         )
         
         case 4: return .stateWithTypeAndStateKey(eventType: try FfiConverterString.read(from: &buf), stateKey: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 5: return .toDevice(eventType: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -30783,6 +30805,11 @@ public struct FfiConverterTypeWidgetEventFilter: FfiConverterRustBuffer {
             writeInt(&buf, Int32(4))
             FfiConverterString.write(eventType, into: &buf)
             FfiConverterString.write(stateKey, into: &buf)
+            
+        
+        case let .toDevice(eventType):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(eventType, into: &buf)
             
         }
     }
@@ -36123,6 +36150,16 @@ public func createCaptionEdit(caption: String?, formattedCaption: FormattedBody?
     )
 })
 }
+/**
+ * Set the global enablement level for the Sentry layer (after the logs have
+ * been set up).
+ */
+public func enableSentryLogging(enabled: Bool) {try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_func_enable_sentry_logging(
+        FfiConverterBool.lower(enabled),$0
+    )
+}
+}
 public func genTransactionId() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_func_gen_transaction_id($0
@@ -36183,7 +36220,7 @@ public func getElementCallRequiredPermissions(ownUserId: String, ownDeviceId: St
  * the NSE process on iOS). Otherwise, this can remain false, in which case a
  * multithreaded tokio runtime will be set up.
  */
-public func initPlatform(config: TracingConfiguration, useLightweightTokioRuntime: Bool) {try! rustCall() {
+public func initPlatform(config: TracingConfiguration, useLightweightTokioRuntime: Bool)throws  {try rustCallWithError(FfiConverterTypeClientError.lift) {
     uniffi_matrix_sdk_ffi_fn_func_init_platform(
         FfiConverterTypeTracingConfiguration.lower(config),
         FfiConverterBool.lower(useLightweightTokioRuntime),$0
@@ -36387,6 +36424,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_create_caption_edit() != 33992) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_func_enable_sentry_logging() != 53125) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_func_gen_transaction_id() != 15808) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -36396,7 +36436,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_get_element_call_required_permissions() != 30181) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_func_init_platform() != 35062) {
+    if (uniffi_matrix_sdk_ffi_checksum_func_init_platform() != 11113) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_is_room_alias_format_valid() != 54845) {
