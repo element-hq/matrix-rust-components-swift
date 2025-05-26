@@ -5852,6 +5852,11 @@ public protocol RoomProtocol : AnyObject {
     
     func invitedMembersCount()  -> UInt64
     
+    /**
+     * Get the user who created the invite, if any.
+     */
+    func inviter() async throws  -> RoomMember?
+    
     func isDirect() async  -> Bool
     
     func isPublic()  -> Bool
@@ -6767,6 +6772,26 @@ open func invitedMembersCount() -> UInt64 {
     uniffi_matrix_sdk_ffi_fn_method_room_invited_members_count(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+    /**
+     * Get the user who created the invite, if any.
+     */
+open func inviter()async throws  -> RoomMember? {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_inviter(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeRoomMember.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func isDirect()async  -> Bool {
@@ -37115,6 +37140,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_invited_members_count() != 1023) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_inviter() != 18103) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_is_direct() != 10462) {
