@@ -5859,6 +5859,14 @@ public protocol RoomProtocol : AnyObject {
     
     func isDirect() async  -> Bool
     
+    /**
+     * Checks whether the room is encrypted or not.
+     *
+     * **Note**: this info may not be reliable if you don't set up
+     * `m.room.encryption` as required state.
+     */
+    func isEncrypted() async  -> Bool
+    
     func isPublic()  -> Bool
     
     /**
@@ -5883,6 +5891,8 @@ public protocol RoomProtocol : AnyObject {
     func kickUser(userId: String, reason: String?) async throws 
     
     func latestEncryptionState() async throws  -> EncryptionState
+    
+    func latestEvent() async  -> EventTimelineItem?
     
     /**
      * Leave this room.
@@ -5930,9 +5940,18 @@ public protocol RoomProtocol : AnyObject {
     
     func membersNoSync() async throws  -> RoomMembersIterator
     
+    /**
+     * The room's current membership state.
+     */
     func membership()  -> Membership
     
     func ownUserId()  -> String
+    
+    /**
+     * Builds a `RoomPreview` from a room list item. This is intended for
+     * invited, knocked or banned rooms.
+     */
+    func previewRoom(via: [String]) async throws  -> RoomPreview
     
     /**
      * Publish a new room alias for this room in the room directory.
@@ -6121,6 +6140,10 @@ public protocol RoomProtocol : AnyObject {
     
     func suggestedRoleForUser(userId: String) async throws  -> RoomMemberRole
     
+    /**
+     * Create a timeline with a default configuration, i.e. a live timeline
+     * with read receipts and read marker tracking.
+     */
     func timeline() async throws  -> Timeline
     
     /**
@@ -6812,6 +6835,30 @@ open func isDirect()async  -> Bool {
         )
 }
     
+    /**
+     * Checks whether the room is encrypted or not.
+     *
+     * **Note**: this info may not be reliable if you don't set up
+     * `m.room.encryption` as required state.
+     */
+open func isEncrypted()async  -> Bool {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_is_encrypted(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: nil
+            
+        )
+}
+    
 open func isPublic() -> Bool {
     return try!  FfiConverterBool.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_is_public(self.uniffiClonePointer(),$0
@@ -6904,6 +6951,24 @@ open func latestEncryptionState()async throws  -> EncryptionState {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterTypeEncryptionState_lift,
             errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+open func latestEvent()async  -> EventTimelineItem? {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_latest_event(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeEventTimelineItem.lift,
+            errorHandler: nil
+            
         )
 }
     
@@ -7118,6 +7183,9 @@ open func membersNoSync()async throws  -> RoomMembersIterator {
         )
 }
     
+    /**
+     * The room's current membership state.
+     */
 open func membership() -> Membership {
     return try!  FfiConverterTypeMembership.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_membership(self.uniffiClonePointer(),$0
@@ -7130,6 +7198,27 @@ open func ownUserId() -> String {
     uniffi_matrix_sdk_ffi_fn_method_room_own_user_id(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+    /**
+     * Builds a `RoomPreview` from a room list item. This is intended for
+     * invited, knocked or banned rooms.
+     */
+open func previewRoom(via: [String])async throws  -> RoomPreview {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_preview_room(
+                    self.uniffiClonePointer(),
+                    FfiConverterSequenceString.lower(via)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeRoomPreview.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
     /**
@@ -7702,6 +7791,10 @@ open func suggestedRoleForUser(userId: String)async throws  -> RoomMemberRole {
         )
 }
     
+    /**
+     * Create a timeline with a default configuration, i.e. a live timeline
+     * with read receipts and read marker tracking.
+     */
 open func timeline()async throws  -> Timeline {
     return
         try  await uniffiRustCallAsync(
@@ -8249,7 +8342,7 @@ public protocol RoomListProtocol : AnyObject {
     
     func loadingState(listener: RoomListLoadingStateListener) throws  -> RoomListLoadingStateResult
     
-    func room(roomId: String) throws  -> RoomListItem
+    func room(roomId: String) throws  -> Room
     
 }
 
@@ -8311,8 +8404,8 @@ open func loadingState(listener: RoomListLoadingStateListener)throws  -> RoomLis
 })
 }
     
-open func room(roomId: String)throws  -> RoomListItem {
-    return try  FfiConverterTypeRoomListItem.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
+open func room(roomId: String)throws  -> Room {
+    return try  FfiConverterTypeRoom.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_roomlist_room(self.uniffiClonePointer(),
         FfiConverterString.lower(roomId),$0
     )
@@ -8597,283 +8690,11 @@ public func FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult_lower(_ val
 
 
 
-public protocol RoomListItemProtocol : AnyObject {
-    
-    func avatarUrl()  -> String?
-    
-    func canonicalAlias()  -> String?
-    
-    /**
-     * Returns the room's name from the state event if available, otherwise
-     * compute a room name based on the room's nature (DM or not) and number of
-     * members.
-     */
-    func displayName()  -> String?
-    
-    func id()  -> String
-    
-    func isDirect() async  -> Bool
-    
-    /**
-     * Checks whether the room is encrypted or not.
-     *
-     * **Note**: this info may not be reliable if you don't set up
-     * `m.room.encryption` as required state.
-     */
-    func isEncrypted() async  -> Bool
-    
-    func latestEvent() async  -> EventTimelineItem?
-    
-    /**
-     * The room's current membership state.
-     */
-    func membership()  -> Membership
-    
-    /**
-     * Builds a `RoomPreview` from a room list item. This is intended for
-     * invited, knocked or banned rooms.
-     */
-    func previewRoom(via: [String]) async throws  -> RoomPreview
-    
-    func roomInfo() async throws  -> RoomInfo
-    
-}
-
-open class RoomListItem:
-    RoomListItemProtocol {
-    fileprivate let pointer: UnsafeMutableRawPointer!
-
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
-    public struct NoPointer {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
-    }
-
-    /// This constructor can be used to instantiate a fake object.
-    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    ///
-    /// - Warning:
-    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
-    }
-
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_roomlistitem(self.pointer, $0) }
-    }
-    // No primary constructor declared for this class.
-
-    deinit {
-        guard let pointer = pointer else {
-            return
-        }
-
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roomlistitem(pointer, $0) }
-    }
-
-    
-
-    
-open func avatarUrl() -> String? {
-    return try!  FfiConverterOptionString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_avatar_url(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func canonicalAlias() -> String? {
-    return try!  FfiConverterOptionString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_canonical_alias(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-    /**
-     * Returns the room's name from the state event if available, otherwise
-     * compute a room name based on the room's nature (DM or not) and number of
-     * members.
-     */
-open func displayName() -> String? {
-    return try!  FfiConverterOptionString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_display_name(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func id() -> String {
-    return try!  FfiConverterString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_id(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func isDirect()async  -> Bool {
-    return
-        try!  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_roomlistitem_is_direct(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: nil
-            
-        )
-}
-    
-    /**
-     * Checks whether the room is encrypted or not.
-     *
-     * **Note**: this info may not be reliable if you don't set up
-     * `m.room.encryption` as required state.
-     */
-open func isEncrypted()async  -> Bool {
-    return
-        try!  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_roomlistitem_is_encrypted(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: nil
-            
-        )
-}
-    
-open func latestEvent()async  -> EventTimelineItem? {
-    return
-        try!  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_roomlistitem_latest_event(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterOptionTypeEventTimelineItem.lift,
-            errorHandler: nil
-            
-        )
-}
-    
-    /**
-     * The room's current membership state.
-     */
-open func membership() -> Membership {
-    return try!  FfiConverterTypeMembership.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistitem_membership(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-    /**
-     * Builds a `RoomPreview` from a room list item. This is intended for
-     * invited, knocked or banned rooms.
-     */
-open func previewRoom(via: [String])async throws  -> RoomPreview {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_roomlistitem_preview_room(
-                    self.uniffiClonePointer(),
-                    FfiConverterSequenceString.lower(via)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
-            liftFunc: FfiConverterTypeRoomPreview.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func roomInfo()async throws  -> RoomInfo {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_roomlistitem_room_info(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterTypeRoomInfo.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-
-}
-
-public struct FfiConverterTypeRoomListItem: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
-    typealias SwiftType = RoomListItem
-
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> RoomListItem {
-        return RoomListItem(unsafeFromRawPointer: pointer)
-    }
-
-    public static func lower(_ value: RoomListItem) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomListItem {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
-    }
-
-    public static func write(_ value: RoomListItem, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
-    }
-}
-
-
-
-
-public func FfiConverterTypeRoomListItem_lift(_ pointer: UnsafeMutableRawPointer) throws -> RoomListItem {
-    return try FfiConverterTypeRoomListItem.lift(pointer)
-}
-
-public func FfiConverterTypeRoomListItem_lower(_ value: RoomListItem) -> UnsafeMutableRawPointer {
-    return FfiConverterTypeRoomListItem.lower(value)
-}
-
-
-
-
 public protocol RoomListServiceProtocol : AnyObject {
     
     func allRooms() async throws  -> RoomList
     
-    func room(roomId: String) throws  -> RoomListItem
+    func room(roomId: String) throws  -> Room
     
     func state(listener: RoomListServiceStateListener)  -> TaskHandle
     
@@ -8941,8 +8762,8 @@ open func allRooms()async throws  -> RoomList {
         )
 }
     
-open func room(roomId: String)throws  -> RoomListItem {
-    return try  FfiConverterTypeRoomListItem.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
+open func room(roomId: String)throws  -> Room {
+    return try  FfiConverterTypeRoom.lift(try rustCallWithError(FfiConverterTypeRoomListError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_roomlistservice_room(self.uniffiClonePointer(),
         FfiConverterString.lower(roomId),$0
     )
@@ -27670,24 +27491,24 @@ extension RoomListEntriesDynamicFilterKind: Equatable, Hashable {}
 
 public enum RoomListEntriesUpdate {
     
-    case append(values: [RoomListItem]
+    case append(values: [Room]
     )
     case clear
-    case pushFront(value: RoomListItem
+    case pushFront(value: Room
     )
-    case pushBack(value: RoomListItem
+    case pushBack(value: Room
     )
     case popFront
     case popBack
-    case insert(index: UInt32, value: RoomListItem
+    case insert(index: UInt32, value: Room
     )
-    case set(index: UInt32, value: RoomListItem
+    case set(index: UInt32, value: Room
     )
     case remove(index: UInt32
     )
     case truncate(length: UInt32
     )
-    case reset(values: [RoomListItem]
+    case reset(values: [Room]
     )
 }
 
@@ -27699,25 +27520,25 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .append(values: try FfiConverterSequenceTypeRoomListItem.read(from: &buf)
+        case 1: return .append(values: try FfiConverterSequenceTypeRoom.read(from: &buf)
         )
         
         case 2: return .clear
         
-        case 3: return .pushFront(value: try FfiConverterTypeRoomListItem.read(from: &buf)
+        case 3: return .pushFront(value: try FfiConverterTypeRoom.read(from: &buf)
         )
         
-        case 4: return .pushBack(value: try FfiConverterTypeRoomListItem.read(from: &buf)
+        case 4: return .pushBack(value: try FfiConverterTypeRoom.read(from: &buf)
         )
         
         case 5: return .popFront
         
         case 6: return .popBack
         
-        case 7: return .insert(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeRoomListItem.read(from: &buf)
+        case 7: return .insert(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeRoom.read(from: &buf)
         )
         
-        case 8: return .set(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeRoomListItem.read(from: &buf)
+        case 8: return .set(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeRoom.read(from: &buf)
         )
         
         case 9: return .remove(index: try FfiConverterUInt32.read(from: &buf)
@@ -27726,7 +27547,7 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         case 10: return .truncate(length: try FfiConverterUInt32.read(from: &buf)
         )
         
-        case 11: return .reset(values: try FfiConverterSequenceTypeRoomListItem.read(from: &buf)
+        case 11: return .reset(values: try FfiConverterSequenceTypeRoom.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -27739,7 +27560,7 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         
         case let .append(values):
             writeInt(&buf, Int32(1))
-            FfiConverterSequenceTypeRoomListItem.write(values, into: &buf)
+            FfiConverterSequenceTypeRoom.write(values, into: &buf)
             
         
         case .clear:
@@ -27748,12 +27569,12 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         
         case let .pushFront(value):
             writeInt(&buf, Int32(3))
-            FfiConverterTypeRoomListItem.write(value, into: &buf)
+            FfiConverterTypeRoom.write(value, into: &buf)
             
         
         case let .pushBack(value):
             writeInt(&buf, Int32(4))
-            FfiConverterTypeRoomListItem.write(value, into: &buf)
+            FfiConverterTypeRoom.write(value, into: &buf)
             
         
         case .popFront:
@@ -27767,13 +27588,13 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         case let .insert(index,value):
             writeInt(&buf, Int32(7))
             FfiConverterUInt32.write(index, into: &buf)
-            FfiConverterTypeRoomListItem.write(value, into: &buf)
+            FfiConverterTypeRoom.write(value, into: &buf)
             
         
         case let .set(index,value):
             writeInt(&buf, Int32(8))
             FfiConverterUInt32.write(index, into: &buf)
-            FfiConverterTypeRoomListItem.write(value, into: &buf)
+            FfiConverterTypeRoom.write(value, into: &buf)
             
         
         case let .remove(index):
@@ -27788,7 +27609,7 @@ public struct FfiConverterTypeRoomListEntriesUpdate: FfiConverterRustBuffer {
         
         case let .reset(values):
             writeInt(&buf, Int32(11))
-            FfiConverterSequenceTypeRoomListItem.write(values, into: &buf)
+            FfiConverterSequenceTypeRoom.write(values, into: &buf)
             
         }
     }
@@ -35154,28 +34975,6 @@ fileprivate struct FfiConverterSequenceTypeRoom: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterSequenceTypeRoomListItem: FfiConverterRustBuffer {
-    typealias SwiftType = [RoomListItem]
-
-    public static func write(_ value: [RoomListItem], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for item in value {
-            FfiConverterTypeRoomListItem.write(item, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RoomListItem] {
-        let len: Int32 = try readInt(&buf)
-        var seq = [RoomListItem]()
-        seq.reserveCapacity(Int(len))
-        for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeRoomListItem.read(from: &buf))
-        }
-        return seq
-    }
-}
-
 fileprivate struct FfiConverterSequenceTypeSessionVerificationEmoji: FfiConverterRustBuffer {
     typealias SwiftType = [SessionVerificationEmoji]
 
@@ -37148,6 +36947,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_is_direct() != 10462) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_is_encrypted() != 63995) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_is_public() != 7336) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -37170,6 +36972,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_latest_encryption_state() != 16843) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_latest_event() != 39083) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_leave() != 63688) {
@@ -37205,10 +37010,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_members_no_sync() != 3255) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_membership() != 26065) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_membership() != 45951) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_own_user_id() != 39510) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_preview_room() != 60431) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_publish_room_alias_in_room_directory() != 13924) {
@@ -37295,7 +37103,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_suggested_role_for_user() != 47787) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_timeline() != 701) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_timeline() != 51477) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_timeline_with_configuration() != 35159) {
@@ -37352,7 +37160,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_loading_state() != 21585) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_room() != 8801) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_room() != 62491) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistdynamicentriescontroller_add_one_page() != 47748) {
@@ -37370,40 +37178,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistentrieswithdynamicadaptersresult_entries_stream() != 56632) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_avatar_url() != 39097) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_canonical_alias() != 63300) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_display_name() != 8651) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_id() != 41176) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_direct() != 53352) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_is_encrypted() != 65150) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_latest_event() != 38259) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_membership() != 1596) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_preview_room() != 62868) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistitem_room_info() != 32985) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_all_rooms() != 49704) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_room() != 5185) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_room() != 60695) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_state() != 64650) {
