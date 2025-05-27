@@ -633,6 +633,15 @@ public protocol ClientProtocol : AnyObject {
     /**
      * Clear all the non-critical caches for this Client instance.
      *
+     * WARNING: This will clear all the caches, including the base store (state
+     * store), so callers must make sure that any sync is inactive before
+     * calling this method. In particular, the `SyncService` must not be
+     * running. After the method returns, the Client will be in an unstable
+     * state, and it is required that the caller reinstantiates a new
+     * Client instance, be it via dropping the previous and re-creating it,
+     * restarting their application, or any other similar means.
+     *
+     * - This will get rid of the backing state store file, if provided.
      * - This will empty all the room's persisted event caches, so all rooms
      * will start as if they were empty.
      * - This will empty the media cache according to the current media
@@ -685,13 +694,18 @@ public protocol ClientProtocol : AnyObject {
     
     func encryption()  -> Encryption
     
+    /**
+     * Fetch the media preview configuration from the server.
+     */
+    func fetchMediaPreviewConfig() async throws  -> MediaPreviewConfig?
+    
     func getDmRoom(userId: String) throws  -> Room?
     
     /**
      * Get the invite request avatars display policy
      * currently stored in the cache.
      */
-    func getInviteAvatarsDisplayPolicy() async throws  -> InviteAvatars
+    func getInviteAvatarsDisplayPolicy() async throws  -> InviteAvatars?
     
     func getMediaContent(mediaSource: MediaSource) async throws  -> Data
     
@@ -701,7 +715,7 @@ public protocol ClientProtocol : AnyObject {
      * Get the media previews timeline display policy
      * currently stored in the cache.
      */
-    func getMediaPreviewDisplayPolicy() async throws  -> MediaPreviews
+    func getMediaPreviewDisplayPolicy() async throws  -> MediaPreviews?
     
     func getMediaThumbnail(mediaSource: MediaSource, width: UInt64, height: UInt64) async throws  -> Data
     
@@ -1224,6 +1238,15 @@ open func canDeactivateAccount() -> Bool {
     /**
      * Clear all the non-critical caches for this Client instance.
      *
+     * WARNING: This will clear all the caches, including the base store (state
+     * store), so callers must make sure that any sync is inactive before
+     * calling this method. In particular, the `SyncService` must not be
+     * running. After the method returns, the Client will be in an unstable
+     * state, and it is required that the caller reinstantiates a new
+     * Client instance, be it via dropping the previous and re-creating it,
+     * restarting their application, or any other similar means.
+     *
+     * - This will get rid of the backing state store file, if provided.
      * - This will empty all the room's persisted event caches, so all rooms
      * will start as if they were empty.
      * - This will empty the media cache according to the current media
@@ -1392,6 +1415,26 @@ open func encryption() -> Encryption {
 })
 }
     
+    /**
+     * Fetch the media preview configuration from the server.
+     */
+open func fetchMediaPreviewConfig()async throws  -> MediaPreviewConfig? {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_fetch_media_preview_config(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeMediaPreviewConfig.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
 open func getDmRoom(userId: String)throws  -> Room? {
     return try  FfiConverterOptionTypeRoom.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_client_get_dm_room(self.uniffiClonePointer(),
@@ -1404,7 +1447,7 @@ open func getDmRoom(userId: String)throws  -> Room? {
      * Get the invite request avatars display policy
      * currently stored in the cache.
      */
-open func getInviteAvatarsDisplayPolicy()async throws  -> InviteAvatars {
+open func getInviteAvatarsDisplayPolicy()async throws  -> InviteAvatars? {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -1416,7 +1459,7 @@ open func getInviteAvatarsDisplayPolicy()async throws  -> InviteAvatars {
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterTypeInviteAvatars.lift,
+            liftFunc: FfiConverterOptionTypeInviteAvatars.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -1459,7 +1502,7 @@ open func getMediaFile(mediaSource: MediaSource, filename: String?, mimeType: St
      * Get the media previews timeline display policy
      * currently stored in the cache.
      */
-open func getMediaPreviewDisplayPolicy()async throws  -> MediaPreviews {
+open func getMediaPreviewDisplayPolicy()async throws  -> MediaPreviews? {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -1471,7 +1514,7 @@ open func getMediaPreviewDisplayPolicy()async throws  -> MediaPreviews {
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterTypeMediaPreviews.lift,
+            liftFunc: FfiConverterOptionTypeMediaPreviews.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -31536,7 +31579,7 @@ extension FfiConverterCallbackInterfaceLiveLocationShareListener : FfiConverter 
 
 public protocol MediaPreviewConfigListener : AnyObject {
     
-    func onChange(mediaPreviewConfig: MediaPreviewConfig) 
+    func onChange(mediaPreviewConfig: MediaPreviewConfig?) 
     
 }
 
@@ -31560,7 +31603,7 @@ fileprivate struct UniffiCallbackInterfaceMediaPreviewConfigListener {
                     throw UniffiInternalError.unexpectedStaleHandle
                 }
                 return uniffiObj.onChange(
-                     mediaPreviewConfig: try FfiConverterTypeMediaPreviewConfig.lift(mediaPreviewConfig)
+                     mediaPreviewConfig: try FfiConverterOptionTypeMediaPreviewConfig.lift(mediaPreviewConfig)
                 )
             }
 
@@ -33984,6 +34027,27 @@ fileprivate struct FfiConverterOptionTypeMatrixEntity: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeMediaPreviewConfig: FfiConverterRustBuffer {
+    typealias SwiftType = MediaPreviewConfig?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeMediaPreviewConfig.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeMediaPreviewConfig.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeMentions: FfiConverterRustBuffer {
     typealias SwiftType = Mentions?
 
@@ -34425,6 +34489,27 @@ fileprivate struct FfiConverterOptionTypeIntent: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeInviteAvatars: FfiConverterRustBuffer {
+    typealias SwiftType = InviteAvatars?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeInviteAvatars.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeInviteAvatars.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeJoinRule: FfiConverterRustBuffer {
     typealias SwiftType = JoinRule?
 
@@ -34441,6 +34526,27 @@ fileprivate struct FfiConverterOptionTypeJoinRule: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeJoinRule.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+fileprivate struct FfiConverterOptionTypeMediaPreviews: FfiConverterRustBuffer {
+    typealias SwiftType = MediaPreviews?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeMediaPreviews.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeMediaPreviews.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -36341,7 +36447,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_can_deactivate_account() != 39890) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_clear_caches() != 47085) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_clear_caches() != 65177) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_create_room() != 52700) {
@@ -36368,10 +36474,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_encryption() != 9657) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_fetch_media_preview_config() != 15595) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_dm_room() != 5137) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_invite_avatars_display_policy() != 3997) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_invite_avatars_display_policy() != 46953) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_content() != 40308) {
@@ -36380,7 +36489,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_file() != 52604) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_preview_display_policy() != 55631) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_preview_display_policy() != 19264) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_thumbnail() != 52601) {
@@ -37532,7 +37641,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_livelocationsharelistener_call() != 34519) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_mediapreviewconfiglistener_on_change() != 42142) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_mediapreviewconfiglistener_on_change() != 14770) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettingsdelegate_settings_did_change() != 51708) {
