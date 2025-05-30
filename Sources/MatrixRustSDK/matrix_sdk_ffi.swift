@@ -5920,8 +5920,6 @@ public protocol RoomProtocol : AnyObject {
     
     func isSpace()  -> Bool
     
-    func isTombstoned()  -> Bool
-    
     /**
      * Join this room.
      *
@@ -5989,6 +5987,22 @@ public protocol RoomProtocol : AnyObject {
     func membership()  -> Membership
     
     func ownUserId()  -> String
+    
+    /**
+     * If this room is the successor of a tombstoned room, return the
+     * “reference” to the predecessor room.
+     *
+     * A room is tombstoned if it has received a [`m.room.tombstone`] state
+     * event.
+     *
+     * To determine if a room is the successor of a tombstoned room, the
+     * [`m.room.create`] must have been received, **with** a `predecessor`
+     * field.
+     *
+     * [`m.room.tombstone`]: https://spec.matrix.org/v1.14/client-server-api/#mroomtombstone
+     * [`m.room.create`]: https://spec.matrix.org/v1.14/client-server-api/#mroomcreate
+     */
+    func predecessorRoom()  -> PredecessorRoom?
     
     /**
      * Builds a `RoomPreview` from a room list item. This is intended for
@@ -6180,6 +6194,17 @@ public protocol RoomProtocol : AnyObject {
     func subscribeToRoomInfoUpdates(listener: RoomInfoListener)  -> TaskHandle
     
     func subscribeToTypingNotifications(listener: TypingNotificationsListener)  -> TaskHandle
+    
+    /**
+     * If this room is tombstoned, return the “reference” to the successor room
+     * —i.e. the room replacing this one.
+     *
+     * A room is tombstoned if it has received a [`m.room.tombstone`] state
+     * event.
+     *
+     * [`m.room.tombstone`]: https://spec.matrix.org/v1.14/client-server-api/#mroomtombstone
+     */
+    func successorRoom()  -> SuccessorRoom?
     
     func suggestedRoleForUser(userId: String) async throws  -> RoomMemberRole
     
@@ -6927,13 +6952,6 @@ open func isSpace() -> Bool {
 })
 }
     
-open func isTombstoned() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_room_is_tombstoned(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
     /**
      * Join this room.
      *
@@ -7239,6 +7257,27 @@ open func membership() -> Membership {
 open func ownUserId() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_own_user_id(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * If this room is the successor of a tombstoned room, return the
+     * “reference” to the predecessor room.
+     *
+     * A room is tombstoned if it has received a [`m.room.tombstone`] state
+     * event.
+     *
+     * To determine if a room is the successor of a tombstoned room, the
+     * [`m.room.create`] must have been received, **with** a `predecessor`
+     * field.
+     *
+     * [`m.room.tombstone`]: https://spec.matrix.org/v1.14/client-server-api/#mroomtombstone
+     * [`m.room.create`]: https://spec.matrix.org/v1.14/client-server-api/#mroomcreate
+     */
+open func predecessorRoom() -> PredecessorRoom? {
+    return try!  FfiConverterOptionTypePredecessorRoom.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_room_predecessor_room(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -7813,6 +7852,22 @@ open func subscribeToTypingNotifications(listener: TypingNotificationsListener) 
     return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_typing_notifications(self.uniffiClonePointer(),
         FfiConverterCallbackInterfaceTypingNotificationsListener.lower(listener),$0
+    )
+})
+}
+    
+    /**
+     * If this room is tombstoned, return the “reference” to the successor room
+     * —i.e. the room replacing this one.
+     *
+     * A room is tombstoned if it has received a [`m.room.tombstone`] state
+     * event.
+     *
+     * [`m.room.tombstone`]: https://spec.matrix.org/v1.14/client-server-api/#mroomtombstone
+     */
+open func successorRoom() -> SuccessorRoom? {
+    return try!  FfiConverterOptionTypeSuccessorRoom.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_room_successor_room(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -16106,6 +16161,85 @@ public func FfiConverterTypePowerLevels_lower(_ value: PowerLevels) -> RustBuffe
 }
 
 
+/**
+ * When a room A is tombstoned, it is replaced by a room B. The room A is the
+ * predecessor of B, and B is the successor of A. This type holds information
+ * about the predecessor room. See [`Room::predecessor_room`].
+ *
+ * To know the predecessor of a room, the [`m.room.create`] state event must
+ * have been received.
+ *
+ * [`m.room.create`]: https://spec.matrix.org/v1.14/client-server-api/#mroomcreate
+ */
+public struct PredecessorRoom {
+    /**
+     * The ID of the replacement room.
+     */
+    public var roomId: String
+    /**
+     * The event ID of the last known event in the predecesssor room.
+     */
+    public var lastEventId: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The ID of the replacement room.
+         */roomId: String, 
+        /**
+         * The event ID of the last known event in the predecesssor room.
+         */lastEventId: String) {
+        self.roomId = roomId
+        self.lastEventId = lastEventId
+    }
+}
+
+
+
+extension PredecessorRoom: Equatable, Hashable {
+    public static func ==(lhs: PredecessorRoom, rhs: PredecessorRoom) -> Bool {
+        if lhs.roomId != rhs.roomId {
+            return false
+        }
+        if lhs.lastEventId != rhs.lastEventId {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(roomId)
+        hasher.combine(lastEventId)
+    }
+}
+
+
+public struct FfiConverterTypePredecessorRoom: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PredecessorRoom {
+        return
+            try PredecessorRoom(
+                roomId: FfiConverterString.read(from: &buf), 
+                lastEventId: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PredecessorRoom, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.roomId, into: &buf)
+        FfiConverterString.write(value.lastEventId, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypePredecessorRoom_lift(_ buf: RustBuffer) throws -> PredecessorRoom {
+    return try FfiConverterTypePredecessorRoom.lift(buf)
+}
+
+public func FfiConverterTypePredecessorRoom_lower(_ value: PredecessorRoom) -> RustBuffer {
+    return FfiConverterTypePredecessorRoom.lower(value)
+}
+
+
 public struct PusherIdentifiers {
     public var pushkey: String
     public var appId: String
@@ -16830,7 +16964,7 @@ public struct RoomInfo {
     /**
      * If present, it means the room has been archived/upgraded.
      */
-    public var tombstone: RoomTombstoneInfo?
+    public var successorRoom: SuccessorRoom?
     public var isFavourite: Bool
     public var canonicalAlias: String?
     public var alternativeAliases: [String]
@@ -16897,7 +17031,7 @@ public struct RoomInfo {
          */rawName: String?, topic: String?, avatarUrl: String?, isDirect: Bool, isPublic: Bool, isSpace: Bool, 
         /**
          * If present, it means the room has been archived/upgraded.
-         */tombstone: RoomTombstoneInfo?, isFavourite: Bool, canonicalAlias: String?, alternativeAliases: [String], membership: Membership, 
+         */successorRoom: SuccessorRoom?, isFavourite: Bool, canonicalAlias: String?, alternativeAliases: [String], membership: Membership, 
         /**
          * Member who invited the current user to a room that's in the invited
          * state.
@@ -16939,7 +17073,7 @@ public struct RoomInfo {
         self.isDirect = isDirect
         self.isPublic = isPublic
         self.isSpace = isSpace
-        self.tombstone = tombstone
+        self.successorRoom = successorRoom
         self.isFavourite = isFavourite
         self.canonicalAlias = canonicalAlias
         self.alternativeAliases = alternativeAliases
@@ -16999,7 +17133,7 @@ extension RoomInfo: Equatable, Hashable {
         if lhs.isSpace != rhs.isSpace {
             return false
         }
-        if lhs.tombstone != rhs.tombstone {
+        if lhs.successorRoom != rhs.successorRoom {
             return false
         }
         if lhs.isFavourite != rhs.isFavourite {
@@ -17082,7 +17216,7 @@ extension RoomInfo: Equatable, Hashable {
         hasher.combine(isDirect)
         hasher.combine(isPublic)
         hasher.combine(isSpace)
-        hasher.combine(tombstone)
+        hasher.combine(successorRoom)
         hasher.combine(isFavourite)
         hasher.combine(canonicalAlias)
         hasher.combine(alternativeAliases)
@@ -17123,7 +17257,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 isDirect: FfiConverterBool.read(from: &buf), 
                 isPublic: FfiConverterBool.read(from: &buf), 
                 isSpace: FfiConverterBool.read(from: &buf), 
-                tombstone: FfiConverterOptionTypeRoomTombstoneInfo.read(from: &buf), 
+                successorRoom: FfiConverterOptionTypeSuccessorRoom.read(from: &buf), 
                 isFavourite: FfiConverterBool.read(from: &buf), 
                 canonicalAlias: FfiConverterOptionString.read(from: &buf), 
                 alternativeAliases: FfiConverterSequenceString.read(from: &buf), 
@@ -17160,7 +17294,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isDirect, into: &buf)
         FfiConverterBool.write(value.isPublic, into: &buf)
         FfiConverterBool.write(value.isSpace, into: &buf)
-        FfiConverterOptionTypeRoomTombstoneInfo.write(value.tombstone, into: &buf)
+        FfiConverterOptionTypeSuccessorRoom.write(value.successorRoom, into: &buf)
         FfiConverterBool.write(value.isFavourite, into: &buf)
         FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
         FfiConverterSequenceString.write(value.alternativeAliases, into: &buf)
@@ -17911,67 +18045,6 @@ public func FfiConverterTypeRoomPreviewInfo_lower(_ value: RoomPreviewInfo) -> R
 
 
 /**
- * Contains the `m.room.tombstone` state of the room, with a message about the
- * room upgrade and the id of the newly created room to replace this one.
- */
-public struct RoomTombstoneInfo {
-    public var body: String
-    public var replacementRoomId: String
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(body: String, replacementRoomId: String) {
-        self.body = body
-        self.replacementRoomId = replacementRoomId
-    }
-}
-
-
-
-extension RoomTombstoneInfo: Equatable, Hashable {
-    public static func ==(lhs: RoomTombstoneInfo, rhs: RoomTombstoneInfo) -> Bool {
-        if lhs.body != rhs.body {
-            return false
-        }
-        if lhs.replacementRoomId != rhs.replacementRoomId {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(body)
-        hasher.combine(replacementRoomId)
-    }
-}
-
-
-public struct FfiConverterTypeRoomTombstoneInfo: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomTombstoneInfo {
-        return
-            try RoomTombstoneInfo(
-                body: FfiConverterString.read(from: &buf), 
-                replacementRoomId: FfiConverterString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: RoomTombstoneInfo, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.body, into: &buf)
-        FfiConverterString.write(value.replacementRoomId, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeRoomTombstoneInfo_lift(_ buf: RustBuffer) throws -> RoomTombstoneInfo {
-    return try FfiConverterTypeRoomTombstoneInfo.lift(buf)
-}
-
-public func FfiConverterTypeRoomTombstoneInfo_lower(_ value: RoomTombstoneInfo) -> RustBuffer {
-    return FfiConverterTypeRoomTombstoneInfo.lower(value)
-}
-
-
-/**
  * A push ruleset scopes a set of rules according to some criteria.
  */
 public struct Ruleset {
@@ -18605,6 +18678,84 @@ public func FfiConverterTypeSimplePushRule_lift(_ buf: RustBuffer) throws -> Sim
 
 public func FfiConverterTypeSimplePushRule_lower(_ value: SimplePushRule) -> RustBuffer {
     return FfiConverterTypeSimplePushRule.lower(value)
+}
+
+
+/**
+ * When a room A is tombstoned, it is replaced by a room B. The room A is the
+ * predecessor of B, and B is the successor of A. This type holds information
+ * about the successor room. See [`Room::successor_room`].
+ *
+ * A room is tombstoned if it has received a [`m.room.tombstone`] state event.
+ *
+ * [`m.room.tombstone`]: https://spec.matrix.org/v1.14/client-server-api/#mroomtombstone
+ */
+public struct SuccessorRoom {
+    /**
+     * The ID of the replacement room.
+     */
+    public var roomId: String
+    /**
+     * The message explaining why the room has been tombstoned.
+     */
+    public var reason: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The ID of the replacement room.
+         */roomId: String, 
+        /**
+         * The message explaining why the room has been tombstoned.
+         */reason: String?) {
+        self.roomId = roomId
+        self.reason = reason
+    }
+}
+
+
+
+extension SuccessorRoom: Equatable, Hashable {
+    public static func ==(lhs: SuccessorRoom, rhs: SuccessorRoom) -> Bool {
+        if lhs.roomId != rhs.roomId {
+            return false
+        }
+        if lhs.reason != rhs.reason {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(roomId)
+        hasher.combine(reason)
+    }
+}
+
+
+public struct FfiConverterTypeSuccessorRoom: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SuccessorRoom {
+        return
+            try SuccessorRoom(
+                roomId: FfiConverterString.read(from: &buf), 
+                reason: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SuccessorRoom, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.roomId, into: &buf)
+        FfiConverterOptionString.write(value.reason, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeSuccessorRoom_lift(_ buf: RustBuffer) throws -> SuccessorRoom {
+    return try FfiConverterTypeSuccessorRoom.lift(buf)
+}
+
+public func FfiConverterTypeSuccessorRoom_lower(_ value: SuccessorRoom) -> RustBuffer {
+    return FfiConverterTypeSuccessorRoom.lower(value)
 }
 
 
@@ -27417,6 +27568,7 @@ public enum RoomListEntriesDynamicFilterKind {
     )
     case fuzzyMatchRoomName(pattern: String
     )
+    case deduplicateVersions
 }
 
 
@@ -27453,6 +27605,8 @@ public struct FfiConverterTypeRoomListEntriesDynamicFilterKind: FfiConverterRust
         
         case 11: return .fuzzyMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
         )
+        
+        case 12: return .deduplicateVersions
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -27510,6 +27664,10 @@ public struct FfiConverterTypeRoomListEntriesDynamicFilterKind: FfiConverterRust
             writeInt(&buf, Int32(11))
             FfiConverterString.write(pattern, into: &buf)
             
+        
+        case .deduplicateVersions:
+            writeInt(&buf, Int32(12))
+        
         }
     }
 }
@@ -34153,6 +34311,27 @@ fileprivate struct FfiConverterOptionTypePowerLevels: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypePredecessorRoom: FfiConverterRustBuffer {
+    typealias SwiftType = PredecessorRoom?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypePredecessorRoom.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypePredecessorRoom.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeReplyParameters: FfiConverterRustBuffer {
     typealias SwiftType = ReplyParameters?
 
@@ -34237,27 +34416,6 @@ fileprivate struct FfiConverterOptionTypeRoomMemberWithSenderInfo: FfiConverterR
     }
 }
 
-fileprivate struct FfiConverterOptionTypeRoomTombstoneInfo: FfiConverterRustBuffer {
-    typealias SwiftType = RoomTombstoneInfo?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeRoomTombstoneInfo.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeRoomTombstoneInfo.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeSetData: FfiConverterRustBuffer {
     typealias SwiftType = SetData?
 
@@ -34274,6 +34432,27 @@ fileprivate struct FfiConverterOptionTypeSetData: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeSetData.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+fileprivate struct FfiConverterOptionTypeSuccessorRoom: FfiConverterRustBuffer {
+    typealias SwiftType = SuccessorRoom?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeSuccessorRoom.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeSuccessorRoom.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -37068,9 +37247,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_is_space() != 16919) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_is_tombstoned() != 49186) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_join() != 9240) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -37123,6 +37299,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_own_user_id() != 39510) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_predecessor_room() != 22093) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_preview_room() != 60431) {
@@ -37207,6 +37386,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_typing_notifications() != 38524) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_successor_room() != 27360) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_suggested_role_for_user() != 47787) {
