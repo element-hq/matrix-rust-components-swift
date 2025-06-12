@@ -11309,7 +11309,7 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendImage(params: UploadParameters, thumbnailPath: String?, imageInfo: ImageInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
     
-    func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?) async 
+    func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?, replyParams: ReplyParameters?) async throws 
     
     func sendPollResponse(pollStartEventId: String, answers: [String]) async throws 
     
@@ -11761,21 +11761,20 @@ open func sendImage(params: UploadParameters, thumbnailPath: String?, imageInfo:
 })
 }
     
-open func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?)async  {
+open func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?, replyParams: ReplyParameters?)async throws  {
     return
-        try!  await uniffiRustCallAsync(
+        try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_send_location(
                     self.uniffiClonePointer(),
-                    FfiConverterString.lower(body),FfiConverterString.lower(geoUri),FfiConverterOptionString.lower(description),FfiConverterOptionUInt8.lower(zoomLevel),FfiConverterOptionTypeAssetType.lower(assetType)
+                    FfiConverterString.lower(body),FfiConverterString.lower(geoUri),FfiConverterOptionString.lower(description),FfiConverterOptionUInt8.lower(zoomLevel),FfiConverterOptionTypeAssetType.lower(assetType),FfiConverterOptionTypeReplyParameters.lower(replyParams)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
-            errorHandler: nil
-            
+            errorHandler: FfiConverterTypeClientError.lift
         )
 }
     
@@ -38251,7 +38250,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 25436) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_location() != 47400) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_location() != 57832) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_poll_response() != 7453) {
