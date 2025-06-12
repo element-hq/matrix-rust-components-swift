@@ -11100,6 +11100,8 @@ public protocol ThreadSummaryProtocol : AnyObject {
     
     func latestEvent()  -> EmbeddedEventDetails
     
+    func numReplies()  -> UInt64
+    
 }
 
 open class ThreadSummary:
@@ -11146,6 +11148,13 @@ open class ThreadSummary:
 open func latestEvent() -> EmbeddedEventDetails {
     return try!  FfiConverterTypeEmbeddedEventDetails.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_threadsummary_latest_event(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func numReplies() -> UInt64 {
+    return try!  FfiConverterUInt64.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_threadsummary_num_replies(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -38188,6 +38197,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_threadsummary_latest_event() != 52917) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_threadsummary_num_replies() != 10634) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_add_listener() != 18746) {
