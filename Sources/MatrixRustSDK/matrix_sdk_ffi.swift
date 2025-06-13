@@ -5880,7 +5880,7 @@ public protocol RoomProtocol : AnyObject {
     /**
      * Remove the `ComposerDraft` stored in the state store for this room.
      */
-    func clearComposerDraft() async throws 
+    func clearComposerDraft(threadRoot: String?) async throws 
     
     /**
      * Clear the event cache storage for the current room.
@@ -6037,7 +6037,7 @@ public protocol RoomProtocol : AnyObject {
     /**
      * Retrieve the `ComposerDraft` stored in the state store for this room.
      */
-    func loadComposerDraft() async throws  -> ComposerDraft?
+    func loadComposerDraft(threadRoot: String?) async throws  -> ComposerDraft?
     
     /**
      * Mark a room as read, by attaching a read receipt on the latest event.
@@ -6186,7 +6186,7 @@ public protocol RoomProtocol : AnyObject {
      * Store the given `ComposerDraft` in the state store using the current
      * room id, as identifier.
      */
-    func saveComposerDraft(draft: ComposerDraft) async throws 
+    func saveComposerDraft(draft: ComposerDraft, threadRoot: String?) async throws 
     
     /**
      * Send a call notification event in the current room.
@@ -6655,13 +6655,13 @@ open func canonicalAlias() -> String? {
     /**
      * Remove the `ComposerDraft` stored in the state store for this room.
      */
-open func clearComposerDraft()async throws  {
+open func clearComposerDraft(threadRoot: String?)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_clear_composer_draft(
-                    self.uniffiClonePointer()
-                    
+                    self.uniffiClonePointer(),
+                    FfiConverterOptionString.lower(threadRoot)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -7155,13 +7155,13 @@ open func leave()async throws  {
     /**
      * Retrieve the `ComposerDraft` stored in the state store for this room.
      */
-open func loadComposerDraft()async throws  -> ComposerDraft? {
+open func loadComposerDraft(threadRoot: String?)async throws  -> ComposerDraft? {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_load_composer_draft(
-                    self.uniffiClonePointer()
-                    
+                    self.uniffiClonePointer(),
+                    FfiConverterOptionString.lower(threadRoot)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
@@ -7624,13 +7624,13 @@ open func roomInfo()async throws  -> RoomInfo {
      * Store the given `ComposerDraft` in the state store using the current
      * room id, as identifier.
      */
-open func saveComposerDraft(draft: ComposerDraft)async throws  {
+open func saveComposerDraft(draft: ComposerDraft, threadRoot: String?)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_save_composer_draft(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeComposerDraft.lower(draft)
+                    FfiConverterTypeComposerDraft.lower(draft),FfiConverterOptionString.lower(threadRoot)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -37773,7 +37773,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_canonical_alias() != 19786) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_composer_draft() != 39667) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_composer_draft() != 59182) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_event_cache_storage() != 13838) {
@@ -37863,7 +37863,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_leave() != 63688) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_load_composer_draft() != 38115) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_load_composer_draft() != 62856) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_mark_as_read() != 57806) {
@@ -37935,7 +37935,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_room_info() != 41146) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_save_composer_draft() != 62232) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_save_composer_draft() != 27585) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_call_notification() != 43366) {
