@@ -715,6 +715,11 @@ public protocol ClientProtocol : AnyObject {
     
     func getMediaContent(mediaSource: MediaSource) async throws  -> Data
     
+    /**
+     * Retrieves a media file from the media source
+     *
+     * Not available on Wasm platforms, due to lack of accessible file system.
+     */
     func getMediaFile(mediaSource: MediaSource, filename: String?, mimeType: String, useCache: Bool, tempDir: String?) async throws  -> MediaFileHandle
     
     /**
@@ -781,6 +786,11 @@ public protocol ClientProtocol : AnyObject {
     func ignoreUser(userId: String) async throws 
     
     func ignoredUsers() async throws  -> [String]
+    
+    /**
+     * Checks if the server supports the LiveKit RTC focus for placing calls.
+     */
+    func isLivekitRtcSupported() async throws  -> Bool
     
     /**
      * Checks if the server supports the report room API.
@@ -867,11 +877,11 @@ public protocol ClientProtocol : AnyObject {
     /**
      * Empty the server version and unstable features cache.
      *
-     * Since the SDK caches server capabilities (versions and unstable
-     * features), it's possible to have a stale entry in the cache. This
-     * functions makes it possible to force reset it.
+     * Since the SDK caches server info (versions, unstable features,
+     * well-known etc), it's possible to have a stale entry in the cache.
+     * This functions makes it possible to force reset it.
      */
-    func resetServerCapabilities() async throws 
+    func resetServerInfo() async throws 
     
     /**
      * Resolves the given room alias to a room ID (and a list of servers), if
@@ -1522,6 +1532,11 @@ open func getMediaContent(mediaSource: MediaSource)async throws  -> Data {
         )
 }
     
+    /**
+     * Retrieves a media file from the media source
+     *
+     * Not available on Wasm platforms, due to lack of accessible file system.
+     */
 open func getMediaFile(mediaSource: MediaSource, filename: String?, mimeType: String, useCache: Bool, tempDir: String?)async throws  -> MediaFileHandle {
     return
         try  await uniffiRustCallAsync(
@@ -1798,6 +1813,26 @@ open func ignoredUsers()async throws  -> [String] {
 }
     
     /**
+     * Checks if the server supports the LiveKit RTC focus for placing calls.
+     */
+open func isLivekitRtcSupported()async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_is_livekit_rtc_supported(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
      * Checks if the server supports the report room API.
      */
 open func isReportRoomApiSupported()async throws  -> Bool {
@@ -2062,15 +2097,15 @@ open func removeAvatar()async throws  {
     /**
      * Empty the server version and unstable features cache.
      *
-     * Since the SDK caches server capabilities (versions and unstable
-     * features), it's possible to have a stale entry in the cache. This
-     * functions makes it possible to force reset it.
+     * Since the SDK caches server info (versions, unstable features,
+     * well-known etc), it's possible to have a stale entry in the cache.
+     * This functions makes it possible to force reset it.
      */
-open func resetServerCapabilities()async throws  {
+open func resetServerInfo()async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_reset_server_capabilities(
+                uniffi_matrix_sdk_ffi_fn_method_client_reset_server_info(
                     self.uniffiClonePointer()
                     
                 )
@@ -5857,24 +5892,6 @@ public protocol RoomProtocol : AnyObject {
     
     func banUser(userId: String, reason: String?) async throws 
     
-    func canUserBan(userId: String) async throws  -> Bool
-    
-    func canUserInvite(userId: String) async throws  -> Bool
-    
-    func canUserKick(userId: String) async throws  -> Bool
-    
-    func canUserPinUnpin(userId: String) async throws  -> Bool
-    
-    func canUserRedactOther(userId: String) async throws  -> Bool
-    
-    func canUserRedactOwn(userId: String) async throws  -> Bool
-    
-    func canUserSendMessage(userId: String, message: MessageLikeEventType) async throws  -> Bool
-    
-    func canUserSendState(userId: String, stateEvent: StateEventType) async throws  -> Bool
-    
-    func canUserTriggerRoomNotification(userId: String) async throws  -> Bool
-    
     func canonicalAlias()  -> String?
     
     /**
@@ -6492,159 +6509,6 @@ open func banUser(userId: String, reason: String?)async throws  {
         )
 }
     
-open func canUserBan(userId: String)async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_can_user_ban(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(userId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func canUserInvite(userId: String)async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_can_user_invite(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(userId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func canUserKick(userId: String)async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_can_user_kick(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(userId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func canUserPinUnpin(userId: String)async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_can_user_pin_unpin(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(userId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func canUserRedactOther(userId: String)async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_can_user_redact_other(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(userId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func canUserRedactOwn(userId: String)async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_can_user_redact_own(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(userId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func canUserSendMessage(userId: String, message: MessageLikeEventType)async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_can_user_send_message(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(userId),FfiConverterTypeMessageLikeEventType.lower(message)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func canUserSendState(userId: String, stateEvent: StateEventType)async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_can_user_send_state(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(userId),FfiConverterTypeStateEventType.lower(stateEvent)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-open func canUserTriggerRoomNotification(userId: String)async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_can_user_trigger_room_notification(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(userId)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
 open func canonicalAlias() -> String? {
     return try!  FfiConverterOptionString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_canonical_alias(self.uniffiClonePointer(),$0
@@ -6826,9 +6690,9 @@ open func getPowerLevels()async throws  -> RoomPowerLevels {
                     
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
             liftFunc: FfiConverterTypeRoomPowerLevels.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
@@ -7574,9 +7438,9 @@ open func resetPowerLevels()async throws  -> RoomPowerLevels {
                     
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
             liftFunc: FfiConverterTypeRoomPowerLevels.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
@@ -9253,6 +9117,308 @@ public func FfiConverterTypeRoomMessageEventContentWithoutRelation_lift(_ pointe
 
 public func FfiConverterTypeRoomMessageEventContentWithoutRelation_lower(_ value: RoomMessageEventContentWithoutRelation) -> UnsafeMutableRawPointer {
     return FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(value)
+}
+
+
+
+
+public protocol RoomPowerLevelsProtocol : AnyObject {
+    
+    /**
+     * Returns true if the user with the given user_id is able to ban in the
+     * room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+    func canUserBan(userId: String) throws  -> Bool
+    
+    /**
+     * Returns true if the user with the given user_id is able to kick in the
+     * room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+    func canUserInvite(userId: String) throws  -> Bool
+    
+    /**
+     * Returns true if the user with the given user_id is able to kick in the
+     * room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+    func canUserKick(userId: String) throws  -> Bool
+    
+    /**
+     * Returns true if the user with the given user_id is able to pin or unpin
+     * events in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+    func canUserPinUnpin(userId: String) throws  -> Bool
+    
+    /**
+     * Returns true if the user with the given user_id is able to redact
+     * messages of other users in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+    func canUserRedactOther(userId: String) throws  -> Bool
+    
+    /**
+     * Returns true if the user with the given user_id is able to redact
+     * their own messages in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+    func canUserRedactOwn(userId: String) throws  -> Bool
+    
+    /**
+     * Returns true if the user with the given user_id is able to send a
+     * specific message type in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+    func canUserSendMessage(userId: String, message: MessageLikeEventType) throws  -> Bool
+    
+    /**
+     * Returns true if the user with the given user_id is able to send a
+     * specific state event type in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+    func canUserSendState(userId: String, stateEvent: StateEventType) throws  -> Bool
+    
+    /**
+     * Returns true if the user with the given user_id is able to trigger a
+     * notification in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+    func canUserTriggerRoomNotification(userId: String) throws  -> Bool
+    
+    func values()  -> RoomPowerLevelsValues
+    
+}
+
+open class RoomPowerLevels:
+    RoomPowerLevelsProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_roompowerlevels(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roompowerlevels(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Returns true if the user with the given user_id is able to ban in the
+     * room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+open func canUserBan(userId: String)throws  -> Bool {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_user_ban(self.uniffiClonePointer(),
+        FfiConverterString.lower(userId),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the user with the given user_id is able to kick in the
+     * room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+open func canUserInvite(userId: String)throws  -> Bool {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_user_invite(self.uniffiClonePointer(),
+        FfiConverterString.lower(userId),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the user with the given user_id is able to kick in the
+     * room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+open func canUserKick(userId: String)throws  -> Bool {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_user_kick(self.uniffiClonePointer(),
+        FfiConverterString.lower(userId),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the user with the given user_id is able to pin or unpin
+     * events in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+open func canUserPinUnpin(userId: String)throws  -> Bool {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_user_pin_unpin(self.uniffiClonePointer(),
+        FfiConverterString.lower(userId),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the user with the given user_id is able to redact
+     * messages of other users in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+open func canUserRedactOther(userId: String)throws  -> Bool {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_user_redact_other(self.uniffiClonePointer(),
+        FfiConverterString.lower(userId),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the user with the given user_id is able to redact
+     * their own messages in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+open func canUserRedactOwn(userId: String)throws  -> Bool {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_user_redact_own(self.uniffiClonePointer(),
+        FfiConverterString.lower(userId),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the user with the given user_id is able to send a
+     * specific message type in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+open func canUserSendMessage(userId: String, message: MessageLikeEventType)throws  -> Bool {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_user_send_message(self.uniffiClonePointer(),
+        FfiConverterString.lower(userId),
+        FfiConverterTypeMessageLikeEventType.lower(message),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the user with the given user_id is able to send a
+     * specific state event type in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+open func canUserSendState(userId: String, stateEvent: StateEventType)throws  -> Bool {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_user_send_state(self.uniffiClonePointer(),
+        FfiConverterString.lower(userId),
+        FfiConverterTypeStateEventType.lower(stateEvent),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the user with the given user_id is able to trigger a
+     * notification in the room.
+     *
+     * The call may fail if there is an error in getting the power levels.
+     */
+open func canUserTriggerRoomNotification(userId: String)throws  -> Bool {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_user_trigger_room_notification(self.uniffiClonePointer(),
+        FfiConverterString.lower(userId),$0
+    )
+})
+}
+    
+open func values() -> RoomPowerLevelsValues {
+    return try!  FfiConverterTypeRoomPowerLevelsValues.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_values(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+
+}
+
+public struct FfiConverterTypeRoomPowerLevels: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = RoomPowerLevels
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> RoomPowerLevels {
+        return RoomPowerLevels(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: RoomPowerLevels) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomPowerLevels {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: RoomPowerLevels, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeRoomPowerLevels_lift(_ pointer: UnsafeMutableRawPointer) throws -> RoomPowerLevels {
+    return try FfiConverterTypeRoomPowerLevels.lift(pointer)
+}
+
+public func FfiConverterTypeRoomPowerLevels_lower(_ value: RoomPowerLevels) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeRoomPowerLevels.lower(value)
 }
 
 
@@ -18038,7 +18204,11 @@ public func FfiConverterTypeRoomNotificationSettings_lower(_ value: RoomNotifica
 }
 
 
-public struct RoomPowerLevels {
+/**
+ * This intermediary struct is used to expose the power levels values through
+ * FFI and work around it not exposing public exported object fields.
+ */
+public struct RoomPowerLevelsValues {
     /**
      * The level required to ban a user.
      */
@@ -18128,8 +18298,8 @@ public struct RoomPowerLevels {
 
 
 
-extension RoomPowerLevels: Equatable, Hashable {
-    public static func ==(lhs: RoomPowerLevels, rhs: RoomPowerLevels) -> Bool {
+extension RoomPowerLevelsValues: Equatable, Hashable {
+    public static func ==(lhs: RoomPowerLevelsValues, rhs: RoomPowerLevelsValues) -> Bool {
         if lhs.ban != rhs.ban {
             return false
         }
@@ -18178,10 +18348,10 @@ extension RoomPowerLevels: Equatable, Hashable {
 }
 
 
-public struct FfiConverterTypeRoomPowerLevels: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomPowerLevels {
+public struct FfiConverterTypeRoomPowerLevelsValues: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomPowerLevelsValues {
         return
-            try RoomPowerLevels(
+            try RoomPowerLevelsValues(
                 ban: FfiConverterInt64.read(from: &buf), 
                 invite: FfiConverterInt64.read(from: &buf), 
                 kick: FfiConverterInt64.read(from: &buf), 
@@ -18195,7 +18365,7 @@ public struct FfiConverterTypeRoomPowerLevels: FfiConverterRustBuffer {
         )
     }
 
-    public static func write(_ value: RoomPowerLevels, into buf: inout [UInt8]) {
+    public static func write(_ value: RoomPowerLevelsValues, into buf: inout [UInt8]) {
         FfiConverterInt64.write(value.ban, into: &buf)
         FfiConverterInt64.write(value.invite, into: &buf)
         FfiConverterInt64.write(value.kick, into: &buf)
@@ -18210,12 +18380,12 @@ public struct FfiConverterTypeRoomPowerLevels: FfiConverterRustBuffer {
 }
 
 
-public func FfiConverterTypeRoomPowerLevels_lift(_ buf: RustBuffer) throws -> RoomPowerLevels {
-    return try FfiConverterTypeRoomPowerLevels.lift(buf)
+public func FfiConverterTypeRoomPowerLevelsValues_lift(_ buf: RustBuffer) throws -> RoomPowerLevelsValues {
+    return try FfiConverterTypeRoomPowerLevelsValues.lift(buf)
 }
 
-public func FfiConverterTypeRoomPowerLevels_lower(_ value: RoomPowerLevels) -> RustBuffer {
-    return FfiConverterTypeRoomPowerLevels.lower(value)
+public func FfiConverterTypeRoomPowerLevelsValues_lower(_ value: RoomPowerLevelsValues) -> RustBuffer {
+    return FfiConverterTypeRoomPowerLevelsValues.lower(value)
 }
 
 
@@ -37257,7 +37427,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_content() != 40308) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_file() != 52604) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_file() != 20094) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_preview_display_policy() != 19264) {
@@ -37302,6 +37472,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_ignored_users() != 49620) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_livekit_rtc_supported() != 34863) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_is_report_room_api_supported() != 17934) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -37341,7 +37514,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_remove_avatar() != 29033) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_reset_server_capabilities() != 39651) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_reset_server_info() != 16333) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_resolve_room_alias() != 3551) {
@@ -37743,33 +37916,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_ban_user() != 35046) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_ban() != 64711) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_invite() != 62459) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_kick() != 12773) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_pin_unpin() != 8341) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_redact_other() != 13274) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_redact_own() != 57442) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_send_message() != 36743) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_send_state() != 19062) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_can_user_trigger_room_notification() != 18832) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_canonical_alias() != 19786) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -37800,7 +37946,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_forget() != 37840) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_get_power_levels() != 54094) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_get_power_levels() != 47640) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_get_room_visibility() != 412) {
@@ -37926,7 +38072,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_report_room() != 8059) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_reset_power_levels() != 63622) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_reset_power_levels() != 5060) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_room_events_debug_string() != 37832) {
@@ -38086,6 +38232,36 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roommembersiterator_next_chunk() != 23186) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_ban() != 57457) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_invite() != 58911) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_kick() != 51066) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_pin_unpin() != 4609) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_redact_other() != 52543) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_redact_own() != 2983) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_send_message() != 48291) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_send_state() != 14792) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_trigger_room_notification() != 26319) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_values() != 38774) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_forget() != 18179) {
