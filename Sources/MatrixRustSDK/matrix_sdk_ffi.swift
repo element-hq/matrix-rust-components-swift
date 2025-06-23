@@ -9125,6 +9125,57 @@ public func FfiConverterTypeRoomMessageEventContentWithoutRelation_lower(_ value
 public protocol RoomPowerLevelsProtocol : AnyObject {
     
     /**
+     * Returns true if the current user is able to ban in the room.
+     */
+    func canOwnUserBan()  -> Bool
+    
+    /**
+     * Returns true if the current user is able to invite in the room.
+     */
+    func canOwnUserInvite()  -> Bool
+    
+    /**
+     * Returns true if the current user is able to kick in the room.
+     */
+    func canOwnUserKick()  -> Bool
+    
+    /**
+     * Returns true if the current user is able to pin or unpin events in the
+     * room.
+     */
+    func canOwnUserPinUnpin()  -> Bool
+    
+    /**
+     * Returns true if the current user user is able to redact messages of
+     * other users in the room.
+     */
+    func canOwnUserRedactOther()  -> Bool
+    
+    /**
+     * Returns true if the current user is able to redact their own messages in
+     * the room.
+     */
+    func canOwnUserRedactOwn()  -> Bool
+    
+    /**
+     * Returns true if the current user is able to send a specific message type
+     * in the room.
+     */
+    func canOwnUserSendMessage(message: MessageLikeEventType)  -> Bool
+    
+    /**
+     * Returns true if the current user is able to send a specific state event
+     * type in the room.
+     */
+    func canOwnUserSendState(stateEvent: StateEventType)  -> Bool
+    
+    /**
+     * Returns true if the current user is able to trigger a notification in
+     * the room.
+     */
+    func canOwnUserTriggerRoomNotification()  -> Bool
+    
+    /**
      * Returns true if the user with the given user_id is able to ban in the
      * room.
      *
@@ -9133,7 +9184,7 @@ public protocol RoomPowerLevelsProtocol : AnyObject {
     func canUserBan(userId: String) throws  -> Bool
     
     /**
-     * Returns true if the user with the given user_id is able to kick in the
+     * Returns true if the user with the given user_id is able to invite in the
      * room.
      *
      * The call may fail if there is an error in getting the power levels.
@@ -9196,6 +9247,12 @@ public protocol RoomPowerLevelsProtocol : AnyObject {
      */
     func canUserTriggerRoomNotification(userId: String) throws  -> Bool
     
+    /**
+     * Gets a map with the `UserId` of users with power levels other than `0`
+     * and their power level.
+     */
+    func userPowerLevels()  -> [String: Int64]
+    
     func values()  -> RoomPowerLevelsValues
     
 }
@@ -9242,6 +9299,104 @@ open class RoomPowerLevels:
 
     
     /**
+     * Returns true if the current user is able to ban in the room.
+     */
+open func canOwnUserBan() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_own_user_ban(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the current user is able to invite in the room.
+     */
+open func canOwnUserInvite() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_own_user_invite(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the current user is able to kick in the room.
+     */
+open func canOwnUserKick() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_own_user_kick(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the current user is able to pin or unpin events in the
+     * room.
+     */
+open func canOwnUserPinUnpin() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_own_user_pin_unpin(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the current user user is able to redact messages of
+     * other users in the room.
+     */
+open func canOwnUserRedactOther() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_own_user_redact_other(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the current user is able to redact their own messages in
+     * the room.
+     */
+open func canOwnUserRedactOwn() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_own_user_redact_own(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the current user is able to send a specific message type
+     * in the room.
+     */
+open func canOwnUserSendMessage(message: MessageLikeEventType) -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_own_user_send_message(self.uniffiClonePointer(),
+        FfiConverterTypeMessageLikeEventType.lower(message),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the current user is able to send a specific state event
+     * type in the room.
+     */
+open func canOwnUserSendState(stateEvent: StateEventType) -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_own_user_send_state(self.uniffiClonePointer(),
+        FfiConverterTypeStateEventType.lower(stateEvent),$0
+    )
+})
+}
+    
+    /**
+     * Returns true if the current user is able to trigger a notification in
+     * the room.
+     */
+open func canOwnUserTriggerRoomNotification() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_own_user_trigger_room_notification(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
      * Returns true if the user with the given user_id is able to ban in the
      * room.
      *
@@ -9256,7 +9411,7 @@ open func canUserBan(userId: String)throws  -> Bool {
 }
     
     /**
-     * Returns true if the user with the given user_id is able to kick in the
+     * Returns true if the user with the given user_id is able to invite in the
      * room.
      *
      * The call may fail if there is an error in getting the power levels.
@@ -9365,6 +9520,17 @@ open func canUserTriggerRoomNotification(userId: String)throws  -> Bool {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_can_user_trigger_room_notification(self.uniffiClonePointer(),
         FfiConverterString.lower(userId),$0
+    )
+})
+}
+    
+    /**
+     * Gets a map with the `UserId` of users with power levels other than `0`
+     * and their power level.
+     */
+open func userPowerLevels() -> [String: Int64] {
+    return try!  FfiConverterDictionaryStringInt64.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roompowerlevels_user_power_levels(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -17548,7 +17714,6 @@ public struct RoomInfo {
     public var activeMembersCount: UInt64
     public var invitedMembersCount: UInt64
     public var joinedMembersCount: UInt64
-    public var userPowerLevels: [String: Int64]
     public var highlightCount: UInt64
     public var notificationCount: UInt64
     public var cachedUserDefinedNotificationMode: RoomNotificationMode?
@@ -17585,6 +17750,10 @@ public struct RoomInfo {
      * The history visibility for this room, if known.
      */
     public var historyVisibility: RoomHistoryVisibility
+    /**
+     * This room's current power levels.
+     */
+    public var powerLevels: RoomPowerLevels
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -17605,7 +17774,7 @@ public struct RoomInfo {
          *
          * Can be missing if the room membership invite event is missing from the
          * store.
-         */inviter: RoomMember?, heroes: [RoomHero], activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, userPowerLevels: [String: Int64], highlightCount: UInt64, notificationCount: UInt64, cachedUserDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], 
+         */inviter: RoomMember?, heroes: [RoomHero], activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, highlightCount: UInt64, notificationCount: UInt64, cachedUserDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], 
         /**
          * Whether this room has been explicitly marked as unread
          */isMarkedUnread: Bool, 
@@ -17629,7 +17798,10 @@ public struct RoomInfo {
          */joinRule: JoinRule?, 
         /**
          * The history visibility for this room, if known.
-         */historyVisibility: RoomHistoryVisibility) {
+         */historyVisibility: RoomHistoryVisibility, 
+        /**
+         * This room's current power levels.
+         */powerLevels: RoomPowerLevels) {
         self.id = id
         self.encryptionState = encryptionState
         self.creator = creator
@@ -17650,7 +17822,6 @@ public struct RoomInfo {
         self.activeMembersCount = activeMembersCount
         self.invitedMembersCount = invitedMembersCount
         self.joinedMembersCount = joinedMembersCount
-        self.userPowerLevels = userPowerLevels
         self.highlightCount = highlightCount
         self.notificationCount = notificationCount
         self.cachedUserDefinedNotificationMode = cachedUserDefinedNotificationMode
@@ -17663,151 +17834,10 @@ public struct RoomInfo {
         self.pinnedEventIds = pinnedEventIds
         self.joinRule = joinRule
         self.historyVisibility = historyVisibility
+        self.powerLevels = powerLevels
     }
 }
 
-
-
-extension RoomInfo: Equatable, Hashable {
-    public static func ==(lhs: RoomInfo, rhs: RoomInfo) -> Bool {
-        if lhs.id != rhs.id {
-            return false
-        }
-        if lhs.encryptionState != rhs.encryptionState {
-            return false
-        }
-        if lhs.creator != rhs.creator {
-            return false
-        }
-        if lhs.displayName != rhs.displayName {
-            return false
-        }
-        if lhs.rawName != rhs.rawName {
-            return false
-        }
-        if lhs.topic != rhs.topic {
-            return false
-        }
-        if lhs.avatarUrl != rhs.avatarUrl {
-            return false
-        }
-        if lhs.isDirect != rhs.isDirect {
-            return false
-        }
-        if lhs.isPublic != rhs.isPublic {
-            return false
-        }
-        if lhs.isSpace != rhs.isSpace {
-            return false
-        }
-        if lhs.successorRoom != rhs.successorRoom {
-            return false
-        }
-        if lhs.isFavourite != rhs.isFavourite {
-            return false
-        }
-        if lhs.canonicalAlias != rhs.canonicalAlias {
-            return false
-        }
-        if lhs.alternativeAliases != rhs.alternativeAliases {
-            return false
-        }
-        if lhs.membership != rhs.membership {
-            return false
-        }
-        if lhs.inviter != rhs.inviter {
-            return false
-        }
-        if lhs.heroes != rhs.heroes {
-            return false
-        }
-        if lhs.activeMembersCount != rhs.activeMembersCount {
-            return false
-        }
-        if lhs.invitedMembersCount != rhs.invitedMembersCount {
-            return false
-        }
-        if lhs.joinedMembersCount != rhs.joinedMembersCount {
-            return false
-        }
-        if lhs.userPowerLevels != rhs.userPowerLevels {
-            return false
-        }
-        if lhs.highlightCount != rhs.highlightCount {
-            return false
-        }
-        if lhs.notificationCount != rhs.notificationCount {
-            return false
-        }
-        if lhs.cachedUserDefinedNotificationMode != rhs.cachedUserDefinedNotificationMode {
-            return false
-        }
-        if lhs.hasRoomCall != rhs.hasRoomCall {
-            return false
-        }
-        if lhs.activeRoomCallParticipants != rhs.activeRoomCallParticipants {
-            return false
-        }
-        if lhs.isMarkedUnread != rhs.isMarkedUnread {
-            return false
-        }
-        if lhs.numUnreadMessages != rhs.numUnreadMessages {
-            return false
-        }
-        if lhs.numUnreadNotifications != rhs.numUnreadNotifications {
-            return false
-        }
-        if lhs.numUnreadMentions != rhs.numUnreadMentions {
-            return false
-        }
-        if lhs.pinnedEventIds != rhs.pinnedEventIds {
-            return false
-        }
-        if lhs.joinRule != rhs.joinRule {
-            return false
-        }
-        if lhs.historyVisibility != rhs.historyVisibility {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-        hasher.combine(encryptionState)
-        hasher.combine(creator)
-        hasher.combine(displayName)
-        hasher.combine(rawName)
-        hasher.combine(topic)
-        hasher.combine(avatarUrl)
-        hasher.combine(isDirect)
-        hasher.combine(isPublic)
-        hasher.combine(isSpace)
-        hasher.combine(successorRoom)
-        hasher.combine(isFavourite)
-        hasher.combine(canonicalAlias)
-        hasher.combine(alternativeAliases)
-        hasher.combine(membership)
-        hasher.combine(inviter)
-        hasher.combine(heroes)
-        hasher.combine(activeMembersCount)
-        hasher.combine(invitedMembersCount)
-        hasher.combine(joinedMembersCount)
-        hasher.combine(userPowerLevels)
-        hasher.combine(highlightCount)
-        hasher.combine(notificationCount)
-        hasher.combine(cachedUserDefinedNotificationMode)
-        hasher.combine(hasRoomCall)
-        hasher.combine(activeRoomCallParticipants)
-        hasher.combine(isMarkedUnread)
-        hasher.combine(numUnreadMessages)
-        hasher.combine(numUnreadNotifications)
-        hasher.combine(numUnreadMentions)
-        hasher.combine(pinnedEventIds)
-        hasher.combine(joinRule)
-        hasher.combine(historyVisibility)
-    }
-}
 
 
 public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
@@ -17834,7 +17864,6 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 activeMembersCount: FfiConverterUInt64.read(from: &buf), 
                 invitedMembersCount: FfiConverterUInt64.read(from: &buf), 
                 joinedMembersCount: FfiConverterUInt64.read(from: &buf), 
-                userPowerLevels: FfiConverterDictionaryStringInt64.read(from: &buf), 
                 highlightCount: FfiConverterUInt64.read(from: &buf), 
                 notificationCount: FfiConverterUInt64.read(from: &buf), 
                 cachedUserDefinedNotificationMode: FfiConverterOptionTypeRoomNotificationMode.read(from: &buf), 
@@ -17846,7 +17875,8 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 numUnreadMentions: FfiConverterUInt64.read(from: &buf), 
                 pinnedEventIds: FfiConverterSequenceString.read(from: &buf), 
                 joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
-                historyVisibility: FfiConverterTypeRoomHistoryVisibility.read(from: &buf)
+                historyVisibility: FfiConverterTypeRoomHistoryVisibility.read(from: &buf), 
+                powerLevels: FfiConverterTypeRoomPowerLevels.read(from: &buf)
         )
     }
 
@@ -17871,7 +17901,6 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.activeMembersCount, into: &buf)
         FfiConverterUInt64.write(value.invitedMembersCount, into: &buf)
         FfiConverterUInt64.write(value.joinedMembersCount, into: &buf)
-        FfiConverterDictionaryStringInt64.write(value.userPowerLevels, into: &buf)
         FfiConverterUInt64.write(value.highlightCount, into: &buf)
         FfiConverterUInt64.write(value.notificationCount, into: &buf)
         FfiConverterOptionTypeRoomNotificationMode.write(value.cachedUserDefinedNotificationMode, into: &buf)
@@ -17884,6 +17913,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.pinnedEventIds, into: &buf)
         FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
         FfiConverterTypeRoomHistoryVisibility.write(value.historyVisibility, into: &buf)
+        FfiConverterTypeRoomPowerLevels.write(value.powerLevels, into: &buf)
     }
 }
 
@@ -38234,10 +38264,37 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roommembersiterator_next_chunk() != 23186) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_own_user_ban() != 7183) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_own_user_invite() != 57708) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_own_user_kick() != 461) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_own_user_pin_unpin() != 52852) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_own_user_redact_other() != 60699) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_own_user_redact_own() != 32905) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_own_user_send_message() != 2424) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_own_user_send_state() != 33539) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_own_user_trigger_room_notification() != 64150) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_ban() != 57457) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_invite() != 58911) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_invite() != 41275) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_kick() != 51066) {
@@ -38259,6 +38316,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_can_user_trigger_room_notification() != 26319) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_user_power_levels() != 16221) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roompowerlevels_values() != 38774) {
