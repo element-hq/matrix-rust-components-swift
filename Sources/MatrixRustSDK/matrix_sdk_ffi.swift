@@ -2737,6 +2737,11 @@ public protocol ClientBuilderProtocol : AnyObject {
     
     func crossProcessStoreLocksHolderName(holderName: String)  -> ClientBuilder
     
+    /**
+     * Set the trust requirement to be used when decrypting events.
+     */
+    func decryptionSettings(decryptionSettings: DecryptionSettings)  -> ClientBuilder
+    
     func disableAutomaticTokenRefresh()  -> ClientBuilder
     
     /**
@@ -2766,11 +2771,6 @@ public protocol ClientBuilderProtocol : AnyObject {
      * Add a default request config to this client.
      */
     func requestConfig(config: RequestConfig)  -> ClientBuilder
-    
-    /**
-     * Set the trust requirement to be used when decrypting events.
-     */
-    func roomDecryptionTrustRequirement(trustRequirement: TrustRequirement)  -> ClientBuilder
     
     /**
      * Set the strategy to be used for picking recipient devices when sending
@@ -3004,6 +3004,17 @@ open func crossProcessStoreLocksHolderName(holderName: String) -> ClientBuilder 
 })
 }
     
+    /**
+     * Set the trust requirement to be used when decrypting events.
+     */
+open func decryptionSettings(decryptionSettings: DecryptionSettings) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_decryption_settings(self.uniffiClonePointer(),
+        FfiConverterTypeDecryptionSettings_lower(decryptionSettings),$0
+    )
+})
+}
+    
 open func disableAutomaticTokenRefresh() -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_disable_automatic_token_refresh(self.uniffiClonePointer(),$0
@@ -3074,17 +3085,6 @@ open func requestConfig(config: RequestConfig) -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_request_config(self.uniffiClonePointer(),
         FfiConverterTypeRequestConfig.lower(config),$0
-    )
-})
-}
-    
-    /**
-     * Set the trust requirement to be used when decrypting events.
-     */
-open func roomDecryptionTrustRequirement(trustRequirement: TrustRequirement) -> ClientBuilder {
-    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_room_decryption_trust_requirement(self.uniffiClonePointer(),
-        FfiConverterTypeTrustRequirement_lower(trustRequirement),$0
     )
 })
 }
@@ -37661,6 +37661,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_cross_process_store_locks_holder_name() != 46627) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_decryption_settings() != 34715) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_automatic_token_refresh() != 43839) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -37683,9 +37686,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_request_config() != 58783) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_room_decryption_trust_requirement() != 2776) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_room_key_recipient_strategy() != 41183) {
