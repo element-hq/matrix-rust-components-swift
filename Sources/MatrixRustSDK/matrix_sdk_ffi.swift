@@ -634,9 +634,16 @@ public protocol ClientProtocol : AnyObject {
      * Clear all the non-critical caches for this Client instance.
      *
      * WARNING: This will clear all the caches, including the base store (state
-     * store), so callers must make sure that any sync is inactive before
-     * calling this method. In particular, the `SyncService` must not be
-     * running. After the method returns, the Client will be in an unstable
+     * store), so callers must make sure that the Client is at rest before
+     * calling it.
+     *
+     * In particular, if a [`SyncService`] is running, it must be passed here
+     * as a parameter, or stopped before calling this method. Ideally, the
+     * send queues should have been disabled and must all be inactive (i.e.
+     * not sending events); this method will disable them, but it might not
+     * be enough if the queues are still processing events.
+     *
+     * After the method returns, the Client will be in an unstable
      * state, and it is required that the caller reinstantiates a new
      * Client instance, be it via dropping the previous and re-creating it,
      * restarting their application, or any other similar means.
@@ -647,7 +654,7 @@ public protocol ClientProtocol : AnyObject {
      * - This will empty the media cache according to the current media
      * retention policy.
      */
-    func clearCaches() async throws 
+    func clearCaches(syncService: SyncService?) async throws 
     
     func createRoom(request: CreateRoomParameters) async throws  -> String
     
@@ -1269,9 +1276,16 @@ open func canDeactivateAccount() -> Bool {
      * Clear all the non-critical caches for this Client instance.
      *
      * WARNING: This will clear all the caches, including the base store (state
-     * store), so callers must make sure that any sync is inactive before
-     * calling this method. In particular, the `SyncService` must not be
-     * running. After the method returns, the Client will be in an unstable
+     * store), so callers must make sure that the Client is at rest before
+     * calling it.
+     *
+     * In particular, if a [`SyncService`] is running, it must be passed here
+     * as a parameter, or stopped before calling this method. Ideally, the
+     * send queues should have been disabled and must all be inactive (i.e.
+     * not sending events); this method will disable them, but it might not
+     * be enough if the queues are still processing events.
+     *
+     * After the method returns, the Client will be in an unstable
      * state, and it is required that the caller reinstantiates a new
      * Client instance, be it via dropping the previous and re-creating it,
      * restarting their application, or any other similar means.
@@ -1282,13 +1296,13 @@ open func canDeactivateAccount() -> Bool {
      * - This will empty the media cache according to the current media
      * retention policy.
      */
-open func clearCaches()async throws  {
+open func clearCaches(syncService: SyncService?)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_clear_caches(
-                    self.uniffiClonePointer()
-                    
+                    self.uniffiClonePointer(),
+                    FfiConverterOptionTypeSyncService.lower(syncService)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -20714,388 +20728,6 @@ public func FfiConverterTypeVideoMessageContent_lower(_ value: VideoMessageConte
 
 
 /**
- * Properties to create a new virtual Element Call widget.
- */
-public struct VirtualElementCallWidgetOptions {
-    /**
-     * The url to the Element Call app including any `/room` path if required.
-     *
-     * E.g. <https://call.element.io>, <https://call.element.dev>, <https://call.element.dev/room>
-     */
-    public var elementCallUrl: String
-    /**
-     * The widget id.
-     */
-    public var widgetId: String
-    /**
-     * The url that is used as the target for the PostMessages sent
-     * by the widget (to the client).
-     *
-     * For a web app client this is the client url. In case of using other
-     * platforms the client most likely is setup up to listen to
-     * postmessages in the same webview the widget is hosted. In this case
-     * the `parent_url` is set to the url of the webview with the widget. Be
-     * aware that this means that the widget will receive its own postmessage
-     * messages. The `matrix-widget-api` (js) ignores those so this works but
-     * it might break custom implementations.
-     *
-     * Defaults to `element_call_url` for the non-iframe (dedicated webview)
-     * usecase.
-     */
-    public var parentUrl: String?
-    /**
-     * Whether the branding header of Element call should be hidden.
-     *
-     * Default: `true`
-     */
-    public var hideHeader: Bool?
-    /**
-     * If set, the lobby will be skipped and the widget will join the
-     * call on the `io.element.join` action.
-     *
-     * Default: `false`
-     */
-    public var preload: Bool?
-    /**
-     * The font scale which will be used inside element call.
-     *
-     * Default: `1`
-     */
-    public var fontScale: Double?
-    /**
-     * Whether element call should prompt the user to open in the browser or
-     * the app.
-     *
-     * Default: `false`
-     */
-    public var appPrompt: Bool?
-    /**
-     * Make it not possible to get to the calls list in the webview.
-     *
-     * Default: `true`
-     */
-    public var confineToRoom: Bool?
-    /**
-     * The font to use, to adapt to the system font.
-     */
-    public var font: String?
-    /**
-     * The encryption system to use.
-     *
-     * Use `EncryptionSystem::Unencrypted` to disable encryption.
-     */
-    public var encryption: EncryptionSystem
-    /**
-     * The intent of showing the call.
-     * If the user wants to start a call or join an existing one.
-     * Controls if the lobby is skipped or not.
-     */
-    public var intent: Intent?
-    /**
-     * Do not show the screenshare button.
-     */
-    public var hideScreensharing: Bool
-    /**
-     * Can be used to pass a PostHog id to element call.
-     */
-    public var posthogUserId: String?
-    /**
-     * The host of the posthog api.
-     * Supported since Element Call v0.9.0. Only used by the embedded package.
-     */
-    public var posthogApiHost: String?
-    /**
-     * The key for the posthog api.
-     * Supported since Element Call v0.9.0. Only used by the embedded package.
-     */
-    public var posthogApiKey: String?
-    /**
-     * The url to use for submitting rageshakes.
-     * Supported since Element Call v0.9.0. Only used by the embedded package.
-     */
-    public var rageshakeSubmitUrl: String?
-    /**
-     * Sentry [DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/)
-     * Supported since Element Call v0.9.0. Only used by the embedded package.
-     */
-    public var sentryDsn: String?
-    /**
-     * Sentry [environment](https://docs.sentry.io/concepts/key-terms/key-terms/)
-     * Supported since Element Call v0.9.0. Only used by the embedded package.
-     */
-    public var sentryEnvironment: String?
-    /**
-     * - `false`: the webview shows a a list of devices injected by the
-     * client. (used on ios & android)
-     */
-    public var controlledMediaDevices: Bool
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        /**
-         * The url to the Element Call app including any `/room` path if required.
-         *
-         * E.g. <https://call.element.io>, <https://call.element.dev>, <https://call.element.dev/room>
-         */elementCallUrl: String, 
-        /**
-         * The widget id.
-         */widgetId: String, 
-        /**
-         * The url that is used as the target for the PostMessages sent
-         * by the widget (to the client).
-         *
-         * For a web app client this is the client url. In case of using other
-         * platforms the client most likely is setup up to listen to
-         * postmessages in the same webview the widget is hosted. In this case
-         * the `parent_url` is set to the url of the webview with the widget. Be
-         * aware that this means that the widget will receive its own postmessage
-         * messages. The `matrix-widget-api` (js) ignores those so this works but
-         * it might break custom implementations.
-         *
-         * Defaults to `element_call_url` for the non-iframe (dedicated webview)
-         * usecase.
-         */parentUrl: String?, 
-        /**
-         * Whether the branding header of Element call should be hidden.
-         *
-         * Default: `true`
-         */hideHeader: Bool?, 
-        /**
-         * If set, the lobby will be skipped and the widget will join the
-         * call on the `io.element.join` action.
-         *
-         * Default: `false`
-         */preload: Bool?, 
-        /**
-         * The font scale which will be used inside element call.
-         *
-         * Default: `1`
-         */fontScale: Double?, 
-        /**
-         * Whether element call should prompt the user to open in the browser or
-         * the app.
-         *
-         * Default: `false`
-         */appPrompt: Bool?, 
-        /**
-         * Make it not possible to get to the calls list in the webview.
-         *
-         * Default: `true`
-         */confineToRoom: Bool?, 
-        /**
-         * The font to use, to adapt to the system font.
-         */font: String?, 
-        /**
-         * The encryption system to use.
-         *
-         * Use `EncryptionSystem::Unencrypted` to disable encryption.
-         */encryption: EncryptionSystem, 
-        /**
-         * The intent of showing the call.
-         * If the user wants to start a call or join an existing one.
-         * Controls if the lobby is skipped or not.
-         */intent: Intent?, 
-        /**
-         * Do not show the screenshare button.
-         */hideScreensharing: Bool, 
-        /**
-         * Can be used to pass a PostHog id to element call.
-         */posthogUserId: String?, 
-        /**
-         * The host of the posthog api.
-         * Supported since Element Call v0.9.0. Only used by the embedded package.
-         */posthogApiHost: String?, 
-        /**
-         * The key for the posthog api.
-         * Supported since Element Call v0.9.0. Only used by the embedded package.
-         */posthogApiKey: String?, 
-        /**
-         * The url to use for submitting rageshakes.
-         * Supported since Element Call v0.9.0. Only used by the embedded package.
-         */rageshakeSubmitUrl: String?, 
-        /**
-         * Sentry [DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/)
-         * Supported since Element Call v0.9.0. Only used by the embedded package.
-         */sentryDsn: String?, 
-        /**
-         * Sentry [environment](https://docs.sentry.io/concepts/key-terms/key-terms/)
-         * Supported since Element Call v0.9.0. Only used by the embedded package.
-         */sentryEnvironment: String?, 
-        /**
-         * - `false`: the webview shows a a list of devices injected by the
-         * client. (used on ios & android)
-         */controlledMediaDevices: Bool) {
-        self.elementCallUrl = elementCallUrl
-        self.widgetId = widgetId
-        self.parentUrl = parentUrl
-        self.hideHeader = hideHeader
-        self.preload = preload
-        self.fontScale = fontScale
-        self.appPrompt = appPrompt
-        self.confineToRoom = confineToRoom
-        self.font = font
-        self.encryption = encryption
-        self.intent = intent
-        self.hideScreensharing = hideScreensharing
-        self.posthogUserId = posthogUserId
-        self.posthogApiHost = posthogApiHost
-        self.posthogApiKey = posthogApiKey
-        self.rageshakeSubmitUrl = rageshakeSubmitUrl
-        self.sentryDsn = sentryDsn
-        self.sentryEnvironment = sentryEnvironment
-        self.controlledMediaDevices = controlledMediaDevices
-    }
-}
-
-
-
-extension VirtualElementCallWidgetOptions: Equatable, Hashable {
-    public static func ==(lhs: VirtualElementCallWidgetOptions, rhs: VirtualElementCallWidgetOptions) -> Bool {
-        if lhs.elementCallUrl != rhs.elementCallUrl {
-            return false
-        }
-        if lhs.widgetId != rhs.widgetId {
-            return false
-        }
-        if lhs.parentUrl != rhs.parentUrl {
-            return false
-        }
-        if lhs.hideHeader != rhs.hideHeader {
-            return false
-        }
-        if lhs.preload != rhs.preload {
-            return false
-        }
-        if lhs.fontScale != rhs.fontScale {
-            return false
-        }
-        if lhs.appPrompt != rhs.appPrompt {
-            return false
-        }
-        if lhs.confineToRoom != rhs.confineToRoom {
-            return false
-        }
-        if lhs.font != rhs.font {
-            return false
-        }
-        if lhs.encryption != rhs.encryption {
-            return false
-        }
-        if lhs.intent != rhs.intent {
-            return false
-        }
-        if lhs.hideScreensharing != rhs.hideScreensharing {
-            return false
-        }
-        if lhs.posthogUserId != rhs.posthogUserId {
-            return false
-        }
-        if lhs.posthogApiHost != rhs.posthogApiHost {
-            return false
-        }
-        if lhs.posthogApiKey != rhs.posthogApiKey {
-            return false
-        }
-        if lhs.rageshakeSubmitUrl != rhs.rageshakeSubmitUrl {
-            return false
-        }
-        if lhs.sentryDsn != rhs.sentryDsn {
-            return false
-        }
-        if lhs.sentryEnvironment != rhs.sentryEnvironment {
-            return false
-        }
-        if lhs.controlledMediaDevices != rhs.controlledMediaDevices {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(elementCallUrl)
-        hasher.combine(widgetId)
-        hasher.combine(parentUrl)
-        hasher.combine(hideHeader)
-        hasher.combine(preload)
-        hasher.combine(fontScale)
-        hasher.combine(appPrompt)
-        hasher.combine(confineToRoom)
-        hasher.combine(font)
-        hasher.combine(encryption)
-        hasher.combine(intent)
-        hasher.combine(hideScreensharing)
-        hasher.combine(posthogUserId)
-        hasher.combine(posthogApiHost)
-        hasher.combine(posthogApiKey)
-        hasher.combine(rageshakeSubmitUrl)
-        hasher.combine(sentryDsn)
-        hasher.combine(sentryEnvironment)
-        hasher.combine(controlledMediaDevices)
-    }
-}
-
-
-public struct FfiConverterTypeVirtualElementCallWidgetOptions: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> VirtualElementCallWidgetOptions {
-        return
-            try VirtualElementCallWidgetOptions(
-                elementCallUrl: FfiConverterString.read(from: &buf), 
-                widgetId: FfiConverterString.read(from: &buf), 
-                parentUrl: FfiConverterOptionString.read(from: &buf), 
-                hideHeader: FfiConverterOptionBool.read(from: &buf), 
-                preload: FfiConverterOptionBool.read(from: &buf), 
-                fontScale: FfiConverterOptionDouble.read(from: &buf), 
-                appPrompt: FfiConverterOptionBool.read(from: &buf), 
-                confineToRoom: FfiConverterOptionBool.read(from: &buf), 
-                font: FfiConverterOptionString.read(from: &buf), 
-                encryption: FfiConverterTypeEncryptionSystem.read(from: &buf), 
-                intent: FfiConverterOptionTypeIntent.read(from: &buf), 
-                hideScreensharing: FfiConverterBool.read(from: &buf), 
-                posthogUserId: FfiConverterOptionString.read(from: &buf), 
-                posthogApiHost: FfiConverterOptionString.read(from: &buf), 
-                posthogApiKey: FfiConverterOptionString.read(from: &buf), 
-                rageshakeSubmitUrl: FfiConverterOptionString.read(from: &buf), 
-                sentryDsn: FfiConverterOptionString.read(from: &buf), 
-                sentryEnvironment: FfiConverterOptionString.read(from: &buf), 
-                controlledMediaDevices: FfiConverterBool.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: VirtualElementCallWidgetOptions, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.elementCallUrl, into: &buf)
-        FfiConverterString.write(value.widgetId, into: &buf)
-        FfiConverterOptionString.write(value.parentUrl, into: &buf)
-        FfiConverterOptionBool.write(value.hideHeader, into: &buf)
-        FfiConverterOptionBool.write(value.preload, into: &buf)
-        FfiConverterOptionDouble.write(value.fontScale, into: &buf)
-        FfiConverterOptionBool.write(value.appPrompt, into: &buf)
-        FfiConverterOptionBool.write(value.confineToRoom, into: &buf)
-        FfiConverterOptionString.write(value.font, into: &buf)
-        FfiConverterTypeEncryptionSystem.write(value.encryption, into: &buf)
-        FfiConverterOptionTypeIntent.write(value.intent, into: &buf)
-        FfiConverterBool.write(value.hideScreensharing, into: &buf)
-        FfiConverterOptionString.write(value.posthogUserId, into: &buf)
-        FfiConverterOptionString.write(value.posthogApiHost, into: &buf)
-        FfiConverterOptionString.write(value.posthogApiKey, into: &buf)
-        FfiConverterOptionString.write(value.rageshakeSubmitUrl, into: &buf)
-        FfiConverterOptionString.write(value.sentryDsn, into: &buf)
-        FfiConverterOptionString.write(value.sentryEnvironment, into: &buf)
-        FfiConverterBool.write(value.controlledMediaDevices, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeVirtualElementCallWidgetOptions_lift(_ buf: RustBuffer) throws -> VirtualElementCallWidgetOptions {
-    return try FfiConverterTypeVirtualElementCallWidgetOptions.lift(buf)
-}
-
-public func FfiConverterTypeVirtualElementCallWidgetOptions_lower(_ value: VirtualElementCallWidgetOptions) -> RustBuffer {
-    return FfiConverterTypeVirtualElementCallWidgetOptions.lower(value)
-}
-
-
-/**
  * Capabilities that a widget can request from a client.
  */
 public struct WidgetCapabilities {
@@ -22922,90 +22554,6 @@ extension EncryptedMessage: Equatable, Hashable {}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
-/**
- * Defines if a call is encrypted and which encryption system should be used.
- *
- * This controls the url parameters: `perParticipantE2EE`, `password`.
- */
-
-public enum EncryptionSystem {
-    
-    /**
-     * Equivalent to the element call url parameter: `enableE2EE=false`
-     */
-    case unencrypted
-    /**
-     * Equivalent to the element call url parameter:
-     * `perParticipantE2EE=true`
-     */
-    case perParticipantKeys
-    /**
-     * Equivalent to the element call url parameter:
-     * `password={secret}`
-     */
-    case sharedSecret(
-        /**
-         * The secret/password which is used in the url.
-         */secret: String
-    )
-}
-
-
-public struct FfiConverterTypeEncryptionSystem: FfiConverterRustBuffer {
-    typealias SwiftType = EncryptionSystem
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EncryptionSystem {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .unencrypted
-        
-        case 2: return .perParticipantKeys
-        
-        case 3: return .sharedSecret(secret: try FfiConverterString.read(from: &buf)
-        )
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: EncryptionSystem, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case .unencrypted:
-            writeInt(&buf, Int32(1))
-        
-        
-        case .perParticipantKeys:
-            writeInt(&buf, Int32(2))
-        
-        
-        case let .sharedSecret(secret):
-            writeInt(&buf, Int32(3))
-            FfiConverterString.write(secret, into: &buf)
-            
-        }
-    }
-}
-
-
-public func FfiConverterTypeEncryptionSystem_lift(_ buf: RustBuffer) throws -> EncryptionSystem {
-    return try FfiConverterTypeEncryptionSystem.lift(buf)
-}
-
-public func FfiConverterTypeEncryptionSystem_lower(_ value: EncryptionSystem) -> RustBuffer {
-    return FfiConverterTypeEncryptionSystem.lower(value)
-}
-
-
-
-extension EncryptionSystem: Equatable, Hashable {}
-
-
-
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum ErrorKind {
     
@@ -24316,72 +23864,6 @@ extension HumanQrLoginError: Foundation.LocalizedError {
         String(reflecting: self)
     }
 }
-
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
-/**
- * Defines the intent of showing the call.
- *
- * This controls whether to show or skip the lobby.
- */
-
-public enum Intent {
-    
-    /**
-     * The user wants to start a call.
-     */
-    case startCall
-    /**
-     * The user wants to join an existing call.
-     */
-    case joinExisting
-}
-
-
-public struct FfiConverterTypeIntent: FfiConverterRustBuffer {
-    typealias SwiftType = Intent
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Intent {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .startCall
-        
-        case 2: return .joinExisting
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: Intent, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case .startCall:
-            writeInt(&buf, Int32(1))
-        
-        
-        case .joinExisting:
-            writeInt(&buf, Int32(2))
-        
-        }
-    }
-}
-
-
-public func FfiConverterTypeIntent_lift(_ buf: RustBuffer) throws -> Intent {
-    return try FfiConverterTypeIntent.lift(buf)
-}
-
-public func FfiConverterTypeIntent_lower(_ value: Intent) -> RustBuffer {
-    return FfiConverterTypeIntent.lower(value)
-}
-
-
-
-extension Intent: Equatable, Hashable {}
-
-
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -34696,6 +34178,27 @@ fileprivate struct FfiConverterOptionTypeSendHandle: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeSyncService: FfiConverterRustBuffer {
+    typealias SwiftType = SyncService?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeSyncService.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeSyncService.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeTaskHandle: FfiConverterRustBuffer {
     typealias SwiftType = TaskHandle?
 
@@ -35426,27 +34929,6 @@ fileprivate struct FfiConverterOptionTypeEventSendState: FfiConverterRustBuffer 
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeEventSendState.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-fileprivate struct FfiConverterOptionTypeIntent: FfiConverterRustBuffer {
-    typealias SwiftType = Intent?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeIntent.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeIntent.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -36983,6 +36465,8 @@ fileprivate struct FfiConverterDictionaryTypeTagNameTypeTagInfo: FfiConverterRus
 
 
 
+
+
 /**
  * Typealias from the type name used in the UDL file to the builtin type.  This
  * is needed because the UDL type name is used in function/method signatures.
@@ -37294,7 +36778,7 @@ public func messageEventContentNew(msgtype: MessageType)throws  -> RoomMessageEv
 public func newVirtualElementCallWidget(props: VirtualElementCallWidgetOptions)throws  -> WidgetSettings {
     return try  FfiConverterTypeWidgetSettings.lift(try rustCallWithError(FfiConverterTypeParseError.lift) {
     uniffi_matrix_sdk_ffi_fn_func_new_virtual_element_call_widget(
-        FfiConverterTypeVirtualElementCallWidgetOptions.lower(props),$0
+        FfiConverterTypeVirtualElementCallWidgetOptions_lower(props),$0
     )
 })
 }
@@ -37409,7 +36893,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_message_event_content_new() != 57839) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_func_new_virtual_element_call_widget() != 4988) {
+    if (uniffi_matrix_sdk_ffi_checksum_func_new_virtual_element_call_widget() != 61776) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_parse_matrix_entity_from() != 49710) {
@@ -37454,7 +36938,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_can_deactivate_account() != 39890) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_clear_caches() != 65177) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_clear_caches() != 55711) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_create_room() != 52700) {
