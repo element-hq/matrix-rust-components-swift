@@ -6019,7 +6019,12 @@ public protocol RoomProtocol : AnyObject {
      */
     func isEncrypted() async  -> Bool
     
-    func isPublic()  -> Bool
+    /**
+     * Whether the room can be publicly joined or not, based on its join rule.
+     *
+     * Can return `None` if the join rule state event is missing.
+     */
+    func isPublic()  -> Bool?
     
     /**
      * Returns whether the send queue for that particular room is enabled or
@@ -6888,8 +6893,13 @@ open func isEncrypted()async  -> Bool {
         )
 }
     
-open func isPublic() -> Bool {
-    return try!  FfiConverterBool.lift(try! rustCall() {
+    /**
+     * Whether the room can be publicly joined or not, based on its join rule.
+     *
+     * Can return `None` if the join rule state event is missing.
+     */
+open func isPublic() -> Bool? {
+    return try!  FfiConverterOptionBool.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_is_public(self.uniffiClonePointer(),$0
     )
 })
@@ -16050,11 +16060,10 @@ public struct NotificationRoomInfo {
     public var joinedMembersCount: UInt64
     public var isEncrypted: Bool?
     public var isDirect: Bool
-    public var isPublic: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, isEncrypted: Bool?, isDirect: Bool, isPublic: Bool) {
+    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, isEncrypted: Bool?, isDirect: Bool) {
         self.displayName = displayName
         self.avatarUrl = avatarUrl
         self.canonicalAlias = canonicalAlias
@@ -16062,7 +16071,6 @@ public struct NotificationRoomInfo {
         self.joinedMembersCount = joinedMembersCount
         self.isEncrypted = isEncrypted
         self.isDirect = isDirect
-        self.isPublic = isPublic
     }
 }
 
@@ -16091,9 +16099,6 @@ extension NotificationRoomInfo: Equatable, Hashable {
         if lhs.isDirect != rhs.isDirect {
             return false
         }
-        if lhs.isPublic != rhs.isPublic {
-            return false
-        }
         return true
     }
 
@@ -16105,7 +16110,6 @@ extension NotificationRoomInfo: Equatable, Hashable {
         hasher.combine(joinedMembersCount)
         hasher.combine(isEncrypted)
         hasher.combine(isDirect)
-        hasher.combine(isPublic)
     }
 }
 
@@ -16120,8 +16124,7 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
                 joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
                 joinedMembersCount: FfiConverterUInt64.read(from: &buf), 
                 isEncrypted: FfiConverterOptionBool.read(from: &buf), 
-                isDirect: FfiConverterBool.read(from: &buf), 
-                isPublic: FfiConverterBool.read(from: &buf)
+                isDirect: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -16133,7 +16136,6 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.joinedMembersCount, into: &buf)
         FfiConverterOptionBool.write(value.isEncrypted, into: &buf)
         FfiConverterBool.write(value.isDirect, into: &buf)
-        FfiConverterBool.write(value.isPublic, into: &buf)
     }
 }
 
@@ -17692,7 +17694,13 @@ public struct RoomInfo {
     public var topic: String?
     public var avatarUrl: String?
     public var isDirect: Bool
-    public var isPublic: Bool
+    /**
+     * Whether the room is public or not, based on the join rules.
+     *
+     * Can be `None` if the join rules state event is not available for this
+     * room.
+     */
+    public var isPublic: Bool?
     public var isSpace: Bool
     /**
      * If present, it means the room has been archived/upgraded.
@@ -17752,8 +17760,10 @@ public struct RoomInfo {
     public var historyVisibility: RoomHistoryVisibility
     /**
      * This room's current power levels.
+     *
+     * Can be missing if the room power levels event is missing from the store.
      */
-    public var powerLevels: RoomPowerLevels
+    public var powerLevels: RoomPowerLevels?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -17764,7 +17774,13 @@ public struct RoomInfo {
          */displayName: String?, 
         /**
          * Room name as defined by the room state event only.
-         */rawName: String?, topic: String?, avatarUrl: String?, isDirect: Bool, isPublic: Bool, isSpace: Bool, 
+         */rawName: String?, topic: String?, avatarUrl: String?, isDirect: Bool, 
+        /**
+         * Whether the room is public or not, based on the join rules.
+         *
+         * Can be `None` if the join rules state event is not available for this
+         * room.
+         */isPublic: Bool?, isSpace: Bool, 
         /**
          * If present, it means the room has been archived/upgraded.
          */successorRoom: SuccessorRoom?, isFavourite: Bool, canonicalAlias: String?, alternativeAliases: [String], membership: Membership, 
@@ -17801,7 +17817,9 @@ public struct RoomInfo {
          */historyVisibility: RoomHistoryVisibility, 
         /**
          * This room's current power levels.
-         */powerLevels: RoomPowerLevels) {
+         *
+         * Can be missing if the room power levels event is missing from the store.
+         */powerLevels: RoomPowerLevels?) {
         self.id = id
         self.encryptionState = encryptionState
         self.creator = creator
@@ -17852,7 +17870,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 topic: FfiConverterOptionString.read(from: &buf), 
                 avatarUrl: FfiConverterOptionString.read(from: &buf), 
                 isDirect: FfiConverterBool.read(from: &buf), 
-                isPublic: FfiConverterBool.read(from: &buf), 
+                isPublic: FfiConverterOptionBool.read(from: &buf), 
                 isSpace: FfiConverterBool.read(from: &buf), 
                 successorRoom: FfiConverterOptionTypeSuccessorRoom.read(from: &buf), 
                 isFavourite: FfiConverterBool.read(from: &buf), 
@@ -17876,7 +17894,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 pinnedEventIds: FfiConverterSequenceString.read(from: &buf), 
                 joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
                 historyVisibility: FfiConverterTypeRoomHistoryVisibility.read(from: &buf), 
-                powerLevels: FfiConverterTypeRoomPowerLevels.read(from: &buf)
+                powerLevels: FfiConverterOptionTypeRoomPowerLevels.read(from: &buf)
         )
     }
 
@@ -17889,7 +17907,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.topic, into: &buf)
         FfiConverterOptionString.write(value.avatarUrl, into: &buf)
         FfiConverterBool.write(value.isDirect, into: &buf)
-        FfiConverterBool.write(value.isPublic, into: &buf)
+        FfiConverterOptionBool.write(value.isPublic, into: &buf)
         FfiConverterBool.write(value.isSpace, into: &buf)
         FfiConverterOptionTypeSuccessorRoom.write(value.successorRoom, into: &buf)
         FfiConverterBool.write(value.isFavourite, into: &buf)
@@ -17913,7 +17931,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.pinnedEventIds, into: &buf)
         FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
         FfiConverterTypeRoomHistoryVisibility.write(value.historyVisibility, into: &buf)
-        FfiConverterTypeRoomPowerLevels.write(value.powerLevels, into: &buf)
+        FfiConverterOptionTypeRoomPowerLevels.write(value.powerLevels, into: &buf)
     }
 }
 
@@ -18466,7 +18484,7 @@ public struct RoomPreviewInfo {
     /**
      * The join rule for this room (private, public, knock, etc.).
      */
-    public var joinRule: JoinRule
+    public var joinRule: JoinRule?
     /**
      * Whether the room is direct or not, if known.
      */
@@ -18511,7 +18529,7 @@ public struct RoomPreviewInfo {
          */membership: Membership?, 
         /**
          * The join rule for this room (private, public, knock, etc.).
-         */joinRule: JoinRule, 
+         */joinRule: JoinRule?, 
         /**
          * Whether the room is direct or not, if known.
          */isDirect: Bool?, 
@@ -18612,7 +18630,7 @@ public struct FfiConverterTypeRoomPreviewInfo: FfiConverterRustBuffer {
                 roomType: FfiConverterTypeRoomType.read(from: &buf), 
                 isHistoryWorldReadable: FfiConverterOptionBool.read(from: &buf), 
                 membership: FfiConverterOptionTypeMembership.read(from: &buf), 
-                joinRule: FfiConverterTypeJoinRule.read(from: &buf), 
+                joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
                 isDirect: FfiConverterOptionBool.read(from: &buf), 
                 heroes: FfiConverterOptionSequenceTypeRoomHero.read(from: &buf)
         )
@@ -18629,7 +18647,7 @@ public struct FfiConverterTypeRoomPreviewInfo: FfiConverterRustBuffer {
         FfiConverterTypeRoomType.write(value.roomType, into: &buf)
         FfiConverterOptionBool.write(value.isHistoryWorldReadable, into: &buf)
         FfiConverterOptionTypeMembership.write(value.membership, into: &buf)
-        FfiConverterTypeJoinRule.write(value.joinRule, into: &buf)
+        FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
         FfiConverterOptionBool.write(value.isDirect, into: &buf)
         FfiConverterOptionSequenceTypeRoomHero.write(value.heroes, into: &buf)
     }
@@ -34636,6 +34654,27 @@ fileprivate struct FfiConverterOptionTypeRoomMessageEventContentWithoutRelation:
     }
 }
 
+fileprivate struct FfiConverterOptionTypeRoomPowerLevels: FfiConverterRustBuffer {
+    typealias SwiftType = RoomPowerLevels?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRoomPowerLevels.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRoomPowerLevels.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeSendHandle: FfiConverterRustBuffer {
     typealias SwiftType = SendHandle?
 
@@ -38012,7 +38051,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_is_encrypted() != 63995) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_is_public() != 7336) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_is_public() != 57746) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_is_send_queue_enabled() != 36591) {
