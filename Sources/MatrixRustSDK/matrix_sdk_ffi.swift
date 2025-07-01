@@ -14191,118 +14191,6 @@ public func FfiConverterTypeCreateRoomParameters_lower(_ value: CreateRoomParame
 }
 
 
-/**
- * Well-known settings specific to ElementCall
- */
-public struct ElementCallWellKnown {
-    public var widgetUrl: String
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(widgetUrl: String) {
-        self.widgetUrl = widgetUrl
-    }
-}
-
-
-
-extension ElementCallWellKnown: Equatable, Hashable {
-    public static func ==(lhs: ElementCallWellKnown, rhs: ElementCallWellKnown) -> Bool {
-        if lhs.widgetUrl != rhs.widgetUrl {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(widgetUrl)
-    }
-}
-
-
-public struct FfiConverterTypeElementCallWellKnown: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ElementCallWellKnown {
-        return
-            try ElementCallWellKnown(
-                widgetUrl: FfiConverterString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ElementCallWellKnown, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.widgetUrl, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeElementCallWellKnown_lift(_ buf: RustBuffer) throws -> ElementCallWellKnown {
-    return try FfiConverterTypeElementCallWellKnown.lift(buf)
-}
-
-public func FfiConverterTypeElementCallWellKnown_lower(_ value: ElementCallWellKnown) -> RustBuffer {
-    return FfiConverterTypeElementCallWellKnown.lower(value)
-}
-
-
-/**
- * Element specific well-known settings
- */
-public struct ElementWellKnown {
-    public var call: ElementCallWellKnown?
-    public var registrationHelperUrl: String?
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(call: ElementCallWellKnown?, registrationHelperUrl: String?) {
-        self.call = call
-        self.registrationHelperUrl = registrationHelperUrl
-    }
-}
-
-
-
-extension ElementWellKnown: Equatable, Hashable {
-    public static func ==(lhs: ElementWellKnown, rhs: ElementWellKnown) -> Bool {
-        if lhs.call != rhs.call {
-            return false
-        }
-        if lhs.registrationHelperUrl != rhs.registrationHelperUrl {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(call)
-        hasher.combine(registrationHelperUrl)
-    }
-}
-
-
-public struct FfiConverterTypeElementWellKnown: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ElementWellKnown {
-        return
-            try ElementWellKnown(
-                call: FfiConverterOptionTypeElementCallWellKnown.read(from: &buf), 
-                registrationHelperUrl: FfiConverterOptionString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ElementWellKnown, into buf: inout [UInt8]) {
-        FfiConverterOptionTypeElementCallWellKnown.write(value.call, into: &buf)
-        FfiConverterOptionString.write(value.registrationHelperUrl, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeElementWellKnown_lift(_ buf: RustBuffer) throws -> ElementWellKnown {
-    return try FfiConverterTypeElementWellKnown.lift(buf)
-}
-
-public func FfiConverterTypeElementWellKnown_lower(_ value: ElementWellKnown) -> RustBuffer {
-    return FfiConverterTypeElementWellKnown.lower(value)
-}
-
-
 public struct EmoteMessageContent {
     public var body: String
     public var formatted: FormattedBody?
@@ -16070,6 +15958,7 @@ public struct NotificationRoomInfo {
     public var displayName: String
     public var avatarUrl: String?
     public var canonicalAlias: String?
+    public var topic: String?
     public var joinRule: JoinRule?
     public var joinedMembersCount: UInt64
     public var isEncrypted: Bool?
@@ -16077,10 +15966,11 @@ public struct NotificationRoomInfo {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, isEncrypted: Bool?, isDirect: Bool) {
+    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, topic: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, isEncrypted: Bool?, isDirect: Bool) {
         self.displayName = displayName
         self.avatarUrl = avatarUrl
         self.canonicalAlias = canonicalAlias
+        self.topic = topic
         self.joinRule = joinRule
         self.joinedMembersCount = joinedMembersCount
         self.isEncrypted = isEncrypted
@@ -16099,6 +15989,9 @@ extension NotificationRoomInfo: Equatable, Hashable {
             return false
         }
         if lhs.canonicalAlias != rhs.canonicalAlias {
+            return false
+        }
+        if lhs.topic != rhs.topic {
             return false
         }
         if lhs.joinRule != rhs.joinRule {
@@ -16120,6 +16013,7 @@ extension NotificationRoomInfo: Equatable, Hashable {
         hasher.combine(displayName)
         hasher.combine(avatarUrl)
         hasher.combine(canonicalAlias)
+        hasher.combine(topic)
         hasher.combine(joinRule)
         hasher.combine(joinedMembersCount)
         hasher.combine(isEncrypted)
@@ -16135,6 +16029,7 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
                 displayName: FfiConverterString.read(from: &buf), 
                 avatarUrl: FfiConverterOptionString.read(from: &buf), 
                 canonicalAlias: FfiConverterOptionString.read(from: &buf), 
+                topic: FfiConverterOptionString.read(from: &buf), 
                 joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
                 joinedMembersCount: FfiConverterUInt64.read(from: &buf), 
                 isEncrypted: FfiConverterOptionBool.read(from: &buf), 
@@ -16146,6 +16041,7 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
         FfiConverterString.write(value.displayName, into: &buf)
         FfiConverterOptionString.write(value.avatarUrl, into: &buf)
         FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
+        FfiConverterOptionString.write(value.topic, into: &buf)
         FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
         FfiConverterUInt64.write(value.joinedMembersCount, into: &buf)
         FfiConverterOptionBool.write(value.isEncrypted, into: &buf)
@@ -34325,27 +34221,6 @@ fileprivate struct FfiConverterOptionTypeComposerDraft: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionTypeElementCallWellKnown: FfiConverterRustBuffer {
-    typealias SwiftType = ElementCallWellKnown?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeElementCallWellKnown.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeElementCallWellKnown.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeEventTimelineItem: FfiConverterRustBuffer {
     typealias SwiftType = EventTimelineItem?
 
@@ -36666,7 +36541,7 @@ public func isRoomAliasFormatValid(alias: String) -> Bool {
  * Log an event.
  *
  * The target should be something like a module path, and can be referenced in
- * the filter string given to `setup_tracing`. `level` and `target` for a
+ * the filter string given to `init_platform`. `level` and `target` for a
  * callsite are fixed at the first `log_event` call for that callsite and can
  * not be changed afterwards, i.e. the level and target passed for second and
  * following `log_event`s with the same callsite will be ignored.
@@ -36685,16 +36560,6 @@ public func logEvent(file: String, line: UInt32?, level: LogLevel, target: Strin
         FfiConverterString.lower(message),$0
     )
 }
-}
-/**
- * Helper function to parse a string into a ElementWellKnown struct
- */
-public func makeElementWellKnown(string: String)throws  -> ElementWellKnown {
-    return try  FfiConverterTypeElementWellKnown.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
-    uniffi_matrix_sdk_ffi_fn_func_make_element_well_known(
-        FfiConverterString.lower(string),$0
-    )
-})
 }
 public func makeWidgetDriver(settings: WidgetSettings)throws  -> WidgetDriverAndHandle {
     return try  FfiConverterTypeWidgetDriverAndHandle.lift(try rustCallWithError(FfiConverterTypeParseError.lift) {
@@ -36863,10 +36728,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_is_room_alias_format_valid() != 54845) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_func_log_event() != 62286) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_func_make_element_well_known() != 21379) {
+    if (uniffi_matrix_sdk_ffi_checksum_func_log_event() != 55646) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_make_widget_driver() != 34206) {
