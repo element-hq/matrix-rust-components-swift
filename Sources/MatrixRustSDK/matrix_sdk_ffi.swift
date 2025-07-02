@@ -30535,6 +30535,10 @@ public enum TraceLogPacks {
      * Enables all the logs relevant to the timeline.
      */
     case timeline
+    /**
+     * Enables all the logs relevant to the notification client.
+     */
+    case notificationClient
 }
 
 
@@ -30550,6 +30554,8 @@ public struct FfiConverterTypeTraceLogPacks: FfiConverterRustBuffer {
         case 2: return .sendQueue
         
         case 3: return .timeline
+        
+        case 4: return .notificationClient
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -30569,6 +30575,10 @@ public struct FfiConverterTypeTraceLogPacks: FfiConverterRustBuffer {
         
         case .timeline:
             writeInt(&buf, Int32(3))
+        
+        
+        case .notificationClient:
+            writeInt(&buf, Int32(4))
         
         }
     }
