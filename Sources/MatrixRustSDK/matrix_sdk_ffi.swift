@@ -22212,7 +22212,7 @@ public enum EmbeddedEventDetails {
     
     case unavailable
     case pending
-    case ready(content: TimelineItemContent, sender: String, senderProfile: ProfileDetails
+    case ready(content: TimelineItemContent, sender: String, senderProfile: ProfileDetails, timestamp: Timestamp, eventOrTransactionId: EventOrTransactionId
     )
     case error(message: String
     )
@@ -22230,7 +22230,7 @@ public struct FfiConverterTypeEmbeddedEventDetails: FfiConverterRustBuffer {
         
         case 2: return .pending
         
-        case 3: return .ready(content: try FfiConverterTypeTimelineItemContent.read(from: &buf), sender: try FfiConverterString.read(from: &buf), senderProfile: try FfiConverterTypeProfileDetails.read(from: &buf)
+        case 3: return .ready(content: try FfiConverterTypeTimelineItemContent.read(from: &buf), sender: try FfiConverterString.read(from: &buf), senderProfile: try FfiConverterTypeProfileDetails.read(from: &buf), timestamp: try FfiConverterTypeTimestamp.read(from: &buf), eventOrTransactionId: try FfiConverterTypeEventOrTransactionId.read(from: &buf)
         )
         
         case 4: return .error(message: try FfiConverterString.read(from: &buf)
@@ -22252,11 +22252,13 @@ public struct FfiConverterTypeEmbeddedEventDetails: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         
         
-        case let .ready(content,sender,senderProfile):
+        case let .ready(content,sender,senderProfile,timestamp,eventOrTransactionId):
             writeInt(&buf, Int32(3))
             FfiConverterTypeTimelineItemContent.write(content, into: &buf)
             FfiConverterString.write(sender, into: &buf)
             FfiConverterTypeProfileDetails.write(senderProfile, into: &buf)
+            FfiConverterTypeTimestamp.write(timestamp, into: &buf)
+            FfiConverterTypeEventOrTransactionId.write(eventOrTransactionId, into: &buf)
             
         
         case let .error(message):
