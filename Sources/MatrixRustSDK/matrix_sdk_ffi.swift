@@ -2867,6 +2867,8 @@ public protocol ClientBuilderProtocol : AnyObject {
      */
     func systemIsMemoryConstrained()  -> ClientBuilder
     
+    func threadsEnabled(enabled: Bool)  -> ClientBuilder
+    
     func userAgent(userAgent: String)  -> ClientBuilder
     
     func username(username: String)  -> ClientBuilder
@@ -3246,6 +3248,14 @@ open func slidingSyncVersionBuilder(versionBuilder: SlidingSyncVersionBuilder) -
 open func systemIsMemoryConstrained() -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_system_is_memory_constrained(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func threadsEnabled(enabled: Bool) -> ClientBuilder {
+    return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_threads_enabled(self.uniffiClonePointer(),
+        FfiConverterBool.lower(enabled),$0
     )
 })
 }
@@ -4892,10 +4902,16 @@ public func FfiConverterTypeMediaSource_lower(_ value: MediaSource) -> UnsafeMut
 public protocol NotificationClientProtocol : AnyObject {
     
     /**
-     * See also documentation of
-     * `MatrixNotificationClient::get_notification`.
+     * Fetches the content of a notification.
+     *
+     * This will first try to get the notification using a short-lived sliding
+     * sync, and if the sliding-sync can't find the event, then it'll use a
+     * `/context` query to find the event with associated member information.
+     *
+     * An error result means that we couldn't resolve the notification; in that
+     * case, a dummy notification may be displayed instead.
      */
-    func getNotification(roomId: String, eventId: String) async throws  -> NotificationItem?
+    func getNotification(roomId: String, eventId: String) async throws  -> NotificationStatus
     
     /**
      * Get several notification items in a single batch.
@@ -4905,7 +4921,7 @@ public protocol NotificationClientProtocol : AnyObject {
      * [`NotificationItem`] or no entry for it if it failed to fetch a
      * notification for the provided [`EventId`].
      */
-    func getNotifications(requests: [NotificationItemsRequest]) async throws  -> [String: NotificationItem]
+    func getNotifications(requests: [NotificationItemsRequest]) async throws  -> [String: BatchNotificationResult]
     
     /**
      * Fetches a room by its ID using the in-memory state store backed client.
@@ -4959,10 +4975,16 @@ open class NotificationClient:
 
     
     /**
-     * See also documentation of
-     * `MatrixNotificationClient::get_notification`.
+     * Fetches the content of a notification.
+     *
+     * This will first try to get the notification using a short-lived sliding
+     * sync, and if the sliding-sync can't find the event, then it'll use a
+     * `/context` query to find the event with associated member information.
+     *
+     * An error result means that we couldn't resolve the notification; in that
+     * case, a dummy notification may be displayed instead.
      */
-open func getNotification(roomId: String, eventId: String)async throws  -> NotificationItem? {
+open func getNotification(roomId: String, eventId: String)async throws  -> NotificationStatus {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -4974,7 +4996,7 @@ open func getNotification(roomId: String, eventId: String)async throws  -> Notif
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterOptionTypeNotificationItem.lift,
+            liftFunc: FfiConverterTypeNotificationStatus.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -4987,7 +5009,7 @@ open func getNotification(roomId: String, eventId: String)async throws  -> Notif
      * [`NotificationItem`] or no entry for it if it failed to fetch a
      * notification for the provided [`EventId`].
      */
-open func getNotifications(requests: [NotificationItemsRequest])async throws  -> [String: NotificationItem] {
+open func getNotifications(requests: [NotificationItemsRequest])async throws  -> [String: BatchNotificationResult] {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -4999,7 +5021,7 @@ open func getNotifications(requests: [NotificationItemsRequest])async throws  ->
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterDictionaryStringTypeNotificationItem.lift,
+            liftFunc: FfiConverterDictionaryStringTypeBatchNotificationResult.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -21652,6 +21674,73 @@ extension BackupUploadState: Equatable, Hashable {}
 
 
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum BatchNotificationResult {
+    
+    /**
+     * We have more detailed information about the notification.
+     */
+    case ok(status: NotificationStatus
+    )
+    /**
+     * An error occurred while trying to fetch the notification.
+     */
+    case error(
+        /**
+         * The error message observed while handling a specific notification.
+         */message: String
+    )
+}
+
+
+public struct FfiConverterTypeBatchNotificationResult: FfiConverterRustBuffer {
+    typealias SwiftType = BatchNotificationResult
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BatchNotificationResult {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .ok(status: try FfiConverterTypeNotificationStatus.read(from: &buf)
+        )
+        
+        case 2: return .error(message: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: BatchNotificationResult, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .ok(status):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeNotificationStatus.write(status, into: &buf)
+            
+        
+        case let .error(message):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(message, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeBatchNotificationResult_lift(_ buf: RustBuffer) throws -> BatchNotificationResult {
+    return try FfiConverterTypeBatchNotificationResult.lift(buf)
+}
+
+public func FfiConverterTypeBatchNotificationResult_lower(_ value: BatchNotificationResult) -> RustBuffer {
+    return FfiConverterTypeBatchNotificationResult.lower(value)
+}
+
+
+
+
 
 public enum ClientBuildError {
 
@@ -25677,6 +25766,79 @@ extension NotificationSettingsError: Foundation.LocalizedError {
         String(reflecting: self)
     }
 }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum NotificationStatus {
+    
+    /**
+     * The event has been found and was not filtered out.
+     */
+    case event(item: NotificationItem
+    )
+    /**
+     * The event couldn't be found in the network queries used to find it.
+     */
+    case eventNotFound
+    /**
+     * The event has been filtered out, either because of the user's push
+     * rules, or because the user which triggered it is ignored by the
+     * current user.
+     */
+    case eventFilteredOut
+}
+
+
+public struct FfiConverterTypeNotificationStatus: FfiConverterRustBuffer {
+    typealias SwiftType = NotificationStatus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NotificationStatus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .event(item: try FfiConverterTypeNotificationItem.read(from: &buf)
+        )
+        
+        case 2: return .eventNotFound
+        
+        case 3: return .eventFilteredOut
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: NotificationStatus, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .event(item):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeNotificationItem.write(item, into: &buf)
+            
+        
+        case .eventNotFound:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .eventFilteredOut:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeNotificationStatus_lift(_ buf: RustBuffer) throws -> NotificationStatus {
+    return try FfiConverterTypeNotificationStatus.lift(buf)
+}
+
+public func FfiConverterTypeNotificationStatus_lower(_ value: NotificationStatus) -> RustBuffer {
+    return FfiConverterTypeNotificationStatus.lower(value)
+}
+
+
+
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -34401,27 +34563,6 @@ fileprivate struct FfiConverterOptionTypeMentions: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionTypeNotificationItem: FfiConverterRustBuffer {
-    typealias SwiftType = NotificationItem?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeNotificationItem.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeNotificationItem.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeNotificationPowerLevels: FfiConverterRustBuffer {
     typealias SwiftType = NotificationPowerLevels?
 
@@ -36231,29 +36372,6 @@ fileprivate struct FfiConverterDictionaryStringTypeIgnoredUser: FfiConverterRust
     }
 }
 
-fileprivate struct FfiConverterDictionaryStringTypeNotificationItem: FfiConverterRustBuffer {
-    public static func write(_ value: [String: NotificationItem], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for (key, value) in value {
-            FfiConverterString.write(key, into: &buf)
-            FfiConverterTypeNotificationItem.write(value, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [String: NotificationItem] {
-        let len: Int32 = try readInt(&buf)
-        var dict = [String: NotificationItem]()
-        dict.reserveCapacity(Int(len))
-        for _ in 0..<len {
-            let key = try FfiConverterString.read(from: &buf)
-            let value = try FfiConverterTypeNotificationItem.read(from: &buf)
-            dict[key] = value
-        }
-        return dict
-    }
-}
-
 fileprivate struct FfiConverterDictionaryStringTypeReceipt: FfiConverterRustBuffer {
     public static func write(_ value: [String: Receipt], into buf: inout [UInt8]) {
         let len = Int32(value.count)
@@ -36271,6 +36389,29 @@ fileprivate struct FfiConverterDictionaryStringTypeReceipt: FfiConverterRustBuff
         for _ in 0..<len {
             let key = try FfiConverterString.read(from: &buf)
             let value = try FfiConverterTypeReceipt.read(from: &buf)
+            dict[key] = value
+        }
+        return dict
+    }
+}
+
+fileprivate struct FfiConverterDictionaryStringTypeBatchNotificationResult: FfiConverterRustBuffer {
+    public static func write(_ value: [String: BatchNotificationResult], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for (key, value) in value {
+            FfiConverterString.write(key, into: &buf)
+            FfiConverterTypeBatchNotificationResult.write(value, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [String: BatchNotificationResult] {
+        let len: Int32 = try readInt(&buf)
+        var dict = [String: BatchNotificationResult]()
+        dict.reserveCapacity(Int(len))
+        for _ in 0..<len {
+            let key = try FfiConverterString.read(from: &buf)
+            let value = try FfiConverterTypeBatchNotificationResult.read(from: &buf)
             dict[key] = value
         }
         return dict
@@ -37118,6 +37259,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_system_is_memory_constrained() != 6898) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_threads_enabled() != 33768) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_user_agent() != 13719) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -37250,10 +37394,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_mediasource_url() != 62692) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_notification() != 2524) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_notification() != 52873) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_notifications() != 30600) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_notifications() != 32112) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_room() != 26581) {
