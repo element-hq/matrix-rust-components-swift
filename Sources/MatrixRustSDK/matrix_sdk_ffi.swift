@@ -4918,8 +4918,9 @@ public protocol NotificationClientProtocol : AnyObject {
      *
      * Returns an error if the flow failed when preparing to fetch the
      * notifications, and a [`HashMap`] containing either a
-     * [`NotificationItem`] or no entry for it if it failed to fetch a
-     * notification for the provided [`EventId`].
+     * [`BatchNotificationResult`], that indicates if the notification was
+     * successfully fetched (in which case, it's a [`NotificationStatus`]), or
+     * an error message if it couldn't be fetched.
      */
     func getNotifications(requests: [NotificationItemsRequest]) async throws  -> [String: BatchNotificationResult]
     
@@ -5006,8 +5007,9 @@ open func getNotification(roomId: String, eventId: String)async throws  -> Notif
      *
      * Returns an error if the flow failed when preparing to fetch the
      * notifications, and a [`HashMap`] containing either a
-     * [`NotificationItem`] or no entry for it if it failed to fetch a
-     * notification for the provided [`EventId`].
+     * [`BatchNotificationResult`], that indicates if the notification was
+     * successfully fetched (in which case, it's a [`NotificationStatus`]), or
+     * an error message if it couldn't be fetched.
      */
 open func getNotifications(requests: [NotificationItemsRequest])async throws  -> [String: BatchNotificationResult] {
     return
@@ -8808,7 +8810,7 @@ public protocol RoomListServiceProtocol : AnyObject {
     
     func state(listener: RoomListServiceStateListener)  -> TaskHandle
     
-    func subscribeToRooms(roomIds: [String]) throws 
+    func subscribeToRooms(roomIds: [String]) async throws 
     
     func syncIndicator(delayBeforeShowingInMs: UInt32, delayBeforeHidingInMs: UInt32, listener: RoomListServiceSyncIndicatorListener)  -> TaskHandle
     
@@ -8888,11 +8890,21 @@ open func state(listener: RoomListServiceStateListener) -> TaskHandle {
 })
 }
     
-open func subscribeToRooms(roomIds: [String])throws  {try rustCallWithError(FfiConverterTypeRoomListError.lift) {
-    uniffi_matrix_sdk_ffi_fn_method_roomlistservice_subscribe_to_rooms(self.uniffiClonePointer(),
-        FfiConverterSequenceString.lower(roomIds),$0
-    )
-}
+open func subscribeToRooms(roomIds: [String])async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_roomlistservice_subscribe_to_rooms(
+                    self.uniffiClonePointer(),
+                    FfiConverterSequenceString.lower(roomIds)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeRoomListError.lift
+        )
 }
     
 open func syncIndicator(delayBeforeShowingInMs: UInt32, delayBeforeHidingInMs: UInt32, listener: RoomListServiceSyncIndicatorListener) -> TaskHandle {
@@ -11221,6 +11233,8 @@ public protocol SyncServiceBuilderProtocol : AnyObject {
      */
     func withOfflineMode()  -> SyncServiceBuilder
     
+    func withSharePos(enable: Bool)  -> SyncServiceBuilder
+    
 }
 
 open class SyncServiceBuilder:
@@ -11294,6 +11308,14 @@ open func withCrossProcessLock() -> SyncServiceBuilder {
 open func withOfflineMode() -> SyncServiceBuilder {
     return try!  FfiConverterTypeSyncServiceBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_offline_mode(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func withSharePos(enable: Bool) -> SyncServiceBuilder {
+    return try!  FfiConverterTypeSyncServiceBuilder.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_share_pos(self.uniffiClonePointer(),
+        FfiConverterBool.lower(enable),$0
     )
 })
 }
@@ -30480,7 +30502,7 @@ public enum TimelineFocus {
     case thread(
         /**
          * The thread root event ID to focus on.
-         */rootEventId: String, numEvents: UInt16
+         */rootEventId: String
     )
     case pinnedEvents(maxEventsToLoad: UInt16, maxConcurrentRequests: UInt16
     )
@@ -30500,7 +30522,7 @@ public struct FfiConverterTypeTimelineFocus: FfiConverterRustBuffer {
         case 2: return .event(eventId: try FfiConverterString.read(from: &buf), numContextEvents: try FfiConverterUInt16.read(from: &buf), hideThreadedEvents: try FfiConverterBool.read(from: &buf)
         )
         
-        case 3: return .thread(rootEventId: try FfiConverterString.read(from: &buf), numEvents: try FfiConverterUInt16.read(from: &buf)
+        case 3: return .thread(rootEventId: try FfiConverterString.read(from: &buf)
         )
         
         case 4: return .pinnedEvents(maxEventsToLoad: try FfiConverterUInt16.read(from: &buf), maxConcurrentRequests: try FfiConverterUInt16.read(from: &buf)
@@ -30526,10 +30548,9 @@ public struct FfiConverterTypeTimelineFocus: FfiConverterRustBuffer {
             FfiConverterBool.write(hideThreadedEvents, into: &buf)
             
         
-        case let .thread(rootEventId,numEvents):
+        case let .thread(rootEventId):
             writeInt(&buf, Int32(3))
             FfiConverterString.write(rootEventId, into: &buf)
-            FfiConverterUInt16.write(numEvents, into: &buf)
             
         
         case let .pinnedEvents(maxEventsToLoad,maxConcurrentRequests):
@@ -37397,7 +37418,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_notification() != 52873) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_notifications() != 32112) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_notifications() != 64372) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationclient_get_room() != 26581) {
@@ -37793,7 +37814,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_state() != 64650) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_subscribe_to_rooms() != 59765) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_subscribe_to_rooms() != 5528) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservice_sync_indicator() != 16821) {
@@ -37965,6 +37986,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_offline_mode() != 16958) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_share_pos() != 18892) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_taskhandle_cancel() != 9124) {
