@@ -775,10 +775,16 @@ public protocol ClientProtocol : AnyObject {
     func getSessionVerificationController() async throws  -> SessionVerificationController
     
     /**
-     * Allows generic GET requests to be made through the SDKs internal HTTP
-     * client
+     * Allows generic GET requests to be made through the SDK's internal HTTP
+     * client. This is useful when the caller's native HTTP client wouldn't
+     * have the same configuration (such as certificates, proxies, etc.) This
+     * method returns the raw bytes of the response, so that any kind of
+     * resource can be fetched including images, files, etc.
+     *
+     * Note: When an HTTP error occurs, the error response can be found in the
+     * `ClientError::Generic`'s `details` field.
      */
-    func getUrl(url: String) async throws  -> String
+    func getUrl(url: String) async throws  -> Data
     
     /**
      * The homeserver this client is configured to use.
@@ -1074,8 +1080,14 @@ public protocol ClientProtocol : AnyObject {
      * If not set, a random one will be generated. It can be an existing
      * device ID from a previous login call. Note that this should be done
      * only if the client also holds the corresponding encryption keys.
+     *
+     * * `additional_scopes` - Additional scopes to request from the
+     * authorization server, e.g. "urn:matrix:client:com.example.msc9999.foo".
+     * The scopes for API access and the device ID according to the
+     * [specification](https://spec.matrix.org/v1.15/client-server-api/#allocated-scope-tokens)
+     * are always requested.
      */
-    func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?, loginHint: String?, deviceId: String?) async throws  -> OAuthAuthorizationData
+    func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?, loginHint: String?, deviceId: String?, additionalScopes: [String]?) async throws  -> OAuthAuthorizationData
     
     func userId() throws  -> String
     
@@ -1761,10 +1773,16 @@ open func getSessionVerificationController()async throws  -> SessionVerification
 }
     
     /**
-     * Allows generic GET requests to be made through the SDKs internal HTTP
-     * client
+     * Allows generic GET requests to be made through the SDK's internal HTTP
+     * client. This is useful when the caller's native HTTP client wouldn't
+     * have the same configuration (such as certificates, proxies, etc.) This
+     * method returns the raw bytes of the response, so that any kind of
+     * resource can be fetched including images, files, etc.
+     *
+     * Note: When an HTTP error occurs, the error response can be found in the
+     * `ClientError::Generic`'s `details` field.
      */
-open func getUrl(url: String)async throws  -> String {
+open func getUrl(url: String)async throws  -> Data {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -1776,7 +1794,7 @@ open func getUrl(url: String)async throws  -> String {
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterString.lift,
+            liftFunc: FfiConverterData.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -2684,14 +2702,20 @@ open func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWat
      * If not set, a random one will be generated. It can be an existing
      * device ID from a previous login call. Note that this should be done
      * only if the client also holds the corresponding encryption keys.
+     *
+     * * `additional_scopes` - Additional scopes to request from the
+     * authorization server, e.g. "urn:matrix:client:com.example.msc9999.foo".
+     * The scopes for API access and the device ID according to the
+     * [specification](https://spec.matrix.org/v1.15/client-server-api/#allocated-scope-tokens)
+     * are always requested.
      */
-open func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?, loginHint: String?, deviceId: String?)async throws  -> OAuthAuthorizationData {
+open func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?, loginHint: String?, deviceId: String?, additionalScopes: [String]?)async throws  -> OAuthAuthorizationData {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_url_for_oidc(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeOidcConfiguration.lower(oidcConfiguration),FfiConverterOptionTypeOidcPrompt.lower(prompt),FfiConverterOptionString.lower(loginHint),FfiConverterOptionString.lower(deviceId)
+                    FfiConverterTypeOidcConfiguration.lower(oidcConfiguration),FfiConverterOptionTypeOidcPrompt.lower(prompt),FfiConverterOptionString.lower(loginHint),FfiConverterOptionString.lower(deviceId),FfiConverterOptionSequenceString.lower(additionalScopes)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
@@ -3865,6 +3889,11 @@ public protocol HomeserverLoginDetailsProtocol : AnyObject {
     func supportsPasswordLogin()  -> Bool
     
     /**
+     * Whether the current homeserver supports login using legacy SSO.
+     */
+    func supportsSsoLogin()  -> Bool
+    
+    /**
      * The URL of the currently configured homeserver.
      */
     func url()  -> String
@@ -3949,6 +3978,16 @@ open func supportsOidcLogin() -> Bool {
 open func supportsPasswordLogin() -> Bool {
     return try!  FfiConverterBool.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_homeserverlogindetails_supports_password_login(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Whether the current homeserver supports login using legacy SSO.
+     */
+open func supportsSsoLogin() -> Bool {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_homeserverlogindetails_supports_sso_login(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -6238,7 +6277,7 @@ public protocol RoomProtocol : AnyObject {
      *
      * Returns an error if the room is not found or on rate limit
      */
-    func reportRoom(reason: String?) async throws 
+    func reportRoom(reason: String) async throws 
     
     func resetPowerLevels() async throws  -> RoomPowerLevels
     
@@ -7468,13 +7507,13 @@ open func reportContent(eventId: String, score: Int32?, reason: String?)async th
      *
      * Returns an error if the room is not found or on rate limit
      */
-open func reportRoom(reason: String?)async throws  {
+open func reportRoom(reason: String)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_report_room(
                     self.uniffiClonePointer(),
-                    FfiConverterOptionString.lower(reason)
+                    FfiConverterString.lower(reason)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -9670,7 +9709,7 @@ public protocol RoomPreviewProtocol : AnyObject {
     /**
      * Returns the room info the preview contains.
      */
-    func info() throws  -> RoomPreviewInfo
+    func info()  -> RoomPreviewInfo
     
     /**
      * Get the user who created the invite, if any.
@@ -9763,8 +9802,8 @@ open func forget()async throws  {
     /**
      * Returns the room info the preview contains.
      */
-open func info()throws  -> RoomPreviewInfo {
-    return try  FfiConverterTypeRoomPreviewInfo.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+open func info() -> RoomPreviewInfo {
+    return try!  FfiConverterTypeRoomPreviewInfo.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_roompreview_info(self.uniffiClonePointer(),$0
     )
 })
@@ -11726,7 +11765,7 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendImage(params: UploadParameters, thumbnailPath: String?, imageInfo: ImageInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
     
-    func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?, replyParams: ReplyParameters?) async throws 
+    func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?, repliedToEventId: String?) async throws 
     
     func sendPollResponse(pollStartEventId: String, answers: [String]) async throws 
     
@@ -11739,7 +11778,7 @@ public protocol TimelineProtocol : AnyObject {
      * reply so that clients that support threads can render the reply
      * inside the thread.
      */
-    func sendReply(msg: RoomMessageEventContentWithoutRelation, replyParams: ReplyParameters) async throws 
+    func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String) async throws 
     
     func sendVideo(params: UploadParameters, thumbnailPath: String?, videoInfo: VideoInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
     
@@ -12178,13 +12217,13 @@ open func sendImage(params: UploadParameters, thumbnailPath: String?, imageInfo:
 })
 }
     
-open func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?, replyParams: ReplyParameters?)async throws  {
+open func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?, repliedToEventId: String?)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_send_location(
                     self.uniffiClonePointer(),
-                    FfiConverterString.lower(body),FfiConverterString.lower(geoUri),FfiConverterOptionString.lower(description),FfiConverterOptionUInt8.lower(zoomLevel),FfiConverterOptionTypeAssetType.lower(assetType),FfiConverterOptionTypeReplyParameters.lower(replyParams)
+                    FfiConverterString.lower(body),FfiConverterString.lower(geoUri),FfiConverterOptionString.lower(description),FfiConverterOptionUInt8.lower(zoomLevel),FfiConverterOptionTypeAssetType.lower(assetType),FfiConverterOptionString.lower(repliedToEventId)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -12236,13 +12275,13 @@ open func sendReadReceipt(receiptType: ReceiptType, eventId: String)async throws
      * reply so that clients that support threads can render the reply
      * inside the thread.
      */
-open func sendReply(msg: RoomMessageEventContentWithoutRelation, replyParams: ReplyParameters)async throws  {
+open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String)async throws  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_send_reply(
                     self.uniffiClonePointer(),
-                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(msg),FfiConverterTypeReplyParameters.lower(replyParams)
+                    FfiConverterTypeRoomMessageEventContentWithoutRelation.lower(msg),FfiConverterString.lower(eventId)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -14676,9 +14715,9 @@ public struct GalleryUploadParameters {
      */
     public var mentions: Mentions?
     /**
-     * Optional parameters for sending the media as (threaded) reply.
+     * Optional Event ID to reply to.
      */
-    public var replyParams: ReplyParameters?
+    public var inReplyTo: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -14693,12 +14732,12 @@ public struct GalleryUploadParameters {
          * Optional intentional mentions to be sent with the gallery.
          */mentions: Mentions?, 
         /**
-         * Optional parameters for sending the media as (threaded) reply.
-         */replyParams: ReplyParameters?) {
+         * Optional Event ID to reply to.
+         */inReplyTo: String?) {
         self.caption = caption
         self.formattedCaption = formattedCaption
         self.mentions = mentions
-        self.replyParams = replyParams
+        self.inReplyTo = inReplyTo
     }
 }
 
@@ -14715,7 +14754,7 @@ extension GalleryUploadParameters: Equatable, Hashable {
         if lhs.mentions != rhs.mentions {
             return false
         }
-        if lhs.replyParams != rhs.replyParams {
+        if lhs.inReplyTo != rhs.inReplyTo {
             return false
         }
         return true
@@ -14725,7 +14764,7 @@ extension GalleryUploadParameters: Equatable, Hashable {
         hasher.combine(caption)
         hasher.combine(formattedCaption)
         hasher.combine(mentions)
-        hasher.combine(replyParams)
+        hasher.combine(inReplyTo)
     }
 }
 
@@ -14737,7 +14776,7 @@ public struct FfiConverterTypeGalleryUploadParameters: FfiConverterRustBuffer {
                 caption: FfiConverterOptionString.read(from: &buf), 
                 formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
                 mentions: FfiConverterOptionTypeMentions.read(from: &buf), 
-                replyParams: FfiConverterOptionTypeReplyParameters.read(from: &buf)
+                inReplyTo: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -14745,7 +14784,7 @@ public struct FfiConverterTypeGalleryUploadParameters: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.caption, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
         FfiConverterOptionTypeMentions.write(value.mentions, into: &buf)
-        FfiConverterOptionTypeReplyParameters.write(value.replyParams, into: &buf)
+        FfiConverterOptionString.write(value.inReplyTo, into: &buf)
     }
 }
 
@@ -15532,21 +15571,21 @@ public struct MediaPreviewConfig {
     /**
      * The media previews setting for the user.
      */
-    public var mediaPreviews: MediaPreviews
+    public var mediaPreviews: MediaPreviews?
     /**
      * The invite avatars setting for the user.
      */
-    public var inviteAvatars: InviteAvatars
+    public var inviteAvatars: InviteAvatars?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         /**
          * The media previews setting for the user.
-         */mediaPreviews: MediaPreviews, 
+         */mediaPreviews: MediaPreviews?, 
         /**
          * The invite avatars setting for the user.
-         */inviteAvatars: InviteAvatars) {
+         */inviteAvatars: InviteAvatars?) {
         self.mediaPreviews = mediaPreviews
         self.inviteAvatars = inviteAvatars
     }
@@ -15576,14 +15615,14 @@ public struct FfiConverterTypeMediaPreviewConfig: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MediaPreviewConfig {
         return
             try MediaPreviewConfig(
-                mediaPreviews: FfiConverterTypeMediaPreviews.read(from: &buf), 
-                inviteAvatars: FfiConverterTypeInviteAvatars.read(from: &buf)
+                mediaPreviews: FfiConverterOptionTypeMediaPreviews.read(from: &buf), 
+                inviteAvatars: FfiConverterOptionTypeInviteAvatars.read(from: &buf)
         )
     }
 
     public static func write(_ value: MediaPreviewConfig, into buf: inout [UInt8]) {
-        FfiConverterTypeMediaPreviews.write(value.mediaPreviews, into: &buf)
-        FfiConverterTypeInviteAvatars.write(value.inviteAvatars, into: &buf)
+        FfiConverterOptionTypeMediaPreviews.write(value.mediaPreviews, into: &buf)
+        FfiConverterOptionTypeInviteAvatars.write(value.inviteAvatars, into: &buf)
     }
 }
 
@@ -16873,22 +16912,14 @@ public struct PredecessorRoom {
      * The ID of the replacement room.
      */
     public var roomId: String
-    /**
-     * The event ID of the last known event in the predecesssor room.
-     */
-    public var lastEventId: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         /**
          * The ID of the replacement room.
-         */roomId: String, 
-        /**
-         * The event ID of the last known event in the predecesssor room.
-         */lastEventId: String) {
+         */roomId: String) {
         self.roomId = roomId
-        self.lastEventId = lastEventId
     }
 }
 
@@ -16899,15 +16930,11 @@ extension PredecessorRoom: Equatable, Hashable {
         if lhs.roomId != rhs.roomId {
             return false
         }
-        if lhs.lastEventId != rhs.lastEventId {
-            return false
-        }
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(roomId)
-        hasher.combine(lastEventId)
     }
 }
 
@@ -16916,14 +16943,12 @@ public struct FfiConverterTypePredecessorRoom: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PredecessorRoom {
         return
             try PredecessorRoom(
-                roomId: FfiConverterString.read(from: &buf), 
-                lastEventId: FfiConverterString.read(from: &buf)
+                roomId: FfiConverterString.read(from: &buf)
         )
     }
 
     public static func write(_ value: PredecessorRoom, into buf: inout [UInt8]) {
         FfiConverterString.write(value.roomId, into: &buf)
-        FfiConverterString.write(value.lastEventId, into: &buf)
     }
 }
 
@@ -17154,91 +17179,6 @@ public func FfiConverterTypeReceipt_lift(_ buf: RustBuffer) throws -> Receipt {
 
 public func FfiConverterTypeReceipt_lower(_ value: Receipt) -> RustBuffer {
     return FfiConverterTypeReceipt.lower(value)
-}
-
-
-public struct ReplyParameters {
-    /**
-     * The ID of the event to reply to.
-     */
-    public var eventId: String
-    /**
-     * Whether to enforce a thread relation.
-     */
-    public var enforceThread: Bool
-    /**
-     * If enforcing a threaded relation, whether the message is a reply on a
-     * thread.
-     */
-    public var replyWithinThread: Bool
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        /**
-         * The ID of the event to reply to.
-         */eventId: String, 
-        /**
-         * Whether to enforce a thread relation.
-         */enforceThread: Bool, 
-        /**
-         * If enforcing a threaded relation, whether the message is a reply on a
-         * thread.
-         */replyWithinThread: Bool) {
-        self.eventId = eventId
-        self.enforceThread = enforceThread
-        self.replyWithinThread = replyWithinThread
-    }
-}
-
-
-
-extension ReplyParameters: Equatable, Hashable {
-    public static func ==(lhs: ReplyParameters, rhs: ReplyParameters) -> Bool {
-        if lhs.eventId != rhs.eventId {
-            return false
-        }
-        if lhs.enforceThread != rhs.enforceThread {
-            return false
-        }
-        if lhs.replyWithinThread != rhs.replyWithinThread {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(eventId)
-        hasher.combine(enforceThread)
-        hasher.combine(replyWithinThread)
-    }
-}
-
-
-public struct FfiConverterTypeReplyParameters: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ReplyParameters {
-        return
-            try ReplyParameters(
-                eventId: FfiConverterString.read(from: &buf), 
-                enforceThread: FfiConverterBool.read(from: &buf), 
-                replyWithinThread: FfiConverterBool.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ReplyParameters, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.eventId, into: &buf)
-        FfiConverterBool.write(value.enforceThread, into: &buf)
-        FfiConverterBool.write(value.replyWithinThread, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeReplyParameters_lift(_ buf: RustBuffer) throws -> ReplyParameters {
-    return try FfiConverterTypeReplyParameters.lift(buf)
-}
-
-public func FfiConverterTypeReplyParameters_lower(_ value: ReplyParameters) -> RustBuffer {
-    return FfiConverterTypeReplyParameters.lower(value)
 }
 
 
@@ -20255,9 +20195,9 @@ public struct UploadParameters {
      */
     public var mentions: Mentions?
     /**
-     * Optional parameters for sending the media as (threaded) reply.
+     * Optional Event ID to reply to.
      */
-    public var replyParams: ReplyParameters?
+    public var inReplyTo: String?
     /**
      * Should the media be sent with the send queue, or synchronously?
      *
@@ -20281,8 +20221,8 @@ public struct UploadParameters {
          * Optional intentional mentions to be sent with the media.
          */mentions: Mentions?, 
         /**
-         * Optional parameters for sending the media as (threaded) reply.
-         */replyParams: ReplyParameters?, 
+         * Optional Event ID to reply to.
+         */inReplyTo: String?, 
         /**
          * Should the media be sent with the send queue, or synchronously?
          *
@@ -20292,7 +20232,7 @@ public struct UploadParameters {
         self.caption = caption
         self.formattedCaption = formattedCaption
         self.mentions = mentions
-        self.replyParams = replyParams
+        self.inReplyTo = inReplyTo
         self.useSendQueue = useSendQueue
     }
 }
@@ -20313,7 +20253,7 @@ extension UploadParameters: Equatable, Hashable {
         if lhs.mentions != rhs.mentions {
             return false
         }
-        if lhs.replyParams != rhs.replyParams {
+        if lhs.inReplyTo != rhs.inReplyTo {
             return false
         }
         if lhs.useSendQueue != rhs.useSendQueue {
@@ -20327,7 +20267,7 @@ extension UploadParameters: Equatable, Hashable {
         hasher.combine(caption)
         hasher.combine(formattedCaption)
         hasher.combine(mentions)
-        hasher.combine(replyParams)
+        hasher.combine(inReplyTo)
         hasher.combine(useSendQueue)
     }
 }
@@ -20341,7 +20281,7 @@ public struct FfiConverterTypeUploadParameters: FfiConverterRustBuffer {
                 caption: FfiConverterOptionString.read(from: &buf), 
                 formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
                 mentions: FfiConverterOptionTypeMentions.read(from: &buf), 
-                replyParams: FfiConverterOptionTypeReplyParameters.read(from: &buf), 
+                inReplyTo: FfiConverterOptionString.read(from: &buf), 
                 useSendQueue: FfiConverterBool.read(from: &buf)
         )
     }
@@ -20351,7 +20291,7 @@ public struct FfiConverterTypeUploadParameters: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.caption, into: &buf)
         FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
         FfiConverterOptionTypeMentions.write(value.mentions, into: &buf)
-        FfiConverterOptionTypeReplyParameters.write(value.replyParams, into: &buf)
+        FfiConverterOptionString.write(value.inReplyTo, into: &buf)
         FfiConverterBool.write(value.useSendQueue, into: &buf)
     }
 }
@@ -26579,6 +26519,9 @@ public enum PublicRoomJoinRule {
     
     case `public`
     case knock
+    case restricted
+    case knockRestricted
+    case invite
 }
 
 
@@ -26592,6 +26535,12 @@ public struct FfiConverterTypePublicRoomJoinRule: FfiConverterRustBuffer {
         case 1: return .`public`
         
         case 2: return .knock
+        
+        case 3: return .restricted
+        
+        case 4: return .knockRestricted
+        
+        case 5: return .invite
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -26607,6 +26556,18 @@ public struct FfiConverterTypePublicRoomJoinRule: FfiConverterRustBuffer {
         
         case .knock:
             writeInt(&buf, Int32(2))
+        
+        
+        case .restricted:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .knockRestricted:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .invite:
+            writeInt(&buf, Int32(5))
         
         }
     }
@@ -34676,27 +34637,6 @@ fileprivate struct FfiConverterOptionTypePredecessorRoom: FfiConverterRustBuffer
     }
 }
 
-fileprivate struct FfiConverterOptionTypeReplyParameters: FfiConverterRustBuffer {
-    typealias SwiftType = ReplyParameters?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeReplyParameters.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeReplyParameters.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeResolvedRoomAlias: FfiConverterRustBuffer {
     typealias SwiftType = ResolvedRoomAlias?
 
@@ -37070,7 +37010,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_session_verification_controller() != 55934) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_url() != 50489) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_url() != 32541) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_homeserver() != 26427) {
@@ -37217,7 +37157,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_upload_media() != 51195) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc() != 34524) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc() != 19369) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_user_id() != 40531) {
@@ -37383,6 +37323,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_supports_password_login() != 33501) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_supports_sso_login() != 37773) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_url() != 61326) {
@@ -37685,7 +37628,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_report_content() != 16529) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_report_room() != 8059) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_report_room() != 6449) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_reset_power_levels() != 5060) {
@@ -37913,7 +37856,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_forget() != 18179) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_info() != 9145) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_info() != 50237) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roompreview_inviter() != 1297) {
@@ -38087,7 +38030,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 25436) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_location() != 57832) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_location() != 39080) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_poll_response() != 7453) {
@@ -38096,7 +38039,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_read_receipt() != 37532) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 31468) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 11149) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 1445) {
