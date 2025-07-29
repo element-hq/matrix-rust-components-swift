@@ -6031,6 +6031,16 @@ public protocol RoomProtocol : AnyObject {
     func encryptionState()  -> EncryptionState
     
     /**
+     * Return the current MSC4306 thread subscription for the given thread root
+     * in this room.
+     *
+     * Returns `None` if the thread doesn't exist, or isn't subscribed to, or
+     * the server can't handle MSC4306; otherwise, returns the thread
+     * subscription status.
+     */
+    func fetchThreadSubscription(threadRootEventId: String) async throws  -> ThreadSubscription?
+    
+    /**
      * Forget this room.
      *
      * This communicates to the homeserver that it should forget the room.
@@ -6352,6 +6362,21 @@ public protocol RoomProtocol : AnyObject {
      * Sets a new name to the room.
      */
     func setName(name: String) async throws 
+    
+    /**
+     * Toggle a MSC4306 subscription to a thread in this room, based on the
+     * thread root event id.
+     *
+     * If `subscribed` is `true`, it will subscribe to the thread, with a
+     * precision that the subscription was manually requested by the user
+     * (i.e. not automatic).
+     *
+     * If the thread was already subscribed to (resp. unsubscribed from), while
+     * trying to subscribe to it (resp. unsubscribe from it), it will do
+     * nothing, i.e. subscribing (resp. unsubscribing) to a thread is an
+     * idempotent operation.
+     */
+    func setThreadSubscription(threadRootEventId: String, subscribed: Bool) async throws 
     
     /**
      * Sets a new topic in the room.
@@ -6745,6 +6770,31 @@ open func encryptionState() -> EncryptionState {
     uniffi_matrix_sdk_ffi_fn_method_room_encryption_state(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+    /**
+     * Return the current MSC4306 thread subscription for the given thread root
+     * in this room.
+     *
+     * Returns `None` if the thread doesn't exist, or isn't subscribed to, or
+     * the server can't handle MSC4306; otherwise, returns the thread
+     * subscription status.
+     */
+open func fetchThreadSubscription(threadRootEventId: String)async throws  -> ThreadSubscription? {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_fetch_thread_subscription(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(threadRootEventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeThreadSubscription.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
     /**
@@ -7753,6 +7803,36 @@ open func setName(name: String)async throws  {
                 uniffi_matrix_sdk_ffi_fn_method_room_set_name(
                     self.uniffiClonePointer(),
                     FfiConverterString.lower(name)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Toggle a MSC4306 subscription to a thread in this room, based on the
+     * thread root event id.
+     *
+     * If `subscribed` is `true`, it will subscribe to the thread, with a
+     * precision that the subscription was manually requested by the user
+     * (i.e. not automatic).
+     *
+     * If the thread was already subscribed to (resp. unsubscribed from), while
+     * trying to subscribe to it (resp. unsubscribe from it), it will do
+     * nothing, i.e. subscribing (resp. unsubscribing) to a thread is an
+     * idempotent operation.
+     */
+open func setThreadSubscription(threadRootEventId: String, subscribed: Bool)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_set_thread_subscription(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(threadRootEventId),FfiConverterBool.lower(subscribed)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -17583,7 +17663,7 @@ public func FfiConverterTypeRoomHero_lower(_ value: RoomHero) -> RustBuffer {
 public struct RoomInfo {
     public var id: String
     public var encryptionState: EncryptionState
-    public var creator: String?
+    public var creators: [String]?
     /**
      * The room's name from the room state event if received from sync, or one
      * that's been computed otherwise.
@@ -17666,10 +17746,19 @@ public struct RoomInfo {
      * Can be missing if the room power levels event is missing from the store.
      */
     public var powerLevels: RoomPowerLevels?
+    /**
+     * This room's version.
+     */
+    public var roomVersion: String?
+    /**
+     * Whether creators are privileged over every other user (have infinite
+     * power level).
+     */
+    public var privilegedCreatorsRole: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, encryptionState: EncryptionState, creator: String?, 
+    public init(id: String, encryptionState: EncryptionState, creators: [String]?, 
         /**
          * The room's name from the room state event if received from sync, or one
          * that's been computed otherwise.
@@ -17721,10 +17810,17 @@ public struct RoomInfo {
          * This room's current power levels.
          *
          * Can be missing if the room power levels event is missing from the store.
-         */powerLevels: RoomPowerLevels?) {
+         */powerLevels: RoomPowerLevels?, 
+        /**
+         * This room's version.
+         */roomVersion: String?, 
+        /**
+         * Whether creators are privileged over every other user (have infinite
+         * power level).
+         */privilegedCreatorsRole: Bool) {
         self.id = id
         self.encryptionState = encryptionState
-        self.creator = creator
+        self.creators = creators
         self.displayName = displayName
         self.rawName = rawName
         self.topic = topic
@@ -17755,6 +17851,8 @@ public struct RoomInfo {
         self.joinRule = joinRule
         self.historyVisibility = historyVisibility
         self.powerLevels = powerLevels
+        self.roomVersion = roomVersion
+        self.privilegedCreatorsRole = privilegedCreatorsRole
     }
 }
 
@@ -17766,7 +17864,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
             try RoomInfo(
                 id: FfiConverterString.read(from: &buf), 
                 encryptionState: FfiConverterTypeEncryptionState.read(from: &buf), 
-                creator: FfiConverterOptionString.read(from: &buf), 
+                creators: FfiConverterOptionSequenceString.read(from: &buf), 
                 displayName: FfiConverterOptionString.read(from: &buf), 
                 rawName: FfiConverterOptionString.read(from: &buf), 
                 topic: FfiConverterOptionString.read(from: &buf), 
@@ -17796,14 +17894,16 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 pinnedEventIds: FfiConverterSequenceString.read(from: &buf), 
                 joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
                 historyVisibility: FfiConverterTypeRoomHistoryVisibility.read(from: &buf), 
-                powerLevels: FfiConverterOptionTypeRoomPowerLevels.read(from: &buf)
+                powerLevels: FfiConverterOptionTypeRoomPowerLevels.read(from: &buf), 
+                roomVersion: FfiConverterOptionString.read(from: &buf), 
+                privilegedCreatorsRole: FfiConverterBool.read(from: &buf)
         )
     }
 
     public static func write(_ value: RoomInfo, into buf: inout [UInt8]) {
         FfiConverterString.write(value.id, into: &buf)
         FfiConverterTypeEncryptionState.write(value.encryptionState, into: &buf)
-        FfiConverterOptionString.write(value.creator, into: &buf)
+        FfiConverterOptionSequenceString.write(value.creators, into: &buf)
         FfiConverterOptionString.write(value.displayName, into: &buf)
         FfiConverterOptionString.write(value.rawName, into: &buf)
         FfiConverterOptionString.write(value.topic, into: &buf)
@@ -17834,6 +17934,8 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
         FfiConverterTypeRoomHistoryVisibility.write(value.historyVisibility, into: &buf)
         FfiConverterOptionTypeRoomPowerLevels.write(value.powerLevels, into: &buf)
+        FfiConverterOptionString.write(value.roomVersion, into: &buf)
+        FfiConverterBool.write(value.privilegedCreatorsRole, into: &buf)
     }
 }
 
@@ -17892,15 +17994,15 @@ public struct RoomMember {
     public var avatarUrl: String?
     public var membership: MembershipState
     public var isNameAmbiguous: Bool
-    public var powerLevel: Int64
-    public var normalizedPowerLevel: Int64
+    public var powerLevel: PowerLevel
+    public var normalizedPowerLevel: PowerLevel
     public var isIgnored: Bool
     public var suggestedRoleForPowerLevel: RoomMemberRole
     public var membershipChangeReason: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(userId: String, displayName: String?, avatarUrl: String?, membership: MembershipState, isNameAmbiguous: Bool, powerLevel: Int64, normalizedPowerLevel: Int64, isIgnored: Bool, suggestedRoleForPowerLevel: RoomMemberRole, membershipChangeReason: String?) {
+    public init(userId: String, displayName: String?, avatarUrl: String?, membership: MembershipState, isNameAmbiguous: Bool, powerLevel: PowerLevel, normalizedPowerLevel: PowerLevel, isIgnored: Bool, suggestedRoleForPowerLevel: RoomMemberRole, membershipChangeReason: String?) {
         self.userId = userId
         self.displayName = displayName
         self.avatarUrl = avatarUrl
@@ -17975,8 +18077,8 @@ public struct FfiConverterTypeRoomMember: FfiConverterRustBuffer {
                 avatarUrl: FfiConverterOptionString.read(from: &buf), 
                 membership: FfiConverterTypeMembershipState.read(from: &buf), 
                 isNameAmbiguous: FfiConverterBool.read(from: &buf), 
-                powerLevel: FfiConverterInt64.read(from: &buf), 
-                normalizedPowerLevel: FfiConverterInt64.read(from: &buf), 
+                powerLevel: FfiConverterTypePowerLevel.read(from: &buf), 
+                normalizedPowerLevel: FfiConverterTypePowerLevel.read(from: &buf), 
                 isIgnored: FfiConverterBool.read(from: &buf), 
                 suggestedRoleForPowerLevel: FfiConverterTypeRoomMemberRole.read(from: &buf), 
                 membershipChangeReason: FfiConverterOptionString.read(from: &buf)
@@ -17989,8 +18091,8 @@ public struct FfiConverterTypeRoomMember: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.avatarUrl, into: &buf)
         FfiConverterTypeMembershipState.write(value.membership, into: &buf)
         FfiConverterBool.write(value.isNameAmbiguous, into: &buf)
-        FfiConverterInt64.write(value.powerLevel, into: &buf)
-        FfiConverterInt64.write(value.normalizedPowerLevel, into: &buf)
+        FfiConverterTypePowerLevel.write(value.powerLevel, into: &buf)
+        FfiConverterTypePowerLevel.write(value.normalizedPowerLevel, into: &buf)
         FfiConverterBool.write(value.isIgnored, into: &buf)
         FfiConverterTypeRoomMemberRole.write(value.suggestedRoleForPowerLevel, into: &buf)
         FfiConverterOptionString.write(value.membershipChangeReason, into: &buf)
@@ -19392,6 +19494,66 @@ public func FfiConverterTypeTextMessageContent_lift(_ buf: RustBuffer) throws ->
 
 public func FfiConverterTypeTextMessageContent_lower(_ value: TextMessageContent) -> RustBuffer {
     return FfiConverterTypeTextMessageContent.lower(value)
+}
+
+
+/**
+ * Status of a thread subscription (MSC4306).
+ */
+public struct ThreadSubscription {
+    /**
+     * Whether the thread subscription happened automatically (e.g. after a
+     * mention) or if it was manually requested by the user.
+     */
+    public var automatic: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Whether the thread subscription happened automatically (e.g. after a
+         * mention) or if it was manually requested by the user.
+         */automatic: Bool) {
+        self.automatic = automatic
+    }
+}
+
+
+
+extension ThreadSubscription: Equatable, Hashable {
+    public static func ==(lhs: ThreadSubscription, rhs: ThreadSubscription) -> Bool {
+        if lhs.automatic != rhs.automatic {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(automatic)
+    }
+}
+
+
+public struct FfiConverterTypeThreadSubscription: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThreadSubscription {
+        return
+            try ThreadSubscription(
+                automatic: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ThreadSubscription, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.automatic, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeThreadSubscription_lift(_ buf: RustBuffer) throws -> ThreadSubscription {
+    return try FfiConverterTypeThreadSubscription.lift(buf)
+}
+
+public func FfiConverterTypeThreadSubscription_lower(_ value: ThreadSubscription) -> RustBuffer {
+    return FfiConverterTypeThreadSubscription.lower(value)
 }
 
 
@@ -26432,6 +26594,72 @@ public func FfiConverterTypePollKind_lower(_ value: PollKind) -> RustBuffer {
 
 
 extension PollKind: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum PowerLevel {
+    
+    /**
+     * The user is a room creator and has infinite power level.
+     *
+     * This power level was introduced in room version 12.
+     */
+    case infinite
+    /**
+     * The user has the given power level.
+     */
+    case value(value: Int64
+    )
+}
+
+
+public struct FfiConverterTypePowerLevel: FfiConverterRustBuffer {
+    typealias SwiftType = PowerLevel
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PowerLevel {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .infinite
+        
+        case 2: return .value(value: try FfiConverterInt64.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: PowerLevel, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .infinite:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .value(value):
+            writeInt(&buf, Int32(2))
+            FfiConverterInt64.write(value, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypePowerLevel_lift(_ buf: RustBuffer) throws -> PowerLevel {
+    return try FfiConverterTypePowerLevel.lift(buf)
+}
+
+public func FfiConverterTypePowerLevel_lower(_ value: PowerLevel) -> RustBuffer {
+    return FfiConverterTypePowerLevel.lower(value)
+}
+
+
+
+extension PowerLevel: Equatable, Hashable {}
 
 
 
@@ -34742,6 +34970,27 @@ fileprivate struct FfiConverterOptionTypeSuccessorRoom: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeThreadSubscription: FfiConverterRustBuffer {
+    typealias SwiftType = ThreadSubscription?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeThreadSubscription.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeThreadSubscription.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeThumbnailInfo: FfiConverterRustBuffer {
     typealias SwiftType = ThumbnailInfo?
 
@@ -36809,17 +37058,28 @@ public func sdkGitSha() -> String {
     )
 })
 }
-public func suggestedPowerLevelForRole(role: RoomMemberRole) -> Int64 {
-    return try!  FfiConverterInt64.lift(try! rustCall() {
+/**
+ * Get the suggested power level for the given role.
+ *
+ * Returns an error if the value of the power level is unsupported.
+ */
+public func suggestedPowerLevelForRole(role: RoomMemberRole)throws  -> PowerLevel {
+    return try  FfiConverterTypePowerLevel.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
     uniffi_matrix_sdk_ffi_fn_func_suggested_power_level_for_role(
         FfiConverterTypeRoomMemberRole_lower(role),$0
     )
 })
 }
-public func suggestedRoleForPowerLevel(powerLevel: Int64) -> RoomMemberRole {
-    return try!  FfiConverterTypeRoomMemberRole_lift(try! rustCall() {
+/**
+ * Get the suggested role for the given power level.
+ *
+ * Returns an error if the value of the power level is out of range for numbers
+ * accepted in canonical JSON.
+ */
+public func suggestedRoleForPowerLevel(powerLevel: PowerLevel)throws  -> RoomMemberRole {
+    return try  FfiConverterTypeRoomMemberRole_lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
     uniffi_matrix_sdk_ffi_fn_func_suggested_role_for_power_level(
-        FfiConverterInt64.lower(powerLevel),$0
+        FfiConverterTypePowerLevel.lower(powerLevel),$0
     )
 })
 }
@@ -36905,10 +37165,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_sdk_git_sha() != 4038) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_func_suggested_power_level_for_role() != 61777) {
+    if (uniffi_matrix_sdk_ffi_checksum_func_suggested_power_level_for_role() != 29703) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_func_suggested_role_for_power_level() != 48532) {
+    if (uniffi_matrix_sdk_ffi_checksum_func_suggested_role_for_power_level() != 13856) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roommessageeventcontentwithoutrelation_with_mentions() != 8867) {
@@ -37502,6 +37762,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_encryption_state() != 9101) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_fetch_thread_subscription() != 51696) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_forget() != 37840) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -37662,6 +37925,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_name() != 52127) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_set_thread_subscription() != 3684) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_topic() != 5576) {

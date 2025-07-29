@@ -1726,6 +1726,19 @@ extension QrCodeLoginError: Foundation.LocalizedError {
 public enum RoomMemberRole {
     
     /**
+     * The member is a creator.
+     *
+     * A creator has an infinite power level and cannot be demoted, so this
+     * role is immutable. A room can have several creators.
+     *
+     * It is available in room versions where
+     * `explicitly_privilege_room_creators` in [`AuthorizationRules`] is set to
+     * `true`.
+     *
+     * [`AuthorizationRules`]: ruma::room_version_rules::AuthorizationRules
+     */
+    case creator
+    /**
      * The member is an administrator.
      */
     case administrator
@@ -1747,11 +1760,13 @@ public struct FfiConverterTypeRoomMemberRole: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .administrator
+        case 1: return .creator
         
-        case 2: return .moderator
+        case 2: return .administrator
         
-        case 3: return .user
+        case 3: return .moderator
+        
+        case 4: return .user
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -1761,16 +1776,20 @@ public struct FfiConverterTypeRoomMemberRole: FfiConverterRustBuffer {
         switch value {
         
         
-        case .administrator:
+        case .creator:
             writeInt(&buf, Int32(1))
         
         
-        case .moderator:
+        case .administrator:
             writeInt(&buf, Int32(2))
         
         
-        case .user:
+        case .moderator:
             writeInt(&buf, Int32(3))
+        
+        
+        case .user:
+            writeInt(&buf, Int32(4))
         
         }
     }
