@@ -699,6 +699,12 @@ public protocol ClientProtocol : AnyObject {
      */
     func enableAllSendQueues(enable: Bool) async 
     
+    /**
+     * Enables or disables progress reporting for media uploads in the send
+     * queue.
+     */
+    func enableSendQueueUploadProgress(enable: Bool) 
+    
     func encryption()  -> Encryption
     
     /**
@@ -1482,6 +1488,17 @@ open func enableAllSendQueues(enable: Bool)async  {
             errorHandler: nil
             
         )
+}
+    
+    /**
+     * Enables or disables progress reporting for media uploads in the send
+     * queue.
+     */
+open func enableSendQueueUploadProgress(enable: Bool) {try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_enable_send_queue_upload_progress(self.uniffiClonePointer(),
+        FfiConverterBool.lower(enable),$0
+    )
+}
 }
     
 open func encryption() -> Encryption {
@@ -6038,7 +6055,7 @@ public protocol RoomProtocol : AnyObject {
      * the server can't handle MSC4306; otherwise, returns the thread
      * subscription status.
      */
-    func fetchThreadSubscription(threadRootEventId: String) async throws  -> ThreadSubscription?
+    func fetchThreadSubscription(threadRootEventId: String) async throws  -> ThreadStatus?
     
     /**
      * Forget this room.
@@ -6304,39 +6321,6 @@ public protocol RoomProtocol : AnyObject {
      * room id, as identifier.
      */
     func saveComposerDraft(draft: ComposerDraft, threadRoot: String?) async throws 
-    
-    /**
-     * Send a call notification event in the current room.
-     *
-     * This is only supposed to be used in **custom** situations where the user
-     * explicitly chooses to send a `m.call.notify` event to invite/notify
-     * someone explicitly in unusual conditions. The default should be to
-     * use `send_call_notification_if_necessary` just before a new room call is
-     * created/joined.
-     *
-     * One example could be that the UI allows to start a call with a subset of
-     * users of the room members first. And then later on the user can
-     * invite more users to the call.
-     */
-    func sendCallNotification(callId: String, application: RtcApplicationType, notifyType: NotifyType, mentions: Mentions) async throws 
-    
-    /**
-     * This will only send a call notification event if appropriate.
-     *
-     * This function is supposed to be called whenever the user creates a room
-     * call. It will send a `m.call.notify` event if:
-     * - there is not yet a running call.
-     *
-     * It will configure the notify type: ring or notify based on:
-     * - is this a DM room -> ring
-     * - is this a group with more than one other member -> notify
-     *
-     * Returns:
-     * - `Ok(true)` if the event was successfully sent.
-     * - `Ok(false)` if we didn't send it because it was unnecessary.
-     * - `Err(_)` if sending the event failed.
-     */
-    func sendCallNotificationIfNeeded() async throws  -> Bool
     
     /**
      * Send the current users live location beacon in the room.
@@ -6780,7 +6764,7 @@ open func encryptionState() -> EncryptionState {
      * the server can't handle MSC4306; otherwise, returns the thread
      * subscription status.
      */
-open func fetchThreadSubscription(threadRootEventId: String)async throws  -> ThreadSubscription? {
+open func fetchThreadSubscription(threadRootEventId: String)async throws  -> ThreadStatus? {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -6792,7 +6776,7 @@ open func fetchThreadSubscription(threadRootEventId: String)async throws  -> Thr
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterOptionTypeThreadSubscription.lift,
+            liftFunc: FfiConverterOptionTypeThreadStatus.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -7646,69 +7630,6 @@ open func saveComposerDraft(draft: ComposerDraft, threadRoot: String?)async thro
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-    /**
-     * Send a call notification event in the current room.
-     *
-     * This is only supposed to be used in **custom** situations where the user
-     * explicitly chooses to send a `m.call.notify` event to invite/notify
-     * someone explicitly in unusual conditions. The default should be to
-     * use `send_call_notification_if_necessary` just before a new room call is
-     * created/joined.
-     *
-     * One example could be that the UI allows to start a call with a subset of
-     * users of the room members first. And then later on the user can
-     * invite more users to the call.
-     */
-open func sendCallNotification(callId: String, application: RtcApplicationType, notifyType: NotifyType, mentions: Mentions)async throws  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_send_call_notification(
-                    self.uniffiClonePointer(),
-                    FfiConverterString.lower(callId),FfiConverterTypeRtcApplicationType.lower(application),FfiConverterTypeNotifyType.lower(notifyType),FfiConverterTypeMentions.lower(mentions)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
-            errorHandler: FfiConverterTypeClientError.lift
-        )
-}
-    
-    /**
-     * This will only send a call notification event if appropriate.
-     *
-     * This function is supposed to be called whenever the user creates a room
-     * call. It will send a `m.call.notify` event if:
-     * - there is not yet a running call.
-     *
-     * It will configure the notify type: ring or notify based on:
-     * - is this a DM room -> ring
-     * - is this a group with more than one other member -> notify
-     *
-     * Returns:
-     * - `Ok(true)` if the event was successfully sent.
-     * - `Ok(false)` if we didn't send it because it was unnecessary.
-     * - `Err(_)` if sending the event failed.
-     */
-open func sendCallNotificationIfNeeded()async throws  -> Bool {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_send_call_notification_if_needed(
-                    self.uniffiClonePointer()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
-            liftFunc: FfiConverterBool.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -19497,66 +19418,6 @@ public func FfiConverterTypeTextMessageContent_lower(_ value: TextMessageContent
 }
 
 
-/**
- * Status of a thread subscription (MSC4306).
- */
-public struct ThreadSubscription {
-    /**
-     * Whether the thread subscription happened automatically (e.g. after a
-     * mention) or if it was manually requested by the user.
-     */
-    public var automatic: Bool
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        /**
-         * Whether the thread subscription happened automatically (e.g. after a
-         * mention) or if it was manually requested by the user.
-         */automatic: Bool) {
-        self.automatic = automatic
-    }
-}
-
-
-
-extension ThreadSubscription: Equatable, Hashable {
-    public static func ==(lhs: ThreadSubscription, rhs: ThreadSubscription) -> Bool {
-        if lhs.automatic != rhs.automatic {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(automatic)
-    }
-}
-
-
-public struct FfiConverterTypeThreadSubscription: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThreadSubscription {
-        return
-            try ThreadSubscription(
-                automatic: FfiConverterBool.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ThreadSubscription, into buf: inout [UInt8]) {
-        FfiConverterBool.write(value.automatic, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeThreadSubscription_lift(_ buf: RustBuffer) throws -> ThreadSubscription {
-    return try FfiConverterTypeThreadSubscription.lift(buf)
-}
-
-public func FfiConverterTypeThreadSubscription_lower(_ value: ThreadSubscription) -> RustBuffer {
-    return FfiConverterTypeThreadSubscription.lower(value)
-}
-
-
 public struct ThumbnailInfo {
     public var height: UInt64?
     public var width: UInt64?
@@ -30422,6 +30283,77 @@ extension TagName: Equatable, Hashable {}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Status of a thread subscription (MSC4306).
+ */
+
+public enum ThreadStatus {
+    
+    /**
+     * The thread is subscribed to.
+     */
+    case subscribed(
+        /**
+         * Whether the thread subscription happened automatically (e.g. after a
+         * mention) or if it was manually requested by the user.
+         */automatic: Bool
+    )
+    /**
+     * The thread is not subscribed to.
+     */
+    case unsubscribed
+}
+
+
+public struct FfiConverterTypeThreadStatus: FfiConverterRustBuffer {
+    typealias SwiftType = ThreadStatus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThreadStatus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .subscribed(automatic: try FfiConverterBool.read(from: &buf)
+        )
+        
+        case 2: return .unsubscribed
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ThreadStatus, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .subscribed(automatic):
+            writeInt(&buf, Int32(1))
+            FfiConverterBool.write(automatic, into: &buf)
+            
+        
+        case .unsubscribed:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeThreadStatus_lift(_ buf: RustBuffer) throws -> ThreadStatus {
+    return try FfiConverterTypeThreadStatus.lift(buf)
+}
+
+public func FfiConverterTypeThreadStatus_lower(_ value: ThreadStatus) -> RustBuffer {
+    return FfiConverterTypeThreadStatus.lower(value)
+}
+
+
+
+extension ThreadStatus: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum TimelineChange {
     
@@ -34970,27 +34902,6 @@ fileprivate struct FfiConverterOptionTypeSuccessorRoom: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionTypeThreadSubscription: FfiConverterRustBuffer {
-    typealias SwiftType = ThreadSubscription?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeThreadSubscription.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeThreadSubscription.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeThumbnailInfo: FfiConverterRustBuffer {
     typealias SwiftType = ThumbnailInfo?
 
@@ -35406,6 +35317,27 @@ fileprivate struct FfiConverterOptionTypeShieldState: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeShieldState.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+fileprivate struct FfiConverterOptionTypeThreadStatus: FfiConverterRustBuffer {
+    typealias SwiftType = ThreadStatus?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeThreadStatus.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeThreadStatus.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -37222,6 +37154,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_all_send_queues() != 30834) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_send_queue_upload_progress() != 10688) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_encryption() != 9657) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -37762,7 +37697,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_encryption_state() != 9101) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_fetch_thread_subscription() != 51696) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_fetch_thread_subscription() != 47497) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_forget() != 37840) {
@@ -37904,12 +37839,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_save_composer_draft() != 27585) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_call_notification() != 43366) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_call_notification_if_needed() != 52926) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_live_location() != 34248) {
