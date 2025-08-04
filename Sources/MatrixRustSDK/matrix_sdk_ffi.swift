@@ -12434,180 +12434,6 @@ public func FfiConverterTypeTimeline_lower(_ value: Timeline) -> UnsafeMutableRa
 
 
 
-public protocol TimelineDiffProtocol : AnyObject {
-    
-    func append()  -> [TimelineItem]?
-    
-    func change()  -> TimelineChange
-    
-    func insert()  -> InsertData?
-    
-    func pushBack()  -> TimelineItem?
-    
-    func pushFront()  -> TimelineItem?
-    
-    func remove()  -> UInt32?
-    
-    func reset()  -> [TimelineItem]?
-    
-    func set()  -> SetData?
-    
-    func truncate()  -> UInt32?
-    
-}
-
-open class TimelineDiff:
-    TimelineDiffProtocol {
-    fileprivate let pointer: UnsafeMutableRawPointer!
-
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
-    public struct NoPointer {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
-    }
-
-    /// This constructor can be used to instantiate a fake object.
-    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    ///
-    /// - Warning:
-    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
-    }
-
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_timelinediff(self.pointer, $0) }
-    }
-    // No primary constructor declared for this class.
-
-    deinit {
-        guard let pointer = pointer else {
-            return
-        }
-
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_timelinediff(pointer, $0) }
-    }
-
-    
-
-    
-open func append() -> [TimelineItem]? {
-    return try!  FfiConverterOptionSequenceTypeTimelineItem.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timelinediff_append(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func change() -> TimelineChange {
-    return try!  FfiConverterTypeTimelineChange.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timelinediff_change(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func insert() -> InsertData? {
-    return try!  FfiConverterOptionTypeInsertData.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timelinediff_insert(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func pushBack() -> TimelineItem? {
-    return try!  FfiConverterOptionTypeTimelineItem.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timelinediff_push_back(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func pushFront() -> TimelineItem? {
-    return try!  FfiConverterOptionTypeTimelineItem.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timelinediff_push_front(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func remove() -> UInt32? {
-    return try!  FfiConverterOptionUInt32.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timelinediff_remove(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func reset() -> [TimelineItem]? {
-    return try!  FfiConverterOptionSequenceTypeTimelineItem.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timelinediff_reset(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func set() -> SetData? {
-    return try!  FfiConverterOptionTypeSetData.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timelinediff_set(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-open func truncate() -> UInt32? {
-    return try!  FfiConverterOptionUInt32.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_timelinediff_truncate(self.uniffiClonePointer(),$0
-    )
-})
-}
-    
-
-}
-
-public struct FfiConverterTypeTimelineDiff: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
-    typealias SwiftType = TimelineDiff
-
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> TimelineDiff {
-        return TimelineDiff(unsafeFromRawPointer: pointer)
-    }
-
-    public static func lower(_ value: TimelineDiff) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineDiff {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
-    }
-
-    public static func write(_ value: TimelineDiff, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
-    }
-}
-
-
-
-
-public func FfiConverterTypeTimelineDiff_lift(_ pointer: UnsafeMutableRawPointer) throws -> TimelineDiff {
-    return try FfiConverterTypeTimelineDiff.lift(pointer)
-}
-
-public func FfiConverterTypeTimelineDiff_lower(_ value: TimelineDiff) -> UnsafeMutableRawPointer {
-    return FfiConverterTypeTimelineDiff.lower(value)
-}
-
-
-
-
 public protocol TimelineEventProtocol : AnyObject {
     
     func eventId()  -> String
@@ -30473,6 +30299,147 @@ extension TimelineChange: Equatable, Hashable {}
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
+public enum TimelineDiff {
+    
+    case append(values: [TimelineItem]
+    )
+    case clear
+    case pushFront(value: TimelineItem
+    )
+    case pushBack(value: TimelineItem
+    )
+    case popFront
+    case popBack
+    case insert(index: UInt32, value: TimelineItem
+    )
+    case set(index: UInt32, value: TimelineItem
+    )
+    case remove(index: UInt32
+    )
+    case truncate(length: UInt32
+    )
+    case reset(values: [TimelineItem]
+    )
+}
+
+
+public struct FfiConverterTypeTimelineDiff: FfiConverterRustBuffer {
+    typealias SwiftType = TimelineDiff
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineDiff {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .append(values: try FfiConverterSequenceTypeTimelineItem.read(from: &buf)
+        )
+        
+        case 2: return .clear
+        
+        case 3: return .pushFront(value: try FfiConverterTypeTimelineItem.read(from: &buf)
+        )
+        
+        case 4: return .pushBack(value: try FfiConverterTypeTimelineItem.read(from: &buf)
+        )
+        
+        case 5: return .popFront
+        
+        case 6: return .popBack
+        
+        case 7: return .insert(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeTimelineItem.read(from: &buf)
+        )
+        
+        case 8: return .set(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeTimelineItem.read(from: &buf)
+        )
+        
+        case 9: return .remove(index: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 10: return .truncate(length: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 11: return .reset(values: try FfiConverterSequenceTypeTimelineItem.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: TimelineDiff, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .append(values):
+            writeInt(&buf, Int32(1))
+            FfiConverterSequenceTypeTimelineItem.write(values, into: &buf)
+            
+        
+        case .clear:
+            writeInt(&buf, Int32(2))
+        
+        
+        case let .pushFront(value):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeTimelineItem.write(value, into: &buf)
+            
+        
+        case let .pushBack(value):
+            writeInt(&buf, Int32(4))
+            FfiConverterTypeTimelineItem.write(value, into: &buf)
+            
+        
+        case .popFront:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .popBack:
+            writeInt(&buf, Int32(6))
+        
+        
+        case let .insert(index,value):
+            writeInt(&buf, Int32(7))
+            FfiConverterUInt32.write(index, into: &buf)
+            FfiConverterTypeTimelineItem.write(value, into: &buf)
+            
+        
+        case let .set(index,value):
+            writeInt(&buf, Int32(8))
+            FfiConverterUInt32.write(index, into: &buf)
+            FfiConverterTypeTimelineItem.write(value, into: &buf)
+            
+        
+        case let .remove(index):
+            writeInt(&buf, Int32(9))
+            FfiConverterUInt32.write(index, into: &buf)
+            
+        
+        case let .truncate(length):
+            writeInt(&buf, Int32(10))
+            FfiConverterUInt32.write(length, into: &buf)
+            
+        
+        case let .reset(values):
+            writeInt(&buf, Int32(11))
+            FfiConverterSequenceTypeTimelineItem.write(values, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeTimelineDiff_lift(_ buf: RustBuffer) throws -> TimelineDiff {
+    return try FfiConverterTypeTimelineDiff.lift(buf)
+}
+
+public func FfiConverterTypeTimelineDiff_lower(_ value: TimelineDiff) -> RustBuffer {
+    return FfiConverterTypeTimelineDiff.lower(value)
+}
+
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 public enum TimelineEventType {
     
     case messageLike(content: MessageLikeEventContent
@@ -34461,27 +34428,6 @@ fileprivate struct FfiConverterOptionTypeThreadSummary: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionTypeTimelineItem: FfiConverterRustBuffer {
-    typealias SwiftType = TimelineItem?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeTimelineItem.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeTimelineItem.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionTypeUserIdentity: FfiConverterRustBuffer {
     typealias SwiftType = UserIdentity?
 
@@ -34624,27 +34570,6 @@ fileprivate struct FfiConverterOptionTypeImageInfo: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeImageInfo.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-fileprivate struct FfiConverterOptionTypeInsertData: FfiConverterRustBuffer {
-    typealias SwiftType = InsertData?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeInsertData.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeInsertData.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -34855,27 +34780,6 @@ fileprivate struct FfiConverterOptionTypeRoomMemberWithSenderInfo: FfiConverterR
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeRoomMemberWithSenderInfo.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-fileprivate struct FfiConverterOptionTypeSetData: FfiConverterRustBuffer {
-    typealias SwiftType = SetData?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeSetData.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeSetData.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -35490,27 +35394,6 @@ fileprivate struct FfiConverterOptionSequenceString: FfiConverterRustBuffer {
     }
 }
 
-fileprivate struct FfiConverterOptionSequenceTypeTimelineItem: FfiConverterRustBuffer {
-    typealias SwiftType = [TimelineItem]?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterSequenceTypeTimelineItem.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterSequenceTypeTimelineItem.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
 fileprivate struct FfiConverterOptionSequenceTypeRoomHero: FfiConverterRustBuffer {
     typealias SwiftType = [RoomHero]?
 
@@ -35721,28 +35604,6 @@ fileprivate struct FfiConverterSequenceTypeSessionVerificationEmoji: FfiConverte
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeSessionVerificationEmoji.read(from: &buf))
-        }
-        return seq
-    }
-}
-
-fileprivate struct FfiConverterSequenceTypeTimelineDiff: FfiConverterRustBuffer {
-    typealias SwiftType = [TimelineDiff]
-
-    public static func write(_ value: [TimelineDiff], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for item in value {
-            FfiConverterTypeTimelineDiff.write(item, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [TimelineDiff] {
-        let len: Int32 = try readInt(&buf)
-        var seq = [TimelineDiff]()
-        seq.reserveCapacity(Int(len))
-        for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeTimelineDiff.read(from: &buf))
         }
         return seq
     }
@@ -36381,6 +36242,28 @@ fileprivate struct FfiConverterSequenceTypeSlidingSyncVersion: FfiConverterRustB
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeSlidingSyncVersion.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+fileprivate struct FfiConverterSequenceTypeTimelineDiff: FfiConverterRustBuffer {
+    typealias SwiftType = [TimelineDiff]
+
+    public static func write(_ value: [TimelineDiff], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeTimelineDiff.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [TimelineDiff] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [TimelineDiff]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeTimelineDiff.read(from: &buf))
         }
         return seq
     }
@@ -38252,33 +38135,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_unpin_event() != 52414) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_append() != 8453) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_change() != 4562) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_insert() != 26630) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_push_back() != 53464) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_push_front() != 42084) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_remove() != 74) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_reset() != 34118) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_set() != 13334) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelinediff_truncate() != 34040) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_timelineevent_event_id() != 11088) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -38462,7 +38318,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicestateobserver_on_update() != 62231) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timelinelistener_on_update() != 30147) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timelinelistener_on_update() != 53990) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_typingnotificationslistener_call() != 64299) {
