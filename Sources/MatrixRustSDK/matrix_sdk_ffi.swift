@@ -27814,6 +27814,7 @@ public enum RoomListEntriesDynamicFilterKind {
     )
     case any(filters: [RoomListEntriesDynamicFilterKind]
     )
+    case nonSpace
     case nonLeft
     case joined
     case unread
@@ -27843,28 +27844,30 @@ public struct FfiConverterTypeRoomListEntriesDynamicFilterKind: FfiConverterRust
         case 2: return .any(filters: try FfiConverterSequenceTypeRoomListEntriesDynamicFilterKind.read(from: &buf)
         )
         
-        case 3: return .nonLeft
+        case 3: return .nonSpace
         
-        case 4: return .joined
+        case 4: return .nonLeft
         
-        case 5: return .unread
+        case 5: return .joined
         
-        case 6: return .favourite
+        case 6: return .unread
         
-        case 7: return .invite
+        case 7: return .favourite
         
-        case 8: return .category(expect: try FfiConverterTypeRoomListFilterCategory.read(from: &buf)
+        case 8: return .invite
+        
+        case 9: return .category(expect: try FfiConverterTypeRoomListFilterCategory.read(from: &buf)
         )
         
-        case 9: return .none
+        case 10: return .none
         
-        case 10: return .normalizedMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
+        case 11: return .normalizedMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
         )
         
-        case 11: return .fuzzyMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
+        case 12: return .fuzzyMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
         )
         
-        case 12: return .deduplicateVersions
+        case 13: return .deduplicateVersions
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -27884,47 +27887,51 @@ public struct FfiConverterTypeRoomListEntriesDynamicFilterKind: FfiConverterRust
             FfiConverterSequenceTypeRoomListEntriesDynamicFilterKind.write(filters, into: &buf)
             
         
-        case .nonLeft:
+        case .nonSpace:
             writeInt(&buf, Int32(3))
         
         
-        case .joined:
+        case .nonLeft:
             writeInt(&buf, Int32(4))
         
         
-        case .unread:
+        case .joined:
             writeInt(&buf, Int32(5))
         
         
-        case .favourite:
+        case .unread:
             writeInt(&buf, Int32(6))
         
         
-        case .invite:
+        case .favourite:
             writeInt(&buf, Int32(7))
         
         
-        case let .category(expect):
+        case .invite:
             writeInt(&buf, Int32(8))
+        
+        
+        case let .category(expect):
+            writeInt(&buf, Int32(9))
             FfiConverterTypeRoomListFilterCategory.write(expect, into: &buf)
             
         
         case .none:
-            writeInt(&buf, Int32(9))
+            writeInt(&buf, Int32(10))
         
         
         case let .normalizedMatchRoomName(pattern):
-            writeInt(&buf, Int32(10))
-            FfiConverterString.write(pattern, into: &buf)
-            
-        
-        case let .fuzzyMatchRoomName(pattern):
             writeInt(&buf, Int32(11))
             FfiConverterString.write(pattern, into: &buf)
             
         
-        case .deduplicateVersions:
+        case let .fuzzyMatchRoomName(pattern):
             writeInt(&buf, Int32(12))
+            FfiConverterString.write(pattern, into: &buf)
+            
+        
+        case .deduplicateVersions:
+            writeInt(&buf, Int32(13))
         
         }
     }
