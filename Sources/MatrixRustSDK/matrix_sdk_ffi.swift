@@ -2947,7 +2947,11 @@ public protocol ClientBuilderProtocol : AnyObject {
      */
     func systemIsMemoryConstrained()  -> ClientBuilder
     
-    func threadsEnabled(enabled: Bool)  -> ClientBuilder
+    /**
+     * Whether the client should support threads client-side or not, and enable
+     * experimental support for MSC4306 (threads subscriptions) or not.
+     */
+    func threadsEnabled(enabled: Bool, threadSubscriptions: Bool)  -> ClientBuilder
     
     func userAgent(userAgent: String)  -> ClientBuilder
     
@@ -3301,10 +3305,15 @@ open func systemIsMemoryConstrained() -> ClientBuilder {
 })
 }
     
-open func threadsEnabled(enabled: Bool) -> ClientBuilder {
+    /**
+     * Whether the client should support threads client-side or not, and enable
+     * experimental support for MSC4306 (threads subscriptions) or not.
+     */
+open func threadsEnabled(enabled: Bool, threadSubscriptions: Bool) -> ClientBuilder {
     return try!  FfiConverterTypeClientBuilder.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_threads_enabled(self.uniffiClonePointer(),
-        FfiConverterBool.lower(enabled),$0
+        FfiConverterBool.lower(enabled),
+        FfiConverterBool.lower(threadSubscriptions),$0
     )
 })
 }
@@ -6055,7 +6064,7 @@ public protocol RoomProtocol : AnyObject {
      * the server can't handle MSC4306; otherwise, returns the thread
      * subscription status.
      */
-    func fetchThreadSubscription(threadRootEventId: String) async throws  -> ThreadStatus?
+    func fetchThreadSubscription(threadRootEventId: String) async throws  -> ThreadSubscription?
     
     /**
      * Forget this room.
@@ -6348,8 +6357,8 @@ public protocol RoomProtocol : AnyObject {
     func setName(name: String) async throws 
     
     /**
-     * Toggle a MSC4306 subscription to a thread in this room, based on the
-     * thread root event id.
+     * Set a MSC4306 subscription to a thread in this room, based on the thread
+     * root event id.
      *
      * If `subscribed` is `true`, it will subscribe to the thread, with a
      * precision that the subscription was manually requested by the user
@@ -6764,7 +6773,7 @@ open func encryptionState() -> EncryptionState {
      * the server can't handle MSC4306; otherwise, returns the thread
      * subscription status.
      */
-open func fetchThreadSubscription(threadRootEventId: String)async throws  -> ThreadStatus? {
+open func fetchThreadSubscription(threadRootEventId: String)async throws  -> ThreadSubscription? {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -6776,7 +6785,7 @@ open func fetchThreadSubscription(threadRootEventId: String)async throws  -> Thr
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterOptionTypeThreadStatus.lift,
+            liftFunc: FfiConverterOptionTypeThreadSubscription.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -7735,8 +7744,8 @@ open func setName(name: String)async throws  {
 }
     
     /**
-     * Toggle a MSC4306 subscription to a thread in this room, based on the
-     * thread root event id.
+     * Set a MSC4306 subscription to a thread in this room, based on the thread
+     * root event id.
      *
      * If `subscribed` is `true`, it will subscribe to the thread, with a
      * precision that the subscription was manually requested by the user
@@ -13474,6 +13483,84 @@ public func FfiConverterTypeWidgetDriverHandle_lower(_ value: WidgetDriverHandle
 }
 
 
+/**
+ * Progress of an operation in abstract units.
+ *
+ * Contrary to [`TransmissionProgress`], this allows tracking the progress
+ * of sending or receiving a payload in estimated pseudo units representing a
+ * percentage. This is helpful in cases where the exact progress in bytes isn't
+ * known, for instance, because encryption (which changes the size) happens on
+ * the fly.
+ */
+public struct AbstractProgress {
+    /**
+     * How many units were already transferred.
+     */
+    public var current: UInt64
+    /**
+     * How many units there are in total.
+     */
+    public var total: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * How many units were already transferred.
+         */current: UInt64, 
+        /**
+         * How many units there are in total.
+         */total: UInt64) {
+        self.current = current
+        self.total = total
+    }
+}
+
+
+
+extension AbstractProgress: Equatable, Hashable {
+    public static func ==(lhs: AbstractProgress, rhs: AbstractProgress) -> Bool {
+        if lhs.current != rhs.current {
+            return false
+        }
+        if lhs.total != rhs.total {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(current)
+        hasher.combine(total)
+    }
+}
+
+
+public struct FfiConverterTypeAbstractProgress: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AbstractProgress {
+        return
+            try AbstractProgress(
+                current: FfiConverterUInt64.read(from: &buf), 
+                total: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: AbstractProgress, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.current, into: &buf)
+        FfiConverterUInt64.write(value.total, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeAbstractProgress_lift(_ buf: RustBuffer) throws -> AbstractProgress {
+    return try FfiConverterTypeAbstractProgress.lift(buf)
+}
+
+public func FfiConverterTypeAbstractProgress_lower(_ value: AbstractProgress) -> RustBuffer {
+    return FfiConverterTypeAbstractProgress.lower(value)
+}
+
+
 public struct AudioInfo {
     public var duration: TimeInterval?
     public var size: UInt64?
@@ -15460,6 +15547,85 @@ public func FfiConverterTypeMediaPreviewConfig_lift(_ buf: RustBuffer) throws ->
 
 public func FfiConverterTypeMediaPreviewConfig_lower(_ value: MediaPreviewConfig) -> RustBuffer {
     return FfiConverterTypeMediaPreviewConfig.lower(value)
+}
+
+
+/**
+ * This type represents the progress of a media (consisting of a file and
+ * possibly a thumbnail) being uploaded.
+ */
+public struct MediaUploadProgress {
+    /**
+     * The index of the media within the transaction. A file and its
+     * thumbnail share the same index. Will always be 0 for non-gallery
+     * media uploads.
+     */
+    public var index: UInt64
+    /**
+     * The current combined upload progress for both the file and,
+     * if it exists, its thumbnail.
+     */
+    public var progress: AbstractProgress
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The index of the media within the transaction. A file and its
+         * thumbnail share the same index. Will always be 0 for non-gallery
+         * media uploads.
+         */index: UInt64, 
+        /**
+         * The current combined upload progress for both the file and,
+         * if it exists, its thumbnail.
+         */progress: AbstractProgress) {
+        self.index = index
+        self.progress = progress
+    }
+}
+
+
+
+extension MediaUploadProgress: Equatable, Hashable {
+    public static func ==(lhs: MediaUploadProgress, rhs: MediaUploadProgress) -> Bool {
+        if lhs.index != rhs.index {
+            return false
+        }
+        if lhs.progress != rhs.progress {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(index)
+        hasher.combine(progress)
+    }
+}
+
+
+public struct FfiConverterTypeMediaUploadProgress: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MediaUploadProgress {
+        return
+            try MediaUploadProgress(
+                index: FfiConverterUInt64.read(from: &buf), 
+                progress: FfiConverterTypeAbstractProgress.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MediaUploadProgress, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.index, into: &buf)
+        FfiConverterTypeAbstractProgress.write(value.progress, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeMediaUploadProgress_lift(_ buf: RustBuffer) throws -> MediaUploadProgress {
+    return try FfiConverterTypeMediaUploadProgress.lift(buf)
+}
+
+public func FfiConverterTypeMediaUploadProgress_lower(_ value: MediaUploadProgress) -> RustBuffer {
+    return FfiConverterTypeMediaUploadProgress.lower(value)
 }
 
 
@@ -19241,6 +19407,66 @@ public func FfiConverterTypeTextMessageContent_lift(_ buf: RustBuffer) throws ->
 
 public func FfiConverterTypeTextMessageContent_lower(_ value: TextMessageContent) -> RustBuffer {
     return FfiConverterTypeTextMessageContent.lower(value)
+}
+
+
+/**
+ * A thread subscription (MSC4306).
+ */
+public struct ThreadSubscription {
+    /**
+     * Whether the thread subscription happened automatically (e.g. after a
+     * mention) or if it was manually requested by the user.
+     */
+    public var automatic: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Whether the thread subscription happened automatically (e.g. after a
+         * mention) or if it was manually requested by the user.
+         */automatic: Bool) {
+        self.automatic = automatic
+    }
+}
+
+
+
+extension ThreadSubscription: Equatable, Hashable {
+    public static func ==(lhs: ThreadSubscription, rhs: ThreadSubscription) -> Bool {
+        if lhs.automatic != rhs.automatic {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(automatic)
+    }
+}
+
+
+public struct FfiConverterTypeThreadSubscription: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThreadSubscription {
+        return
+            try ThreadSubscription(
+                automatic: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ThreadSubscription, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.automatic, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeThreadSubscription_lift(_ buf: RustBuffer) throws -> ThreadSubscription {
+    return try FfiConverterTypeThreadSubscription.lift(buf)
+}
+
+public func FfiConverterTypeThreadSubscription_lower(_ value: ThreadSubscription) -> RustBuffer {
+    return FfiConverterTypeThreadSubscription.lower(value)
 }
 
 
@@ -23178,7 +23404,12 @@ public enum EventSendState {
     /**
      * The local event has not been sent yet.
      */
-    case notSentYet
+    case notSentYet(
+        /**
+         * The progress of the sending operation, if the event involves a media
+         * upload.
+         */progress: MediaUploadProgress?
+    )
     /**
      * The local event has been sent to the server, but unsuccessfully: The
      * sending has failed.
@@ -23210,7 +23441,8 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .notSentYet
+        case 1: return .notSentYet(progress: try FfiConverterOptionTypeMediaUploadProgress.read(from: &buf)
+        )
         
         case 2: return .sendingFailed(error: try FfiConverterTypeQueueWedgeError.read(from: &buf), isRecoverable: try FfiConverterBool.read(from: &buf)
         )
@@ -23226,9 +23458,10 @@ public struct FfiConverterTypeEventSendState: FfiConverterRustBuffer {
         switch value {
         
         
-        case .notSentYet:
+        case let .notSentYet(progress):
             writeInt(&buf, Int32(1))
-        
+            FfiConverterOptionTypeMediaUploadProgress.write(progress, into: &buf)
+            
         
         case let .sendingFailed(error,isRecoverable):
             writeInt(&buf, Int32(2))
@@ -27819,6 +28052,8 @@ public enum RoomListEntriesDynamicFilterKind {
     case joined
     case unread
     case favourite
+    case lowPriority
+    case nonLowPriority
     case invite
     case category(expect: RoomListFilterCategory
     )
@@ -27854,20 +28089,24 @@ public struct FfiConverterTypeRoomListEntriesDynamicFilterKind: FfiConverterRust
         
         case 7: return .favourite
         
-        case 8: return .invite
+        case 8: return .lowPriority
         
-        case 9: return .category(expect: try FfiConverterTypeRoomListFilterCategory.read(from: &buf)
+        case 9: return .nonLowPriority
+        
+        case 10: return .invite
+        
+        case 11: return .category(expect: try FfiConverterTypeRoomListFilterCategory.read(from: &buf)
         )
         
-        case 10: return .none
+        case 12: return .none
         
-        case 11: return .normalizedMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
+        case 13: return .normalizedMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
         )
         
-        case 12: return .fuzzyMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
+        case 14: return .fuzzyMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
         )
         
-        case 13: return .deduplicateVersions
+        case 15: return .deduplicateVersions
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -27907,31 +28146,39 @@ public struct FfiConverterTypeRoomListEntriesDynamicFilterKind: FfiConverterRust
             writeInt(&buf, Int32(7))
         
         
-        case .invite:
+        case .lowPriority:
             writeInt(&buf, Int32(8))
         
         
-        case let .category(expect):
+        case .nonLowPriority:
             writeInt(&buf, Int32(9))
+        
+        
+        case .invite:
+            writeInt(&buf, Int32(10))
+        
+        
+        case let .category(expect):
+            writeInt(&buf, Int32(11))
             FfiConverterTypeRoomListFilterCategory.write(expect, into: &buf)
             
         
         case .none:
-            writeInt(&buf, Int32(10))
+            writeInt(&buf, Int32(12))
         
         
         case let .normalizedMatchRoomName(pattern):
-            writeInt(&buf, Int32(11))
+            writeInt(&buf, Int32(13))
             FfiConverterString.write(pattern, into: &buf)
             
         
         case let .fuzzyMatchRoomName(pattern):
-            writeInt(&buf, Int32(12))
+            writeInt(&buf, Int32(14))
             FfiConverterString.write(pattern, into: &buf)
             
         
         case .deduplicateVersions:
-            writeInt(&buf, Int32(13))
+            writeInt(&buf, Int32(15))
         
         }
     }
@@ -30111,77 +30358,6 @@ public func FfiConverterTypeTagName_lower(_ value: TagName) -> RustBuffer {
 
 
 extension TagName: Equatable, Hashable {}
-
-
-
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
-/**
- * Status of a thread subscription (MSC4306).
- */
-
-public enum ThreadStatus {
-    
-    /**
-     * The thread is subscribed to.
-     */
-    case subscribed(
-        /**
-         * Whether the thread subscription happened automatically (e.g. after a
-         * mention) or if it was manually requested by the user.
-         */automatic: Bool
-    )
-    /**
-     * The thread is not subscribed to.
-     */
-    case unsubscribed
-}
-
-
-public struct FfiConverterTypeThreadStatus: FfiConverterRustBuffer {
-    typealias SwiftType = ThreadStatus
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThreadStatus {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .subscribed(automatic: try FfiConverterBool.read(from: &buf)
-        )
-        
-        case 2: return .unsubscribed
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: ThreadStatus, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case let .subscribed(automatic):
-            writeInt(&buf, Int32(1))
-            FfiConverterBool.write(automatic, into: &buf)
-            
-        
-        case .unsubscribed:
-            writeInt(&buf, Int32(2))
-        
-        }
-    }
-}
-
-
-public func FfiConverterTypeThreadStatus_lift(_ buf: RustBuffer) throws -> ThreadStatus {
-    return try FfiConverterTypeThreadStatus.lift(buf)
-}
-
-public func FfiConverterTypeThreadStatus_lower(_ value: ThreadStatus) -> RustBuffer {
-    return FfiConverterTypeThreadStatus.lower(value)
-}
-
-
-
-extension ThreadStatus: Equatable, Hashable {}
 
 
 
@@ -34624,6 +34800,27 @@ fileprivate struct FfiConverterOptionTypeMediaPreviewConfig: FfiConverterRustBuf
     }
 }
 
+fileprivate struct FfiConverterOptionTypeMediaUploadProgress: FfiConverterRustBuffer {
+    typealias SwiftType = MediaUploadProgress?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeMediaUploadProgress.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeMediaUploadProgress.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeMentions: FfiConverterRustBuffer {
     typealias SwiftType = Mentions?
 
@@ -34808,6 +35005,27 @@ fileprivate struct FfiConverterOptionTypeSuccessorRoom: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeSuccessorRoom.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+fileprivate struct FfiConverterOptionTypeThreadSubscription: FfiConverterRustBuffer {
+    typealias SwiftType = ThreadSubscription?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeThreadSubscription.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeThreadSubscription.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -35228,27 +35446,6 @@ fileprivate struct FfiConverterOptionTypeShieldState: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeShieldState.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-fileprivate struct FfiConverterOptionTypeThreadStatus: FfiConverterRustBuffer {
-    typealias SwiftType = ThreadStatus?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeThreadStatus.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeThreadStatus.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -37329,7 +37526,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_system_is_memory_constrained() != 6898) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_threads_enabled() != 33768) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_threads_enabled() != 23935) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_user_agent() != 13719) {
@@ -37587,7 +37784,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_encryption_state() != 9101) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_fetch_thread_subscription() != 47497) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_fetch_thread_subscription() != 51696) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_forget() != 37840) {
@@ -37746,7 +37943,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_name() != 52127) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_set_thread_subscription() != 3684) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_set_thread_subscription() != 48337) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_topic() != 5576) {
