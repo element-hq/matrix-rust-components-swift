@@ -966,6 +966,14 @@ public protocol ClientProtocol : AnyObject {
      */
     func server()  -> String?
     
+    /**
+     * Get server vendor information from the federation API.
+     *
+     * This method retrieves information about the server's name and version
+     * by calling the `/_matrix/federation/v1/version` endpoint.
+     */
+    func serverVendorInfo() async throws  -> ServerVendorInfo
+    
     func session() throws  -> Session
     
     /**
@@ -2354,6 +2362,29 @@ open func server() -> String? {
     uniffi_matrix_sdk_ffi_fn_method_client_server(self.uniffiClonePointer(),$0
     )
 })
+}
+    
+    /**
+     * Get server vendor information from the federation API.
+     *
+     * This method retrieves information about the server's name and version
+     * by calling the `/_matrix/federation/v1/version` endpoint.
+     */
+open func serverVendorInfo()async throws  -> ServerVendorInfo {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_server_vendor_info(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeServerVendorInfo_lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func session()throws  -> Session {
@@ -11767,13 +11798,13 @@ public protocol TimelineProtocol : AnyObject {
      */
     func send(msg: RoomMessageEventContentWithoutRelation) async throws  -> SendHandle
     
-    func sendAudio(params: UploadParameters, audioInfo: AudioInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
+    func sendAudio(params: UploadParameters, audioInfo: AudioInfo) throws  -> SendAttachmentJoinHandle
     
-    func sendFile(params: UploadParameters, fileInfo: FileInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
+    func sendFile(params: UploadParameters, fileInfo: FileInfo) throws  -> SendAttachmentJoinHandle
     
     func sendGallery(params: GalleryUploadParameters, itemInfos: [GalleryItemInfo]) throws  -> SendGalleryJoinHandle
     
-    func sendImage(params: UploadParameters, thumbnailPath: String?, imageInfo: ImageInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
+    func sendImage(params: UploadParameters, thumbnailSource: UploadSource?, imageInfo: ImageInfo) throws  -> SendAttachmentJoinHandle
     
     func sendLocation(body: String, geoUri: String, description: String?, zoomLevel: UInt8?, assetType: AssetType?, repliedToEventId: String?) async throws 
     
@@ -11790,9 +11821,9 @@ public protocol TimelineProtocol : AnyObject {
      */
     func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String) async throws 
     
-    func sendVideo(params: UploadParameters, thumbnailPath: String?, videoInfo: VideoInfo, progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
+    func sendVideo(params: UploadParameters, thumbnailSource: UploadSource?, videoInfo: VideoInfo) throws  -> SendAttachmentJoinHandle
     
-    func sendVoiceMessage(params: UploadParameters, audioInfo: AudioInfo, waveform: [UInt16], progressWatcher: ProgressWatcher?) throws  -> SendAttachmentJoinHandle
+    func sendVoiceMessage(params: UploadParameters, audioInfo: AudioInfo, waveform: [UInt16]) throws  -> SendAttachmentJoinHandle
     
     func subscribeToBackPaginationStatus(listener: PaginationStatusListener) async throws  -> TaskHandle
     
@@ -12187,22 +12218,20 @@ open func send(msg: RoomMessageEventContentWithoutRelation)async throws  -> Send
         )
 }
     
-open func sendAudio(params: UploadParameters, audioInfo: AudioInfo, progressWatcher: ProgressWatcher?)throws  -> SendAttachmentJoinHandle {
+open func sendAudio(params: UploadParameters, audioInfo: AudioInfo)throws  -> SendAttachmentJoinHandle {
     return try  FfiConverterTypeSendAttachmentJoinHandle.lift(try rustCallWithError(FfiConverterTypeRoomError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_audio(self.uniffiClonePointer(),
         FfiConverterTypeUploadParameters.lower(params),
-        FfiConverterTypeAudioInfo.lower(audioInfo),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
+        FfiConverterTypeAudioInfo.lower(audioInfo),$0
     )
 })
 }
     
-open func sendFile(params: UploadParameters, fileInfo: FileInfo, progressWatcher: ProgressWatcher?)throws  -> SendAttachmentJoinHandle {
+open func sendFile(params: UploadParameters, fileInfo: FileInfo)throws  -> SendAttachmentJoinHandle {
     return try  FfiConverterTypeSendAttachmentJoinHandle.lift(try rustCallWithError(FfiConverterTypeRoomError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_file(self.uniffiClonePointer(),
         FfiConverterTypeUploadParameters.lower(params),
-        FfiConverterTypeFileInfo.lower(fileInfo),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
+        FfiConverterTypeFileInfo.lower(fileInfo),$0
     )
 })
 }
@@ -12216,13 +12245,12 @@ open func sendGallery(params: GalleryUploadParameters, itemInfos: [GalleryItemIn
 })
 }
     
-open func sendImage(params: UploadParameters, thumbnailPath: String?, imageInfo: ImageInfo, progressWatcher: ProgressWatcher?)throws  -> SendAttachmentJoinHandle {
+open func sendImage(params: UploadParameters, thumbnailSource: UploadSource?, imageInfo: ImageInfo)throws  -> SendAttachmentJoinHandle {
     return try  FfiConverterTypeSendAttachmentJoinHandle.lift(try rustCallWithError(FfiConverterTypeRoomError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_image(self.uniffiClonePointer(),
         FfiConverterTypeUploadParameters.lower(params),
-        FfiConverterOptionString.lower(thumbnailPath),
-        FfiConverterTypeImageInfo.lower(imageInfo),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
+        FfiConverterOptionTypeUploadSource.lower(thumbnailSource),
+        FfiConverterTypeImageInfo.lower(imageInfo),$0
     )
 })
 }
@@ -12302,24 +12330,22 @@ open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String
         )
 }
     
-open func sendVideo(params: UploadParameters, thumbnailPath: String?, videoInfo: VideoInfo, progressWatcher: ProgressWatcher?)throws  -> SendAttachmentJoinHandle {
+open func sendVideo(params: UploadParameters, thumbnailSource: UploadSource?, videoInfo: VideoInfo)throws  -> SendAttachmentJoinHandle {
     return try  FfiConverterTypeSendAttachmentJoinHandle.lift(try rustCallWithError(FfiConverterTypeRoomError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_video(self.uniffiClonePointer(),
         FfiConverterTypeUploadParameters.lower(params),
-        FfiConverterOptionString.lower(thumbnailPath),
-        FfiConverterTypeVideoInfo.lower(videoInfo),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
+        FfiConverterOptionTypeUploadSource.lower(thumbnailSource),
+        FfiConverterTypeVideoInfo.lower(videoInfo),$0
     )
 })
 }
     
-open func sendVoiceMessage(params: UploadParameters, audioInfo: AudioInfo, waveform: [UInt16], progressWatcher: ProgressWatcher?)throws  -> SendAttachmentJoinHandle {
+open func sendVoiceMessage(params: UploadParameters, audioInfo: AudioInfo, waveform: [UInt16])throws  -> SendAttachmentJoinHandle {
     return try  FfiConverterTypeSendAttachmentJoinHandle.lift(try rustCallWithError(FfiConverterTypeRoomError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_voice_message(self.uniffiClonePointer(),
         FfiConverterTypeUploadParameters.lower(params),
         FfiConverterTypeAudioInfo.lower(audioInfo),
-        FfiConverterSequenceUInt16.lower(waveform),
-        FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher),$0
+        FfiConverterSequenceUInt16.lower(waveform),$0
     )
 })
 }
@@ -15011,45 +15037,6 @@ public func FfiConverterTypeImageMessageContent_lower(_ value: ImageMessageConte
 }
 
 
-public struct InsertData {
-    public var index: UInt32
-    public var item: TimelineItem
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(index: UInt32, item: TimelineItem) {
-        self.index = index
-        self.item = item
-    }
-}
-
-
-
-public struct FfiConverterTypeInsertData: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> InsertData {
-        return
-            try InsertData(
-                index: FfiConverterUInt32.read(from: &buf), 
-                item: FfiConverterTypeTimelineItem.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: InsertData, into buf: inout [UInt8]) {
-        FfiConverterUInt32.write(value.index, into: &buf)
-        FfiConverterTypeTimelineItem.write(value.item, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeInsertData_lift(_ buf: RustBuffer) throws -> InsertData {
-    return try FfiConverterTypeInsertData.lift(buf)
-}
-
-public func FfiConverterTypeInsertData_lower(_ value: InsertData) -> RustBuffer {
-    return FfiConverterTypeInsertData.lower(value)
-}
-
-
 /**
  * An FFI representation of a request to join a room.
  */
@@ -17452,41 +17439,6 @@ public func FfiConverterTypeRoomDescription_lower(_ value: RoomDescription) -> R
 }
 
 
-public struct RoomDirectorySearchEntriesResult {
-    public var entriesStream: TaskHandle
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(entriesStream: TaskHandle) {
-        self.entriesStream = entriesStream
-    }
-}
-
-
-
-public struct FfiConverterTypeRoomDirectorySearchEntriesResult: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomDirectorySearchEntriesResult {
-        return
-            try RoomDirectorySearchEntriesResult(
-                entriesStream: FfiConverterTypeTaskHandle.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: RoomDirectorySearchEntriesResult, into buf: inout [UInt8]) {
-        FfiConverterTypeTaskHandle.write(value.entriesStream, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeRoomDirectorySearchEntriesResult_lift(_ buf: RustBuffer) throws -> RoomDirectorySearchEntriesResult {
-    return try FfiConverterTypeRoomDirectorySearchEntriesResult.lift(buf)
-}
-
-public func FfiConverterTypeRoomDirectorySearchEntriesResult_lower(_ value: RoomDirectorySearchEntriesResult) -> RustBuffer {
-    return FfiConverterTypeRoomDirectorySearchEntriesResult.lower(value)
-}
-
-
 /**
  * Information about a member considered to be a room hero.
  */
@@ -19070,45 +19022,6 @@ public func FfiConverterTypeSessionVerificationRequestDetails_lower(_ value: Ses
 }
 
 
-public struct SetData {
-    public var index: UInt32
-    public var item: TimelineItem
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(index: UInt32, item: TimelineItem) {
-        self.index = index
-        self.item = item
-    }
-}
-
-
-
-public struct FfiConverterTypeSetData: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SetData {
-        return
-            try SetData(
-                index: FfiConverterUInt32.read(from: &buf), 
-                item: FfiConverterTypeTimelineItem.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: SetData, into buf: inout [UInt8]) {
-        FfiConverterUInt32.write(value.index, into: &buf)
-        FfiConverterTypeTimelineItem.write(value.item, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeSetData_lift(_ buf: RustBuffer) throws -> SetData {
-    return try FfiConverterTypeSetData.lift(buf)
-}
-
-public func FfiConverterTypeSetData_lower(_ value: SetData) -> RustBuffer {
-    return FfiConverterTypeSetData.lower(value)
-}
-
-
 /**
  * A push rule is a single rule that states under what conditions an event
  * should be passed onto a push gateway and how the notification should be
@@ -20273,12 +20186,6 @@ public struct UploadParameters {
      * Optional Event ID to reply to.
      */
     public var inReplyTo: String?
-    /**
-     * Should the media be sent with the send queue, or synchronously?
-     *
-     * Watching progress only works with the synchronous method, at the moment.
-     */
-    public var useSendQueue: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -20297,18 +20204,12 @@ public struct UploadParameters {
          */mentions: Mentions?, 
         /**
          * Optional Event ID to reply to.
-         */inReplyTo: String?, 
-        /**
-         * Should the media be sent with the send queue, or synchronously?
-         *
-         * Watching progress only works with the synchronous method, at the moment.
-         */useSendQueue: Bool) {
+         */inReplyTo: String?) {
         self.source = source
         self.caption = caption
         self.formattedCaption = formattedCaption
         self.mentions = mentions
         self.inReplyTo = inReplyTo
-        self.useSendQueue = useSendQueue
     }
 }
 
@@ -20331,9 +20232,6 @@ extension UploadParameters: Equatable, Hashable {
         if lhs.inReplyTo != rhs.inReplyTo {
             return false
         }
-        if lhs.useSendQueue != rhs.useSendQueue {
-            return false
-        }
         return true
     }
 
@@ -20343,7 +20241,6 @@ extension UploadParameters: Equatable, Hashable {
         hasher.combine(formattedCaption)
         hasher.combine(mentions)
         hasher.combine(inReplyTo)
-        hasher.combine(useSendQueue)
     }
 }
 
@@ -20356,8 +20253,7 @@ public struct FfiConverterTypeUploadParameters: FfiConverterRustBuffer {
                 caption: FfiConverterOptionString.read(from: &buf), 
                 formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
                 mentions: FfiConverterOptionTypeMentions.read(from: &buf), 
-                inReplyTo: FfiConverterOptionString.read(from: &buf), 
-                useSendQueue: FfiConverterBool.read(from: &buf)
+                inReplyTo: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -20367,7 +20263,6 @@ public struct FfiConverterTypeUploadParameters: FfiConverterRustBuffer {
         FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
         FfiConverterOptionTypeMentions.write(value.mentions, into: &buf)
         FfiConverterOptionString.write(value.inReplyTo, into: &buf)
-        FfiConverterBool.write(value.useSendQueue, into: &buf)
     }
 }
 
@@ -23632,13 +23527,13 @@ extension FocusEventError: Foundation.LocalizedError {
 
 public enum GalleryItemInfo {
     
-    case audio(audioInfo: AudioInfo, filename: String, caption: String?, formattedCaption: FormattedBody?
+    case audio(audioInfo: AudioInfo, source: UploadSource, caption: String?, formattedCaption: FormattedBody?
     )
-    case file(fileInfo: FileInfo, filename: String, caption: String?, formattedCaption: FormattedBody?
+    case file(fileInfo: FileInfo, source: UploadSource, caption: String?, formattedCaption: FormattedBody?
     )
-    case image(imageInfo: ImageInfo, filename: String, caption: String?, formattedCaption: FormattedBody?, thumbnailPath: String?
+    case image(imageInfo: ImageInfo, source: UploadSource, caption: String?, formattedCaption: FormattedBody?, thumbnailSource: UploadSource?
     )
-    case video(videoInfo: VideoInfo, filename: String, caption: String?, formattedCaption: FormattedBody?, thumbnailPath: String?
+    case video(videoInfo: VideoInfo, source: UploadSource, caption: String?, formattedCaption: FormattedBody?, thumbnailSource: UploadSource?
     )
 }
 
@@ -23650,16 +23545,16 @@ public struct FfiConverterTypeGalleryItemInfo: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .audio(audioInfo: try FfiConverterTypeAudioInfo.read(from: &buf), filename: try FfiConverterString.read(from: &buf), caption: try FfiConverterOptionString.read(from: &buf), formattedCaption: try FfiConverterOptionTypeFormattedBody.read(from: &buf)
+        case 1: return .audio(audioInfo: try FfiConverterTypeAudioInfo.read(from: &buf), source: try FfiConverterTypeUploadSource.read(from: &buf), caption: try FfiConverterOptionString.read(from: &buf), formattedCaption: try FfiConverterOptionTypeFormattedBody.read(from: &buf)
         )
         
-        case 2: return .file(fileInfo: try FfiConverterTypeFileInfo.read(from: &buf), filename: try FfiConverterString.read(from: &buf), caption: try FfiConverterOptionString.read(from: &buf), formattedCaption: try FfiConverterOptionTypeFormattedBody.read(from: &buf)
+        case 2: return .file(fileInfo: try FfiConverterTypeFileInfo.read(from: &buf), source: try FfiConverterTypeUploadSource.read(from: &buf), caption: try FfiConverterOptionString.read(from: &buf), formattedCaption: try FfiConverterOptionTypeFormattedBody.read(from: &buf)
         )
         
-        case 3: return .image(imageInfo: try FfiConverterTypeImageInfo.read(from: &buf), filename: try FfiConverterString.read(from: &buf), caption: try FfiConverterOptionString.read(from: &buf), formattedCaption: try FfiConverterOptionTypeFormattedBody.read(from: &buf), thumbnailPath: try FfiConverterOptionString.read(from: &buf)
+        case 3: return .image(imageInfo: try FfiConverterTypeImageInfo.read(from: &buf), source: try FfiConverterTypeUploadSource.read(from: &buf), caption: try FfiConverterOptionString.read(from: &buf), formattedCaption: try FfiConverterOptionTypeFormattedBody.read(from: &buf), thumbnailSource: try FfiConverterOptionTypeUploadSource.read(from: &buf)
         )
         
-        case 4: return .video(videoInfo: try FfiConverterTypeVideoInfo.read(from: &buf), filename: try FfiConverterString.read(from: &buf), caption: try FfiConverterOptionString.read(from: &buf), formattedCaption: try FfiConverterOptionTypeFormattedBody.read(from: &buf), thumbnailPath: try FfiConverterOptionString.read(from: &buf)
+        case 4: return .video(videoInfo: try FfiConverterTypeVideoInfo.read(from: &buf), source: try FfiConverterTypeUploadSource.read(from: &buf), caption: try FfiConverterOptionString.read(from: &buf), formattedCaption: try FfiConverterOptionTypeFormattedBody.read(from: &buf), thumbnailSource: try FfiConverterOptionTypeUploadSource.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -23670,38 +23565,38 @@ public struct FfiConverterTypeGalleryItemInfo: FfiConverterRustBuffer {
         switch value {
         
         
-        case let .audio(audioInfo,filename,caption,formattedCaption):
+        case let .audio(audioInfo,source,caption,formattedCaption):
             writeInt(&buf, Int32(1))
             FfiConverterTypeAudioInfo.write(audioInfo, into: &buf)
-            FfiConverterString.write(filename, into: &buf)
+            FfiConverterTypeUploadSource.write(source, into: &buf)
             FfiConverterOptionString.write(caption, into: &buf)
             FfiConverterOptionTypeFormattedBody.write(formattedCaption, into: &buf)
             
         
-        case let .file(fileInfo,filename,caption,formattedCaption):
+        case let .file(fileInfo,source,caption,formattedCaption):
             writeInt(&buf, Int32(2))
             FfiConverterTypeFileInfo.write(fileInfo, into: &buf)
-            FfiConverterString.write(filename, into: &buf)
+            FfiConverterTypeUploadSource.write(source, into: &buf)
             FfiConverterOptionString.write(caption, into: &buf)
             FfiConverterOptionTypeFormattedBody.write(formattedCaption, into: &buf)
             
         
-        case let .image(imageInfo,filename,caption,formattedCaption,thumbnailPath):
+        case let .image(imageInfo,source,caption,formattedCaption,thumbnailSource):
             writeInt(&buf, Int32(3))
             FfiConverterTypeImageInfo.write(imageInfo, into: &buf)
-            FfiConverterString.write(filename, into: &buf)
+            FfiConverterTypeUploadSource.write(source, into: &buf)
             FfiConverterOptionString.write(caption, into: &buf)
             FfiConverterOptionTypeFormattedBody.write(formattedCaption, into: &buf)
-            FfiConverterOptionString.write(thumbnailPath, into: &buf)
+            FfiConverterOptionTypeUploadSource.write(thumbnailSource, into: &buf)
             
         
-        case let .video(videoInfo,filename,caption,formattedCaption,thumbnailPath):
+        case let .video(videoInfo,source,caption,formattedCaption,thumbnailSource):
             writeInt(&buf, Int32(4))
             FfiConverterTypeVideoInfo.write(videoInfo, into: &buf)
-            FfiConverterString.write(filename, into: &buf)
+            FfiConverterTypeUploadSource.write(source, into: &buf)
             FfiConverterOptionString.write(caption, into: &buf)
             FfiConverterOptionTypeFormattedBody.write(formattedCaption, into: &buf)
-            FfiConverterOptionString.write(thumbnailPath, into: &buf)
+            FfiConverterOptionTypeUploadSource.write(thumbnailSource, into: &buf)
             
         }
     }
@@ -30364,124 +30259,6 @@ extension TagName: Equatable, Hashable {}
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
-public enum TimelineChange {
-    
-    case append
-    case clear
-    case insert
-    case set
-    case remove
-    case pushBack
-    case pushFront
-    case popBack
-    case popFront
-    case truncate
-    case reset
-}
-
-
-public struct FfiConverterTypeTimelineChange: FfiConverterRustBuffer {
-    typealias SwiftType = TimelineChange
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineChange {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .append
-        
-        case 2: return .clear
-        
-        case 3: return .insert
-        
-        case 4: return .set
-        
-        case 5: return .remove
-        
-        case 6: return .pushBack
-        
-        case 7: return .pushFront
-        
-        case 8: return .popBack
-        
-        case 9: return .popFront
-        
-        case 10: return .truncate
-        
-        case 11: return .reset
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: TimelineChange, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case .append:
-            writeInt(&buf, Int32(1))
-        
-        
-        case .clear:
-            writeInt(&buf, Int32(2))
-        
-        
-        case .insert:
-            writeInt(&buf, Int32(3))
-        
-        
-        case .set:
-            writeInt(&buf, Int32(4))
-        
-        
-        case .remove:
-            writeInt(&buf, Int32(5))
-        
-        
-        case .pushBack:
-            writeInt(&buf, Int32(6))
-        
-        
-        case .pushFront:
-            writeInt(&buf, Int32(7))
-        
-        
-        case .popBack:
-            writeInt(&buf, Int32(8))
-        
-        
-        case .popFront:
-            writeInt(&buf, Int32(9))
-        
-        
-        case .truncate:
-            writeInt(&buf, Int32(10))
-        
-        
-        case .reset:
-            writeInt(&buf, Int32(11))
-        
-        }
-    }
-}
-
-
-public func FfiConverterTypeTimelineChange_lift(_ buf: RustBuffer) throws -> TimelineChange {
-    return try FfiConverterTypeTimelineChange.lift(buf)
-}
-
-public func FfiConverterTypeTimelineChange_lower(_ value: TimelineChange) -> RustBuffer {
-    return FfiConverterTypeTimelineChange.lower(value)
-}
-
-
-
-extension TimelineChange: Equatable, Hashable {}
-
-
-
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
-
 public enum TimelineDiff {
     
     case append(values: [TimelineItem]
@@ -35451,6 +35228,27 @@ fileprivate struct FfiConverterOptionTypeShieldState: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterOptionTypeUploadSource: FfiConverterRustBuffer {
+    typealias SwiftType = UploadSource?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeUploadSource.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeUploadSource.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 fileprivate struct FfiConverterOptionTypeVirtualTimelineItem: FfiConverterRustBuffer {
     typealias SwiftType = VirtualTimelineItem?
 
@@ -36732,6 +36530,8 @@ fileprivate struct FfiConverterDictionaryTypeTagNameTypeTagInfo: FfiConverterRus
 
 
 
+
+
 /**
  * Typealias from the type name used in the UDL file to the builtin type.  This
  * is needed because the UDL type name is used in function/method signatures.
@@ -37377,6 +37177,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_server() != 63276) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_server_vendor_info() != 51933) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_session() != 8085) {
@@ -38300,16 +38103,16 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send() != 9553) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 22559) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_audio() != 36723) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_file() != 4588) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_file() != 4740) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_gallery() != 61071) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 25436) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_image() != 29043) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_location() != 39080) {
@@ -38324,10 +38127,10 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 11149) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 1445) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 52974) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_voice_message() != 50042) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_voice_message() != 17589) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_back_pagination_status() != 46161) {
