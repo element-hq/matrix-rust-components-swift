@@ -1022,6 +1022,8 @@ public protocol ClientProtocol : AnyObject {
      */
     func slidingSyncVersion()  -> SlidingSyncVersion
     
+    func spaceService()  -> SpaceService
+    
     /**
      * Returns a handler to start the SSO login process.
      */
@@ -2552,6 +2554,13 @@ open func setUtdDelegate(utdDelegate: UnableToDecryptDelegate)async throws  {
 open func slidingSyncVersion() -> SlidingSyncVersion {
     return try!  FfiConverterTypeSlidingSyncVersion.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_client_sliding_sync_version(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func spaceService() -> SpaceService {
+    return try!  FfiConverterTypeSpaceService.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_space_service(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -10852,6 +10861,400 @@ public func FfiConverterTypeSessionVerificationEmoji_lower(_ value: SessionVerif
 
 
 
+/**
+ * The `SpaceRoomList`represents a paginated list of direct rooms
+ * that belong to a particular space.
+ *
+ * It can be used to paginate through the list (and have live updates on the
+ * pagination state) as well as subscribe to changes as rooms are joined or
+ * left.
+ *
+ * The `SpaceRoomList` also automatically subscribes to client room changes
+ * and updates the list accordingly as rooms are joined or left.
+ */
+public protocol SpaceRoomListProtocol : AnyObject {
+    
+    /**
+     * Ask the list to retrieve the next page if the end hasn't been reached
+     * yet. Otherwise it no-ops.
+     */
+    func paginate() async throws 
+    
+    /**
+     * Returns if the room list is currently paginating or not.
+     */
+    func paginationState()  -> SpaceRoomListPaginationState
+    
+    /**
+     * Return the current list of rooms.
+     */
+    func rooms()  -> [SpaceRoom]
+    
+    /**
+     * Subscribe to pagination updates.
+     */
+    func subscribeToPaginationStateUpdates(listener: SpaceRoomListPaginationStateListener)  -> TaskHandle
+    
+    /**
+     * Subscribes to room list updates.
+     */
+    func subscribeToRoomUpdate(listener: SpaceRoomListEntriesListener)  -> TaskHandle
+    
+}
+
+/**
+ * The `SpaceRoomList`represents a paginated list of direct rooms
+ * that belong to a particular space.
+ *
+ * It can be used to paginate through the list (and have live updates on the
+ * pagination state) as well as subscribe to changes as rooms are joined or
+ * left.
+ *
+ * The `SpaceRoomList` also automatically subscribes to client room changes
+ * and updates the list accordingly as rooms are joined or left.
+ */
+open class SpaceRoomList:
+    SpaceRoomListProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_spaceroomlist(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_spaceroomlist(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Ask the list to retrieve the next page if the end hasn't been reached
+     * yet. Otherwise it no-ops.
+     */
+open func paginate()async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceroomlist_paginate(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Returns if the room list is currently paginating or not.
+     */
+open func paginationState() -> SpaceRoomListPaginationState {
+    return try!  FfiConverterTypeSpaceRoomListPaginationState_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_spaceroomlist_pagination_state(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Return the current list of rooms.
+     */
+open func rooms() -> [SpaceRoom] {
+    return try!  FfiConverterSequenceTypeSpaceRoom.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_spaceroomlist_rooms(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Subscribe to pagination updates.
+     */
+open func subscribeToPaginationStateUpdates(listener: SpaceRoomListPaginationStateListener) -> TaskHandle {
+    return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_spaceroomlist_subscribe_to_pagination_state_updates(self.uniffiClonePointer(),
+        FfiConverterCallbackInterfaceSpaceRoomListPaginationStateListener.lower(listener),$0
+    )
+})
+}
+    
+    /**
+     * Subscribes to room list updates.
+     */
+open func subscribeToRoomUpdate(listener: SpaceRoomListEntriesListener) -> TaskHandle {
+    return try!  FfiConverterTypeTaskHandle.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_spaceroomlist_subscribe_to_room_update(self.uniffiClonePointer(),
+        FfiConverterCallbackInterfaceSpaceRoomListEntriesListener.lower(listener),$0
+    )
+})
+}
+    
+
+}
+
+public struct FfiConverterTypeSpaceRoomList: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = SpaceRoomList
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> SpaceRoomList {
+        return SpaceRoomList(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: SpaceRoomList) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SpaceRoomList {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: SpaceRoomList, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeSpaceRoomList_lift(_ pointer: UnsafeMutableRawPointer) throws -> SpaceRoomList {
+    return try FfiConverterTypeSpaceRoomList.lift(pointer)
+}
+
+public func FfiConverterTypeSpaceRoomList_lower(_ value: SpaceRoomList) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeSpaceRoomList.lower(value)
+}
+
+
+
+
+/**
+ * The main entry point into the Spaces facilities.
+ *
+ * The spaces service is responsible for retrieving one's joined rooms,
+ * building a graph out of their `m.space.parent` and `m.space.child` state
+ * events, and providing access to the top-level spaces and their children.
+ */
+public protocol SpaceServiceProtocol : AnyObject {
+    
+    /**
+     * Returns a list of all the top-level joined spaces. It will eagerly
+     * compute the latest version and also notify subscribers if there were
+     * any changes.
+     */
+    func joinedSpaces() async  -> [SpaceRoom]
+    
+    /**
+     * Returns a `SpaceRoomList` for the given space ID.
+     */
+    func spaceRoomList(spaceId: String) async throws  -> SpaceRoomList
+    
+    /**
+     * Subscribes to updates on the joined spaces list. If space rooms are
+     * joined or left, the stream will yield diffs that reflect the changes.
+     */
+    func subscribeToJoinedSpaces(listener: SpaceServiceJoinedSpacesListener) async  -> TaskHandle
+    
+}
+
+/**
+ * The main entry point into the Spaces facilities.
+ *
+ * The spaces service is responsible for retrieving one's joined rooms,
+ * building a graph out of their `m.space.parent` and `m.space.child` state
+ * events, and providing access to the top-level spaces and their children.
+ */
+open class SpaceService:
+    SpaceServiceProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_spaceservice(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_spaceservice(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Returns a list of all the top-level joined spaces. It will eagerly
+     * compute the latest version and also notify subscribers if there were
+     * any changes.
+     */
+open func joinedSpaces()async  -> [SpaceRoom] {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceservice_joined_spaces(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeSpaceRoom.lift,
+            errorHandler: nil
+            
+        )
+}
+    
+    /**
+     * Returns a `SpaceRoomList` for the given space ID.
+     */
+open func spaceRoomList(spaceId: String)async throws  -> SpaceRoomList {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceservice_space_room_list(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(spaceId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeSpaceRoomList.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Subscribes to updates on the joined spaces list. If space rooms are
+     * joined or left, the stream will yield diffs that reflect the changes.
+     */
+open func subscribeToJoinedSpaces(listener: SpaceServiceJoinedSpacesListener)async  -> TaskHandle {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceservice_subscribe_to_joined_spaces(
+                    self.uniffiClonePointer(),
+                    FfiConverterCallbackInterfaceSpaceServiceJoinedSpacesListener.lower(listener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeTaskHandle.lift,
+            errorHandler: nil
+            
+        )
+}
+    
+
+}
+
+public struct FfiConverterTypeSpaceService: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = SpaceService
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> SpaceService {
+        return SpaceService(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: SpaceService) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SpaceService {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: SpaceService, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeSpaceService_lift(_ pointer: UnsafeMutableRawPointer) throws -> SpaceService {
+    return try FfiConverterTypeSpaceService.lift(pointer)
+}
+
+public func FfiConverterTypeSpaceService_lower(_ value: SpaceService) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeSpaceService.lower(value)
+}
+
+
+
+
 public protocol SpanProtocol : AnyObject {
     
     func enter() 
@@ -11160,6 +11563,15 @@ public func FfiConverterTypeSsoHandler_lower(_ value: SsoHandler) -> UnsafeMutab
 
 public protocol SyncServiceProtocol : AnyObject {
     
+    /**
+     * Force expiring both sliding sync sessions.
+     *
+     * This ensures that the sync service is stopped before expiring both
+     * sessions. It should be used sparingly, as it will cause a restart of
+     * the sessions on the server as well.
+     */
+    func expireSessions() async 
+    
     func roomListService()  -> RoomListService
     
     func start() async 
@@ -11210,6 +11622,31 @@ open class SyncService:
 
     
 
+    
+    /**
+     * Force expiring both sliding sync sessions.
+     *
+     * This ensures that the sync service is stopped before expiring both
+     * sessions. It should be used sparingly, as it will cause a restart of
+     * the sessions on the server as well.
+     */
+open func expireSessions()async  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_syncservice_expire_sessions(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: nil
+            
+        )
+}
     
 open func roomListService() -> RoomListService {
     return try!  FfiConverterTypeRoomListService.lift(try! rustCall() {
@@ -19127,6 +19564,233 @@ public func FfiConverterTypeSimplePushRule_lift(_ buf: RustBuffer) throws -> Sim
 
 public func FfiConverterTypeSimplePushRule_lower(_ value: SimplePushRule) -> RustBuffer {
     return FfiConverterTypeSimplePushRule.lower(value)
+}
+
+
+/**
+ * Structure representing a room in a space and aggregated information
+ * relevant to the UI layer.
+ */
+public struct SpaceRoom {
+    /**
+     * The ID of the room.
+     */
+    public var roomId: String
+    /**
+     * The canonical alias of the room, if any.
+     */
+    public var canonicalAlias: String?
+    /**
+     * The name of the room, if any.
+     */
+    public var name: String?
+    /**
+     * The topic of the room, if any.
+     */
+    public var topic: String?
+    /**
+     * The URL for the room's avatar, if one is set.
+     */
+    public var avatarUrl: String?
+    /**
+     * The type of room from `m.room.create`, if any.
+     */
+    public var roomType: RoomType
+    /**
+     * The number of members joined to the room.
+     */
+    public var numJoinedMembers: UInt64
+    /**
+     * The join rule of the room.
+     */
+    public var joinRule: JoinRule?
+    /**
+     * Whether the room may be viewed by users without joining.
+     */
+    public var worldReadable: Bool?
+    /**
+     * Whether guest users may join the room and participate in it.
+     */
+    public var guestCanJoin: Bool
+    /**
+     * The number of children room this has, if a space.
+     */
+    public var childrenCount: UInt64
+    /**
+     * Whether this room is joined, left etc.
+     */
+    public var state: Membership?
+    /**
+     * A list of room members considered to be heroes.
+     */
+    public var heroes: [RoomHero]?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The ID of the room.
+         */roomId: String, 
+        /**
+         * The canonical alias of the room, if any.
+         */canonicalAlias: String?, 
+        /**
+         * The name of the room, if any.
+         */name: String?, 
+        /**
+         * The topic of the room, if any.
+         */topic: String?, 
+        /**
+         * The URL for the room's avatar, if one is set.
+         */avatarUrl: String?, 
+        /**
+         * The type of room from `m.room.create`, if any.
+         */roomType: RoomType, 
+        /**
+         * The number of members joined to the room.
+         */numJoinedMembers: UInt64, 
+        /**
+         * The join rule of the room.
+         */joinRule: JoinRule?, 
+        /**
+         * Whether the room may be viewed by users without joining.
+         */worldReadable: Bool?, 
+        /**
+         * Whether guest users may join the room and participate in it.
+         */guestCanJoin: Bool, 
+        /**
+         * The number of children room this has, if a space.
+         */childrenCount: UInt64, 
+        /**
+         * Whether this room is joined, left etc.
+         */state: Membership?, 
+        /**
+         * A list of room members considered to be heroes.
+         */heroes: [RoomHero]?) {
+        self.roomId = roomId
+        self.canonicalAlias = canonicalAlias
+        self.name = name
+        self.topic = topic
+        self.avatarUrl = avatarUrl
+        self.roomType = roomType
+        self.numJoinedMembers = numJoinedMembers
+        self.joinRule = joinRule
+        self.worldReadable = worldReadable
+        self.guestCanJoin = guestCanJoin
+        self.childrenCount = childrenCount
+        self.state = state
+        self.heroes = heroes
+    }
+}
+
+
+
+extension SpaceRoom: Equatable, Hashable {
+    public static func ==(lhs: SpaceRoom, rhs: SpaceRoom) -> Bool {
+        if lhs.roomId != rhs.roomId {
+            return false
+        }
+        if lhs.canonicalAlias != rhs.canonicalAlias {
+            return false
+        }
+        if lhs.name != rhs.name {
+            return false
+        }
+        if lhs.topic != rhs.topic {
+            return false
+        }
+        if lhs.avatarUrl != rhs.avatarUrl {
+            return false
+        }
+        if lhs.roomType != rhs.roomType {
+            return false
+        }
+        if lhs.numJoinedMembers != rhs.numJoinedMembers {
+            return false
+        }
+        if lhs.joinRule != rhs.joinRule {
+            return false
+        }
+        if lhs.worldReadable != rhs.worldReadable {
+            return false
+        }
+        if lhs.guestCanJoin != rhs.guestCanJoin {
+            return false
+        }
+        if lhs.childrenCount != rhs.childrenCount {
+            return false
+        }
+        if lhs.state != rhs.state {
+            return false
+        }
+        if lhs.heroes != rhs.heroes {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(roomId)
+        hasher.combine(canonicalAlias)
+        hasher.combine(name)
+        hasher.combine(topic)
+        hasher.combine(avatarUrl)
+        hasher.combine(roomType)
+        hasher.combine(numJoinedMembers)
+        hasher.combine(joinRule)
+        hasher.combine(worldReadable)
+        hasher.combine(guestCanJoin)
+        hasher.combine(childrenCount)
+        hasher.combine(state)
+        hasher.combine(heroes)
+    }
+}
+
+
+public struct FfiConverterTypeSpaceRoom: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SpaceRoom {
+        return
+            try SpaceRoom(
+                roomId: FfiConverterString.read(from: &buf), 
+                canonicalAlias: FfiConverterOptionString.read(from: &buf), 
+                name: FfiConverterOptionString.read(from: &buf), 
+                topic: FfiConverterOptionString.read(from: &buf), 
+                avatarUrl: FfiConverterOptionString.read(from: &buf), 
+                roomType: FfiConverterTypeRoomType.read(from: &buf), 
+                numJoinedMembers: FfiConverterUInt64.read(from: &buf), 
+                joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
+                worldReadable: FfiConverterOptionBool.read(from: &buf), 
+                guestCanJoin: FfiConverterBool.read(from: &buf), 
+                childrenCount: FfiConverterUInt64.read(from: &buf), 
+                state: FfiConverterOptionTypeMembership.read(from: &buf), 
+                heroes: FfiConverterOptionSequenceTypeRoomHero.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SpaceRoom, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.roomId, into: &buf)
+        FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
+        FfiConverterOptionString.write(value.name, into: &buf)
+        FfiConverterOptionString.write(value.topic, into: &buf)
+        FfiConverterOptionString.write(value.avatarUrl, into: &buf)
+        FfiConverterTypeRoomType.write(value.roomType, into: &buf)
+        FfiConverterUInt64.write(value.numJoinedMembers, into: &buf)
+        FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
+        FfiConverterOptionBool.write(value.worldReadable, into: &buf)
+        FfiConverterBool.write(value.guestCanJoin, into: &buf)
+        FfiConverterUInt64.write(value.childrenCount, into: &buf)
+        FfiConverterOptionTypeMembership.write(value.state, into: &buf)
+        FfiConverterOptionSequenceTypeRoomHero.write(value.heroes, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeSpaceRoom_lift(_ buf: RustBuffer) throws -> SpaceRoom {
+    return try FfiConverterTypeSpaceRoom.lift(buf)
+}
+
+public func FfiConverterTypeSpaceRoom_lower(_ value: SpaceRoom) -> RustBuffer {
+    return FfiConverterTypeSpaceRoom.lower(value)
 }
 
 
@@ -29566,6 +30230,150 @@ extension SlidingSyncVersionBuilder: Equatable, Hashable {}
 
 
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum SpaceListUpdate {
+    
+    case append(values: [SpaceRoom]
+    )
+    case clear
+    case pushFront(value: SpaceRoom
+    )
+    case pushBack(value: SpaceRoom
+    )
+    case popFront
+    case popBack
+    case insert(index: UInt32, value: SpaceRoom
+    )
+    case set(index: UInt32, value: SpaceRoom
+    )
+    case remove(index: UInt32
+    )
+    case truncate(length: UInt32
+    )
+    case reset(values: [SpaceRoom]
+    )
+}
+
+
+public struct FfiConverterTypeSpaceListUpdate: FfiConverterRustBuffer {
+    typealias SwiftType = SpaceListUpdate
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SpaceListUpdate {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .append(values: try FfiConverterSequenceTypeSpaceRoom.read(from: &buf)
+        )
+        
+        case 2: return .clear
+        
+        case 3: return .pushFront(value: try FfiConverterTypeSpaceRoom.read(from: &buf)
+        )
+        
+        case 4: return .pushBack(value: try FfiConverterTypeSpaceRoom.read(from: &buf)
+        )
+        
+        case 5: return .popFront
+        
+        case 6: return .popBack
+        
+        case 7: return .insert(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeSpaceRoom.read(from: &buf)
+        )
+        
+        case 8: return .set(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeSpaceRoom.read(from: &buf)
+        )
+        
+        case 9: return .remove(index: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 10: return .truncate(length: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 11: return .reset(values: try FfiConverterSequenceTypeSpaceRoom.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SpaceListUpdate, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .append(values):
+            writeInt(&buf, Int32(1))
+            FfiConverterSequenceTypeSpaceRoom.write(values, into: &buf)
+            
+        
+        case .clear:
+            writeInt(&buf, Int32(2))
+        
+        
+        case let .pushFront(value):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeSpaceRoom.write(value, into: &buf)
+            
+        
+        case let .pushBack(value):
+            writeInt(&buf, Int32(4))
+            FfiConverterTypeSpaceRoom.write(value, into: &buf)
+            
+        
+        case .popFront:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .popBack:
+            writeInt(&buf, Int32(6))
+        
+        
+        case let .insert(index,value):
+            writeInt(&buf, Int32(7))
+            FfiConverterUInt32.write(index, into: &buf)
+            FfiConverterTypeSpaceRoom.write(value, into: &buf)
+            
+        
+        case let .set(index,value):
+            writeInt(&buf, Int32(8))
+            FfiConverterUInt32.write(index, into: &buf)
+            FfiConverterTypeSpaceRoom.write(value, into: &buf)
+            
+        
+        case let .remove(index):
+            writeInt(&buf, Int32(9))
+            FfiConverterUInt32.write(index, into: &buf)
+            
+        
+        case let .truncate(length):
+            writeInt(&buf, Int32(10))
+            FfiConverterUInt32.write(length, into: &buf)
+            
+        
+        case let .reset(values):
+            writeInt(&buf, Int32(11))
+            FfiConverterSequenceTypeSpaceRoom.write(values, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeSpaceListUpdate_lift(_ buf: RustBuffer) throws -> SpaceListUpdate {
+    return try FfiConverterTypeSpaceListUpdate.lift(buf)
+}
+
+public func FfiConverterTypeSpaceListUpdate_lower(_ value: SpaceListUpdate) -> RustBuffer {
+    return FfiConverterTypeSpaceListUpdate.lower(value)
+}
+
+
+
+extension SpaceListUpdate: Equatable, Hashable {}
+
+
+
 
 public enum SsoError {
 
@@ -33506,6 +34314,249 @@ extension FfiConverterCallbackInterfaceSessionVerificationControllerDelegate : F
 
 
 
+public protocol SpaceRoomListEntriesListener : AnyObject {
+    
+    func onUpdate(rooms: [SpaceListUpdate]) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceSpaceRoomListEntriesListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceSpaceRoomListEntriesListener = UniffiVTableCallbackInterfaceSpaceRoomListEntriesListener(
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            rooms: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSpaceRoomListEntriesListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     rooms: try FfiConverterSequenceTypeSpaceListUpdate.lift(rooms)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceSpaceRoomListEntriesListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface SpaceRoomListEntriesListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitSpaceRoomListEntriesListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_spaceroomlistentrieslistener(&UniffiCallbackInterfaceSpaceRoomListEntriesListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceSpaceRoomListEntriesListener {
+    fileprivate static var handleMap = UniffiHandleMap<SpaceRoomListEntriesListener>()
+}
+
+extension FfiConverterCallbackInterfaceSpaceRoomListEntriesListener : FfiConverter {
+    typealias SwiftType = SpaceRoomListEntriesListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
+public protocol SpaceRoomListPaginationStateListener : AnyObject {
+    
+    func onUpdate(paginationState: SpaceRoomListPaginationState) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceSpaceRoomListPaginationStateListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceSpaceRoomListPaginationStateListener = UniffiVTableCallbackInterfaceSpaceRoomListPaginationStateListener(
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            paginationState: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSpaceRoomListPaginationStateListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     paginationState: try FfiConverterTypeSpaceRoomListPaginationState_lift(paginationState)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceSpaceRoomListPaginationStateListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface SpaceRoomListPaginationStateListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitSpaceRoomListPaginationStateListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_spaceroomlistpaginationstatelistener(&UniffiCallbackInterfaceSpaceRoomListPaginationStateListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceSpaceRoomListPaginationStateListener {
+    fileprivate static var handleMap = UniffiHandleMap<SpaceRoomListPaginationStateListener>()
+}
+
+extension FfiConverterCallbackInterfaceSpaceRoomListPaginationStateListener : FfiConverter {
+    typealias SwiftType = SpaceRoomListPaginationStateListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
+public protocol SpaceServiceJoinedSpacesListener : AnyObject {
+    
+    func onUpdate(roomUpdates: [SpaceListUpdate]) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceSpaceServiceJoinedSpacesListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceSpaceServiceJoinedSpacesListener = UniffiVTableCallbackInterfaceSpaceServiceJoinedSpacesListener(
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            roomUpdates: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSpaceServiceJoinedSpacesListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     roomUpdates: try FfiConverterSequenceTypeSpaceListUpdate.lift(roomUpdates)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceSpaceServiceJoinedSpacesListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface SpaceServiceJoinedSpacesListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitSpaceServiceJoinedSpacesListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_spaceservicejoinedspaceslistener(&UniffiCallbackInterfaceSpaceServiceJoinedSpacesListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceSpaceServiceJoinedSpacesListener {
+    fileprivate static var handleMap = UniffiHandleMap<SpaceServiceJoinedSpacesListener>()
+}
+
+extension FfiConverterCallbackInterfaceSpaceServiceJoinedSpacesListener : FfiConverter {
+    typealias SwiftType = SpaceServiceJoinedSpacesListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
 public protocol SyncServiceStateObserver : AnyObject {
     
     func onUpdate(state: SyncServiceState) 
@@ -35919,6 +36970,28 @@ fileprivate struct FfiConverterSequenceTypeSimplePushRule: FfiConverterRustBuffe
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeSpaceRoom: FfiConverterRustBuffer {
+    typealias SwiftType = [SpaceRoom]
+
+    public static func write(_ value: [SpaceRoom], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeSpaceRoom.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SpaceRoom] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [SpaceRoom]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeSpaceRoom.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypeUserPowerLevelUpdate: FfiConverterRustBuffer {
     typealias SwiftType = [UserPowerLevelUpdate]
 
@@ -36249,6 +37322,28 @@ fileprivate struct FfiConverterSequenceTypeSlidingSyncVersion: FfiConverterRustB
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeSpaceListUpdate: FfiConverterRustBuffer {
+    typealias SwiftType = [SpaceListUpdate]
+
+    public static func write(_ value: [SpaceListUpdate], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeSpaceListUpdate.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SpaceListUpdate] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [SpaceListUpdate]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeSpaceListUpdate.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypeTimelineDiff: FfiConverterRustBuffer {
     typealias SwiftType = [TimelineDiff]
 
@@ -36498,6 +37593,8 @@ fileprivate struct FfiConverterDictionaryTypeTagNameTypeTagInfo: FfiConverterRus
         return dict
     }
 }
+
+
 
 
 
@@ -37210,6 +38307,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_sliding_sync_version() != 4957) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_space_service() != 31959) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_start_sso_login() != 34571) {
@@ -38004,6 +39104,30 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationemoji_symbol() != 46075) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_paginate() != 57707) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_pagination_state() != 33381) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_rooms() != 24664) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_subscribe_to_pagination_state_updates() != 16775) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_subscribe_to_room_update() != 55793) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_joined_spaces() != 54285) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_space_room_list() != 6768) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_subscribe_to_joined_spaces() != 10090) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_span_enter() != 8900) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -38017,6 +39141,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_ssohandler_url() != 10889) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_syncservice_expire_sessions() != 45579) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservice_room_list_service() != 26426) {
@@ -38322,6 +39449,15 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_finish() != 37905) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlistentrieslistener_on_update() != 31502) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlistpaginationstatelistener_on_update() != 11960) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservicejoinedspaceslistener_on_update() != 19262) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicestateobserver_on_update() != 62231) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -38366,6 +39502,9 @@ private var initializationResult: InitializationResult = {
     uniffiCallbackInitRoomListServiceSyncIndicatorListener()
     uniffiCallbackInitSendQueueRoomErrorListener()
     uniffiCallbackInitSessionVerificationControllerDelegate()
+    uniffiCallbackInitSpaceRoomListEntriesListener()
+    uniffiCallbackInitSpaceRoomListPaginationStateListener()
+    uniffiCallbackInitSpaceServiceJoinedSpacesListener()
     uniffiCallbackInitSyncServiceStateObserver()
     uniffiCallbackInitTimelineListener()
     uniffiCallbackInitTypingNotificationsListener()
