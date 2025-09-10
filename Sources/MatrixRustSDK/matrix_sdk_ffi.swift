@@ -6059,6 +6059,16 @@ public protocol RoomProtocol : AnyObject {
     func clearEventCacheStorage() async throws 
     
     /**
+     * Declines a call (and stop ringing).
+     *
+     * # Arguments
+     *
+     * * `rtc_notification_event_id` - the event id of the m.rtc.notification
+     * event.
+     */
+    func declineCall(rtcNotificationEventId: String) async throws 
+    
+    /**
      * Forces the currently active room key, which is used to encrypt messages,
      * to be rotated.
      *
@@ -6261,6 +6271,8 @@ public protocol RoomProtocol : AnyObject {
      */
     func membership()  -> Membership
     
+    func newLatestEvent() async  -> LatestEventValue
+    
     func ownUserId()  -> String
     
     /**
@@ -6431,6 +6443,15 @@ public protocol RoomProtocol : AnyObject {
      * Stop the current users live location share in the room.
      */
     func stopLiveLocationShare() async throws 
+    
+    /**
+     * Subscribes to call decline for a currently ringing call, using a
+     * `listener` to be notified when someone declines.
+     *
+     * Will error if `rtc_notification_event_id` is not a valid event id.
+     * Use the [`TaskHandle`] to cancel the subscription.
+     */
+    func subscribeToCallDeclineEvents(rtcNotificationEventId: String, listener: CallDeclineListener) throws  -> TaskHandle
     
     func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener) async throws  -> TaskHandle
     
@@ -6697,6 +6718,31 @@ open func clearEventCacheStorage()async throws  {
                 uniffi_matrix_sdk_ffi_fn_method_room_clear_event_cache_storage(
                     self.uniffiClonePointer()
                     
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Declines a call (and stop ringing).
+     *
+     * # Arguments
+     *
+     * * `rtc_notification_event_id` - the event id of the m.rtc.notification
+     * event.
+     */
+open func declineCall(rtcNotificationEventId: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_decline_call(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(rtcNotificationEventId)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -7393,6 +7439,24 @@ open func membership() -> Membership {
 })
 }
     
+open func newLatestEvent()async  -> LatestEventValue {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_new_latest_event(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeLatestEventValue.lift,
+            errorHandler: nil
+            
+        )
+}
+    
 open func ownUserId() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_room_own_user_id(self.uniffiClonePointer(),$0
@@ -7892,6 +7956,22 @@ open func stopLiveLocationShare()async throws  {
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
+}
+    
+    /**
+     * Subscribes to call decline for a currently ringing call, using a
+     * `listener` to be notified when someone declines.
+     *
+     * Will error if `rtc_notification_event_id` is not a valid event id.
+     * Use the [`TaskHandle`] to cancel the subscription.
+     */
+open func subscribeToCallDeclineEvents(rtcNotificationEventId: String, listener: CallDeclineListener)throws  -> TaskHandle {
+    return try  FfiConverterTypeTaskHandle.lift(try rustCallWithError(FfiConverterTypeClientError.lift) {
+    uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_call_decline_events(self.uniffiClonePointer(),
+        FfiConverterString.lower(rtcNotificationEventId),
+        FfiConverterCallbackInterfaceCallDeclineListener.lower(listener),$0
+    )
+})
 }
     
 open func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener)async throws  -> TaskHandle {
@@ -18297,21 +18377,19 @@ public struct RoomMember {
     public var membership: MembershipState
     public var isNameAmbiguous: Bool
     public var powerLevel: PowerLevel
-    public var normalizedPowerLevel: PowerLevel
     public var isIgnored: Bool
     public var suggestedRoleForPowerLevel: RoomMemberRole
     public var membershipChangeReason: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(userId: String, displayName: String?, avatarUrl: String?, membership: MembershipState, isNameAmbiguous: Bool, powerLevel: PowerLevel, normalizedPowerLevel: PowerLevel, isIgnored: Bool, suggestedRoleForPowerLevel: RoomMemberRole, membershipChangeReason: String?) {
+    public init(userId: String, displayName: String?, avatarUrl: String?, membership: MembershipState, isNameAmbiguous: Bool, powerLevel: PowerLevel, isIgnored: Bool, suggestedRoleForPowerLevel: RoomMemberRole, membershipChangeReason: String?) {
         self.userId = userId
         self.displayName = displayName
         self.avatarUrl = avatarUrl
         self.membership = membership
         self.isNameAmbiguous = isNameAmbiguous
         self.powerLevel = powerLevel
-        self.normalizedPowerLevel = normalizedPowerLevel
         self.isIgnored = isIgnored
         self.suggestedRoleForPowerLevel = suggestedRoleForPowerLevel
         self.membershipChangeReason = membershipChangeReason
@@ -18340,9 +18418,6 @@ extension RoomMember: Equatable, Hashable {
         if lhs.powerLevel != rhs.powerLevel {
             return false
         }
-        if lhs.normalizedPowerLevel != rhs.normalizedPowerLevel {
-            return false
-        }
         if lhs.isIgnored != rhs.isIgnored {
             return false
         }
@@ -18362,7 +18437,6 @@ extension RoomMember: Equatable, Hashable {
         hasher.combine(membership)
         hasher.combine(isNameAmbiguous)
         hasher.combine(powerLevel)
-        hasher.combine(normalizedPowerLevel)
         hasher.combine(isIgnored)
         hasher.combine(suggestedRoleForPowerLevel)
         hasher.combine(membershipChangeReason)
@@ -18380,7 +18454,6 @@ public struct FfiConverterTypeRoomMember: FfiConverterRustBuffer {
                 membership: FfiConverterTypeMembershipState.read(from: &buf), 
                 isNameAmbiguous: FfiConverterBool.read(from: &buf), 
                 powerLevel: FfiConverterTypePowerLevel.read(from: &buf), 
-                normalizedPowerLevel: FfiConverterTypePowerLevel.read(from: &buf), 
                 isIgnored: FfiConverterBool.read(from: &buf), 
                 suggestedRoleForPowerLevel: FfiConverterTypeRoomMemberRole.read(from: &buf), 
                 membershipChangeReason: FfiConverterOptionString.read(from: &buf)
@@ -18394,7 +18467,6 @@ public struct FfiConverterTypeRoomMember: FfiConverterRustBuffer {
         FfiConverterTypeMembershipState.write(value.membership, into: &buf)
         FfiConverterBool.write(value.isNameAmbiguous, into: &buf)
         FfiConverterTypePowerLevel.write(value.powerLevel, into: &buf)
-        FfiConverterTypePowerLevel.write(value.normalizedPowerLevel, into: &buf)
         FfiConverterBool.write(value.isIgnored, into: &buf)
         FfiConverterTypeRoomMemberRole.write(value.suggestedRoleForPowerLevel, into: &buf)
         FfiConverterOptionString.write(value.membershipChangeReason, into: &buf)
@@ -24801,6 +24873,80 @@ public func FfiConverterTypeKeyDerivationAlgorithm_lower(_ value: KeyDerivationA
 
 
 extension KeyDerivationAlgorithm: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Mimic the [`UiLatestEventValue`] type.
+ */
+
+public enum LatestEventValue {
+    
+    case none
+    case remote(timestamp: Timestamp, sender: String, isOwn: Bool, profile: ProfileDetails, content: TimelineItemContent
+    )
+    case local(timestamp: Timestamp, content: TimelineItemContent, isSending: Bool
+    )
+}
+
+
+public struct FfiConverterTypeLatestEventValue: FfiConverterRustBuffer {
+    typealias SwiftType = LatestEventValue
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LatestEventValue {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .none
+        
+        case 2: return .remote(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), sender: try FfiConverterString.read(from: &buf), isOwn: try FfiConverterBool.read(from: &buf), profile: try FfiConverterTypeProfileDetails.read(from: &buf), content: try FfiConverterTypeTimelineItemContent.read(from: &buf)
+        )
+        
+        case 3: return .local(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), content: try FfiConverterTypeTimelineItemContent.read(from: &buf), isSending: try FfiConverterBool.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: LatestEventValue, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .none:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .remote(timestamp,sender,isOwn,profile,content):
+            writeInt(&buf, Int32(2))
+            FfiConverterTypeTimestamp.write(timestamp, into: &buf)
+            FfiConverterString.write(sender, into: &buf)
+            FfiConverterBool.write(isOwn, into: &buf)
+            FfiConverterTypeProfileDetails.write(profile, into: &buf)
+            FfiConverterTypeTimelineItemContent.write(content, into: &buf)
+            
+        
+        case let .local(timestamp,content,isSending):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeTimestamp.write(timestamp, into: &buf)
+            FfiConverterTypeTimelineItemContent.write(content, into: &buf)
+            FfiConverterBool.write(isSending, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeLatestEventValue_lift(_ buf: RustBuffer) throws -> LatestEventValue {
+    return try FfiConverterTypeLatestEventValue.lift(buf)
+}
+
+public func FfiConverterTypeLatestEventValue_lower(_ value: LatestEventValue) -> RustBuffer {
+    return FfiConverterTypeLatestEventValue.lower(value)
+}
+
 
 
 
@@ -31588,6 +31734,10 @@ public enum TraceLogPacks {
      * Enables all the logs relevant to the notification client.
      */
     case notificationClient
+    /**
+     * Enables all the logs relevant to sync profiling.
+     */
+    case syncProfiling
 }
 
 
@@ -31605,6 +31755,8 @@ public struct FfiConverterTypeTraceLogPacks: FfiConverterRustBuffer {
         case 3: return .timeline
         
         case 4: return .notificationClient
+        
+        case 5: return .syncProfiling
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -31628,6 +31780,10 @@ public struct FfiConverterTypeTraceLogPacks: FfiConverterRustBuffer {
         
         case .notificationClient:
             writeInt(&buf, Int32(4))
+        
+        
+        case .syncProfiling:
+            writeInt(&buf, Int32(5))
         
         }
     }
@@ -32312,6 +32468,90 @@ fileprivate struct FfiConverterCallbackInterfaceBackupSteadyStateListener {
 
 extension FfiConverterCallbackInterfaceBackupSteadyStateListener : FfiConverter {
     typealias SwiftType = BackupSteadyStateListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
+/**
+ * A listener for receiving call decline events in a room.
+ */
+public protocol CallDeclineListener : AnyObject {
+    
+    func call(declinerUserId: String) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceCallDeclineListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceCallDeclineListener = UniffiVTableCallbackInterfaceCallDeclineListener(
+        call: { (
+            uniffiHandle: UInt64,
+            declinerUserId: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceCallDeclineListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.call(
+                     declinerUserId: try FfiConverterString.lift(declinerUserId)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceCallDeclineListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface CallDeclineListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitCallDeclineListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_calldeclinelistener(&UniffiCallbackInterfaceCallDeclineListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceCallDeclineListener {
+    fileprivate static var handleMap = UniffiHandleMap<CallDeclineListener>()
+}
+
+extension FfiConverterCallbackInterfaceCallDeclineListener : FfiConverter {
+    typealias SwiftType = CallDeclineListener
     typealias FfiType = UInt64
 
     public static func lift(_ handle: UInt64) throws -> SwiftType {
@@ -37629,6 +37869,8 @@ fileprivate struct FfiConverterDictionaryTypeTagNameTypeTagInfo: FfiConverterRus
 
 
 
+
+
 /**
  * Typealias from the type name used in the UDL file to the builtin type.  This
  * is needed because the UDL type name is used in function/method signatures.
@@ -37927,10 +38169,11 @@ public func messageEventContentNew(msgtype: MessageType)throws  -> RoomMessageEv
  * * `props` - A struct containing the configuration parameters for a element
  * call widget.
  */
-public func newVirtualElementCallWidget(props: VirtualElementCallWidgetOptions)throws  -> WidgetSettings {
+public func newVirtualElementCallWidget(props: VirtualElementCallWidgetProperties, config: VirtualElementCallWidgetConfig)throws  -> WidgetSettings {
     return try  FfiConverterTypeWidgetSettings.lift(try rustCallWithError(FfiConverterTypeParseError.lift) {
     uniffi_matrix_sdk_ffi_fn_func_new_virtual_element_call_widget(
-        FfiConverterTypeVirtualElementCallWidgetOptions_lower(props),$0
+        FfiConverterTypeVirtualElementCallWidgetProperties_lower(props),
+        FfiConverterTypeVirtualElementCallWidgetConfig_lower(config),$0
     )
 })
 }
@@ -38066,7 +38309,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_message_event_content_new() != 57839) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_func_new_virtual_element_call_widget() != 61776) {
+    if (uniffi_matrix_sdk_ffi_checksum_func_new_virtual_element_call_widget() != 7233) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_parse_matrix_entity_from() != 49710) {
@@ -38669,6 +38912,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_event_cache_storage() != 13838) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_decline_call() != 36115) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_discard_room_key() != 18081) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -38789,6 +39035,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_membership() != 45951) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_new_latest_event() != 11947) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_own_user_id() != 39510) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -38859,6 +39108,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_stop_live_location_share() != 19983) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_call_decline_events() != 62256) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_identity_status_changes() != 8526) {
@@ -39362,6 +39614,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_backupsteadystatelistener_on_update() != 41052) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_calldeclinelistener_call() != 13016) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientdelegate_did_receive_auth_error() != 26350) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -39480,6 +39735,7 @@ private var initializationResult: InitializationResult = {
     uniffiCallbackInitAccountDataListener()
     uniffiCallbackInitBackupStateListener()
     uniffiCallbackInitBackupSteadyStateListener()
+    uniffiCallbackInitCallDeclineListener()
     uniffiCallbackInitClientDelegate()
     uniffiCallbackInitClientSessionDelegate()
     uniffiCallbackInitEnableRecoveryProgressListener()
