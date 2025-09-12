@@ -594,6 +594,12 @@ public protocol ClientProtocol : AnyObject {
     func accountUrl(action: AccountManagementAction?) async throws  -> String?
     
     /**
+     * Adds a recently used emoji to the list and uploads the updated
+     * `io.element.recent_emoji` content to the global account data.
+     */
+    func addRecentEmoji(emoji: String) async throws 
+    
+    /**
      * Find all sliding sync versions that are available.
      *
      * Be careful: This method may hit the store and will send new requests for
@@ -746,6 +752,12 @@ public protocol ClientProtocol : AnyObject {
     func getNotificationSettings() async  -> NotificationSettings
     
     func getProfile(userId: String) async throws  -> UserProfile
+    
+    /**
+     * Gets the list of recently used emojis from the `io.element.recent_emoji`
+     * global account data.
+     */
+    func getRecentEmojis() async throws  -> [RecentEmoji]
     
     func getRecentlyVisitedRooms() async throws  -> [String]
     
@@ -1213,6 +1225,27 @@ open func accountUrl(action: AccountManagementAction?)async throws  -> String? {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterOptionString.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Adds a recently used emoji to the list and uploads the updated
+     * `io.element.recent_emoji` content to the global account data.
+     */
+open func addRecentEmoji(emoji: String)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_add_recent_emoji(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(emoji)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -1696,6 +1729,27 @@ open func getProfile(userId: String)async throws  -> UserProfile {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterTypeUserProfile.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Gets the list of recently used emojis from the `io.element.recent_emoji`
+     * global account data.
+     */
+open func getRecentEmojis()async throws  -> [RecentEmoji] {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_get_recent_emojis(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeRecentEmoji.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -12356,8 +12410,10 @@ public protocol TimelineProtocol : AnyObject {
      *
      * Ensures that only one reaction is sent at a time to avoid race
      * conditions and spamming the homeserver with requests.
+     *
+     * Returns `true` if the reaction was added, `false` if it was removed.
      */
-    func toggleReaction(itemId: EventOrTransactionId, key: String) async throws 
+    func toggleReaction(itemId: EventOrTransactionId, key: String) async throws  -> Bool
     
     /**
      * Adds a new pinned event by sending an updated `m.room.pinned_events`
@@ -12896,8 +12952,10 @@ open func subscribeToBackPaginationStatus(listener: PaginationStatusListener)asy
      *
      * Ensures that only one reaction is sent at a time to avoid race
      * conditions and spamming the homeserver with requests.
+     *
+     * Returns `true` if the reaction was added, `false` if it was removed.
      */
-open func toggleReaction(itemId: EventOrTransactionId, key: String)async throws  {
+open func toggleReaction(itemId: EventOrTransactionId, key: String)async throws  -> Bool {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -12906,10 +12964,10 @@ open func toggleReaction(itemId: EventOrTransactionId, key: String)async throws 
                     FfiConverterTypeEventOrTransactionId.lower(itemId),FfiConverterString.lower(key)
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -17676,6 +17734,78 @@ public func FfiConverterTypeReceipt_lift(_ buf: RustBuffer) throws -> Receipt {
 
 public func FfiConverterTypeReceipt_lower(_ value: Receipt) -> RustBuffer {
     return FfiConverterTypeReceipt.lower(value)
+}
+
+
+/**
+ * Represents an emoji recently used for reactions.
+ */
+public struct RecentEmoji {
+    /**
+     * The actual emoji text representation.
+     */
+    public var emoji: String
+    /**
+     * The number of times this emoji has been used for reactions.
+     */
+    public var count: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The actual emoji text representation.
+         */emoji: String, 
+        /**
+         * The number of times this emoji has been used for reactions.
+         */count: UInt64) {
+        self.emoji = emoji
+        self.count = count
+    }
+}
+
+
+
+extension RecentEmoji: Equatable, Hashable {
+    public static func ==(lhs: RecentEmoji, rhs: RecentEmoji) -> Bool {
+        if lhs.emoji != rhs.emoji {
+            return false
+        }
+        if lhs.count != rhs.count {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(emoji)
+        hasher.combine(count)
+    }
+}
+
+
+public struct FfiConverterTypeRecentEmoji: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RecentEmoji {
+        return
+            try RecentEmoji(
+                emoji: FfiConverterString.read(from: &buf), 
+                count: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RecentEmoji, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.emoji, into: &buf)
+        FfiConverterUInt64.write(value.count, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeRecentEmoji_lift(_ buf: RustBuffer) throws -> RecentEmoji {
+    return try FfiConverterTypeRecentEmoji.lift(buf)
+}
+
+public func FfiConverterTypeRecentEmoji_lower(_ value: RecentEmoji) -> RustBuffer {
+    return FfiConverterTypeRecentEmoji.lower(value)
 }
 
 
@@ -37122,6 +37252,28 @@ fileprivate struct FfiConverterSequenceTypeReactionSenderData: FfiConverterRustB
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeRecentEmoji: FfiConverterRustBuffer {
+    typealias SwiftType = [RecentEmoji]
+
+    public static func write(_ value: [RecentEmoji], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRecentEmoji.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RecentEmoji] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RecentEmoji]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRecentEmoji.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypeRoomDescription: FfiConverterRustBuffer {
     typealias SwiftType = [RoomDescription]
 
@@ -38342,6 +38494,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_account_url() != 42373) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_add_recent_emoji() != 29688) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_available_sliding_sync_versions() != 35296) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -38415,6 +38570,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_profile() != 60062) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recent_emojis() != 64362) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recently_visited_rooms() != 22399) {
@@ -39515,7 +39673,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_back_pagination_status() != 46161) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_toggle_reaction() != 29303) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_toggle_reaction() != 13555) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_unpin_event() != 52414) {
