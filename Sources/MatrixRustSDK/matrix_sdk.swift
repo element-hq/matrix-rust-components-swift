@@ -920,46 +920,46 @@ public struct VirtualElementCallWidgetConfig {
          */intent: Intent?, 
         /**
          * Skip the lobby when joining a call.
-         */skipLobby: Bool?, 
+         */skipLobby: Bool? = nil, 
         /**
          * Whether the branding header of Element call should be shown or if a
          * mobile header navbar should be render.
          *
          * Default: [`HeaderStyle::Standard`]
-         */header: HeaderStyle?, 
+         */header: HeaderStyle? = nil, 
         /**
          * Whether the branding header of Element call should be hidden.
          *
          * Default: `true`
-         */hideHeader: Bool?, 
+         */hideHeader: Bool? = nil, 
         /**
          * If set, the lobby will be skipped and the widget will join the
          * call on the `io.element.join` action.
          *
          * Default: `false`
-         */preload: Bool?, 
+         */preload: Bool? = nil, 
         /**
          * Whether element call should prompt the user to open in the browser or
          * the app.
          *
          * Default: `false`
-         */appPrompt: Bool?, 
+         */appPrompt: Bool? = nil, 
         /**
          * Make it not possible to get to the calls list in the webview.
          *
          * Default: `true`
-         */confineToRoom: Bool?, 
+         */confineToRoom: Bool? = nil, 
         /**
          * Do not show the screenshare button.
-         */hideScreensharing: Bool?, 
+         */hideScreensharing: Bool? = nil, 
         /**
          * Make the audio devices be controlled by the os instead of the
          * element-call webview.
-         */controlledAudioDevices: Bool?, 
+         */controlledAudioDevices: Bool? = nil, 
         /**
          * Whether and what type of notification Element Call should send, when
          * starting a call.
-         */sendNotificationType: NotificationType?) {
+         */sendNotificationType: NotificationType? = nil) {
         self.intent = intent
         self.skipLobby = skipLobby
         self.header = header
@@ -1171,15 +1171,15 @@ public struct VirtualElementCallWidgetProperties {
          *
          * Defaults to `element_call_url` for the non-iframe (dedicated webview)
          * usecase.
-         */parentUrl: String?, 
+         */parentUrl: String? = nil, 
         /**
          * The font scale which will be used inside element call.
          *
          * Default: `1`
-         */fontScale: Double?, 
+         */fontScale: Double? = nil, 
         /**
          * The font to use, to adapt to the system font.
-         */font: String?, 
+         */font: String? = nil, 
         /**
          * The encryption system to use.
          *
@@ -1187,27 +1187,27 @@ public struct VirtualElementCallWidgetProperties {
          */encryption: EncryptionSystem, 
         /**
          * Can be used to pass a PostHog id to element call.
-         */posthogUserId: String?, 
+         */posthogUserId: String? = nil, 
         /**
          * The host of the posthog api.
          * This is only used by the embedded package of Element Call.
-         */posthogApiHost: String?, 
+         */posthogApiHost: String? = nil, 
         /**
          * The key for the posthog api.
          * This is only used by the embedded package of Element Call.
-         */posthogApiKey: String?, 
+         */posthogApiKey: String? = nil, 
         /**
          * The url to use for submitting rageshakes.
          * This is only used by the embedded package of Element Call.
-         */rageshakeSubmitUrl: String?, 
+         */rageshakeSubmitUrl: String? = nil, 
         /**
          * Sentry [DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/)
          * This is only used by the embedded package of Element Call.
-         */sentryDsn: String?, 
+         */sentryDsn: String? = nil, 
         /**
          * Sentry [environment](https://docs.sentry.io/concepts/key-terms/key-terms/)
          * This is only used by the embedded package of Element Call.
-         */sentryEnvironment: String?) {
+         */sentryEnvironment: String? = nil) {
         self.elementCallUrl = elementCallUrl
         self.widgetId = widgetId
         self.parentUrl = parentUrl
