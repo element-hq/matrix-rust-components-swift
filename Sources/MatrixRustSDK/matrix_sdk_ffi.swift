@@ -19857,6 +19857,10 @@ public struct SpaceRoom {
      * A list of room members considered to be heroes.
      */
     public var heroes: [RoomHero]?
+    /**
+     * The via parameters of the room.
+     */
+    public var via: [String]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -19899,7 +19903,10 @@ public struct SpaceRoom {
          */state: Membership?, 
         /**
          * A list of room members considered to be heroes.
-         */heroes: [RoomHero]?) {
+         */heroes: [RoomHero]?, 
+        /**
+         * The via parameters of the room.
+         */via: [String]) {
         self.roomId = roomId
         self.canonicalAlias = canonicalAlias
         self.name = name
@@ -19913,6 +19920,7 @@ public struct SpaceRoom {
         self.childrenCount = childrenCount
         self.state = state
         self.heroes = heroes
+        self.via = via
     }
 }
 
@@ -19959,6 +19967,9 @@ extension SpaceRoom: Equatable, Hashable {
         if lhs.heroes != rhs.heroes {
             return false
         }
+        if lhs.via != rhs.via {
+            return false
+        }
         return true
     }
 
@@ -19976,6 +19987,7 @@ extension SpaceRoom: Equatable, Hashable {
         hasher.combine(childrenCount)
         hasher.combine(state)
         hasher.combine(heroes)
+        hasher.combine(via)
     }
 }
 
@@ -19996,7 +20008,8 @@ public struct FfiConverterTypeSpaceRoom: FfiConverterRustBuffer {
                 guestCanJoin: FfiConverterBool.read(from: &buf), 
                 childrenCount: FfiConverterUInt64.read(from: &buf), 
                 state: FfiConverterOptionTypeMembership.read(from: &buf), 
-                heroes: FfiConverterOptionSequenceTypeRoomHero.read(from: &buf)
+                heroes: FfiConverterOptionSequenceTypeRoomHero.read(from: &buf), 
+                via: FfiConverterSequenceString.read(from: &buf)
         )
     }
 
@@ -20014,6 +20027,7 @@ public struct FfiConverterTypeSpaceRoom: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.childrenCount, into: &buf)
         FfiConverterOptionTypeMembership.write(value.state, into: &buf)
         FfiConverterOptionSequenceTypeRoomHero.write(value.heroes, into: &buf)
+        FfiConverterSequenceString.write(value.via, into: &buf)
     }
 }
 
@@ -25822,7 +25836,10 @@ public enum MessageLikeEventContent {
     
     case callAnswer
     case callInvite
-    case callNotify(notifyType: NotifyType
+    case rtcNotification(notificationType: RtcNotificationType, 
+        /**
+         * The timestamp at which this notification is considered invalid.
+         */expirationTs: Timestamp
     )
     case callHangup
     case callCandidates
@@ -25857,7 +25874,7 @@ public struct FfiConverterTypeMessageLikeEventContent: FfiConverterRustBuffer {
         
         case 2: return .callInvite
         
-        case 3: return .callNotify(notifyType: try FfiConverterTypeNotifyType.read(from: &buf)
+        case 3: return .rtcNotification(notificationType: try FfiConverterTypeRtcNotificationType.read(from: &buf), expirationTs: try FfiConverterTypeTimestamp.read(from: &buf)
         )
         
         case 4: return .callHangup
@@ -25910,9 +25927,10 @@ public struct FfiConverterTypeMessageLikeEventContent: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         
         
-        case let .callNotify(notifyType):
+        case let .rtcNotification(notificationType,expirationTs):
             writeInt(&buf, Int32(3))
-            FfiConverterTypeNotifyType.write(notifyType, into: &buf)
+            FfiConverterTypeRtcNotificationType.write(notificationType, into: &buf)
+            FfiConverterTypeTimestamp.write(expirationTs, into: &buf)
             
         
         case .callHangup:
@@ -26005,7 +26023,7 @@ public enum MessageLikeEventType {
     case callCandidates
     case callHangup
     case callInvite
-    case callNotify
+    case rtcNotification
     case keyVerificationAccept
     case keyVerificationCancel
     case keyVerificationDone
@@ -26042,7 +26060,7 @@ public struct FfiConverterTypeMessageLikeEventType: FfiConverterRustBuffer {
         
         case 4: return .callInvite
         
-        case 5: return .callNotify
+        case 5: return .rtcNotification
         
         case 6: return .keyVerificationAccept
         
@@ -26104,7 +26122,7 @@ public struct FfiConverterTypeMessageLikeEventType: FfiConverterRustBuffer {
             writeInt(&buf, Int32(4))
         
         
-        case .callNotify:
+        case .rtcNotification:
             writeInt(&buf, Int32(5))
         
         
@@ -26755,61 +26773,6 @@ public func FfiConverterTypeNotificationStatus_lower(_ value: NotificationStatus
     return FfiConverterTypeNotificationStatus.lower(value)
 }
 
-
-
-
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
-
-public enum NotifyType {
-    
-    case ring
-    case notify
-}
-
-
-public struct FfiConverterTypeNotifyType: FfiConverterRustBuffer {
-    typealias SwiftType = NotifyType
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NotifyType {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .ring
-        
-        case 2: return .notify
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: NotifyType, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case .ring:
-            writeInt(&buf, Int32(1))
-        
-        
-        case .notify:
-            writeInt(&buf, Int32(2))
-        
-        }
-    }
-}
-
-
-public func FfiConverterTypeNotifyType_lift(_ buf: RustBuffer) throws -> NotifyType {
-    return try FfiConverterTypeNotifyType.lift(buf)
-}
-
-public func FfiConverterTypeNotifyType_lower(_ value: NotifyType) -> RustBuffer {
-    return FfiConverterTypeNotifyType.lower(value)
-}
-
-
-
-extension NotifyType: Equatable, Hashable {}
 
 
 
@@ -30070,48 +30033,55 @@ extension RoomVisibility: Equatable, Hashable {}
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
-public enum RtcApplicationType {
+public enum RtcNotificationType {
     
-    case call
+    case ring
+    case notification
 }
 
 
-public struct FfiConverterTypeRtcApplicationType: FfiConverterRustBuffer {
-    typealias SwiftType = RtcApplicationType
+public struct FfiConverterTypeRtcNotificationType: FfiConverterRustBuffer {
+    typealias SwiftType = RtcNotificationType
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RtcApplicationType {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RtcNotificationType {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .call
+        case 1: return .ring
+        
+        case 2: return .notification
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
-    public static func write(_ value: RtcApplicationType, into buf: inout [UInt8]) {
+    public static func write(_ value: RtcNotificationType, into buf: inout [UInt8]) {
         switch value {
         
         
-        case .call:
+        case .ring:
             writeInt(&buf, Int32(1))
+        
+        
+        case .notification:
+            writeInt(&buf, Int32(2))
         
         }
     }
 }
 
 
-public func FfiConverterTypeRtcApplicationType_lift(_ buf: RustBuffer) throws -> RtcApplicationType {
-    return try FfiConverterTypeRtcApplicationType.lift(buf)
+public func FfiConverterTypeRtcNotificationType_lift(_ buf: RustBuffer) throws -> RtcNotificationType {
+    return try FfiConverterTypeRtcNotificationType.lift(buf)
 }
 
-public func FfiConverterTypeRtcApplicationType_lower(_ value: RtcApplicationType) -> RustBuffer {
-    return FfiConverterTypeRtcApplicationType.lower(value)
+public func FfiConverterTypeRtcNotificationType_lower(_ value: RtcNotificationType) -> RustBuffer {
+    return FfiConverterTypeRtcNotificationType.lower(value)
 }
 
 
 
-extension RtcApplicationType: Equatable, Hashable {}
+extension RtcNotificationType: Equatable, Hashable {}
 
 
 
@@ -31756,7 +31726,7 @@ public enum TimelineItemContent {
     case msgLike(content: MsgLikeContent
     )
     case callInvite
-    case callNotify
+    case rtcNotification
     case roomMembership(userId: String, userDisplayName: String?, change: MembershipChange?, reason: String?
     )
     case profileChange(displayName: String?, prevDisplayName: String?, avatarUrl: String?, prevAvatarUrl: String?
@@ -31782,7 +31752,7 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
         
         case 2: return .callInvite
         
-        case 3: return .callNotify
+        case 3: return .rtcNotification
         
         case 4: return .roomMembership(userId: try FfiConverterString.read(from: &buf), userDisplayName: try FfiConverterOptionString.read(from: &buf), change: try FfiConverterOptionTypeMembershipChange.read(from: &buf), reason: try FfiConverterOptionString.read(from: &buf)
         )
@@ -31816,7 +31786,7 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         
         
-        case .callNotify:
+        case .rtcNotification:
             writeInt(&buf, Int32(3))
         
         
