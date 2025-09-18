@@ -19846,6 +19846,13 @@ public struct SpaceRoom {
      */
     public var guestCanJoin: Bool
     /**
+     * Whether this room is a direct room.
+     *
+     * Only set if the room is known to the client otherwise we
+     * assume DMs shouldn't be exposed publicly in spaces.
+     */
+    public var isDirect: Bool?
+    /**
      * The number of children room this has, if a space.
      */
     public var childrenCount: UInt64
@@ -19896,6 +19903,12 @@ public struct SpaceRoom {
          * Whether guest users may join the room and participate in it.
          */guestCanJoin: Bool, 
         /**
+         * Whether this room is a direct room.
+         *
+         * Only set if the room is known to the client otherwise we
+         * assume DMs shouldn't be exposed publicly in spaces.
+         */isDirect: Bool?, 
+        /**
          * The number of children room this has, if a space.
          */childrenCount: UInt64, 
         /**
@@ -19917,6 +19930,7 @@ public struct SpaceRoom {
         self.joinRule = joinRule
         self.worldReadable = worldReadable
         self.guestCanJoin = guestCanJoin
+        self.isDirect = isDirect
         self.childrenCount = childrenCount
         self.state = state
         self.heroes = heroes
@@ -19958,6 +19972,9 @@ extension SpaceRoom: Equatable, Hashable {
         if lhs.guestCanJoin != rhs.guestCanJoin {
             return false
         }
+        if lhs.isDirect != rhs.isDirect {
+            return false
+        }
         if lhs.childrenCount != rhs.childrenCount {
             return false
         }
@@ -19984,6 +20001,7 @@ extension SpaceRoom: Equatable, Hashable {
         hasher.combine(joinRule)
         hasher.combine(worldReadable)
         hasher.combine(guestCanJoin)
+        hasher.combine(isDirect)
         hasher.combine(childrenCount)
         hasher.combine(state)
         hasher.combine(heroes)
@@ -20006,6 +20024,7 @@ public struct FfiConverterTypeSpaceRoom: FfiConverterRustBuffer {
                 joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
                 worldReadable: FfiConverterOptionBool.read(from: &buf), 
                 guestCanJoin: FfiConverterBool.read(from: &buf), 
+                isDirect: FfiConverterOptionBool.read(from: &buf), 
                 childrenCount: FfiConverterUInt64.read(from: &buf), 
                 state: FfiConverterOptionTypeMembership.read(from: &buf), 
                 heroes: FfiConverterOptionSequenceTypeRoomHero.read(from: &buf), 
@@ -20024,6 +20043,7 @@ public struct FfiConverterTypeSpaceRoom: FfiConverterRustBuffer {
         FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
         FfiConverterOptionBool.write(value.worldReadable, into: &buf)
         FfiConverterBool.write(value.guestCanJoin, into: &buf)
+        FfiConverterOptionBool.write(value.isDirect, into: &buf)
         FfiConverterUInt64.write(value.childrenCount, into: &buf)
         FfiConverterOptionTypeMembership.write(value.state, into: &buf)
         FfiConverterOptionSequenceTypeRoomHero.write(value.heroes, into: &buf)
