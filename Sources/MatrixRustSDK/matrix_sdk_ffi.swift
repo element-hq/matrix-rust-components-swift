@@ -8683,6 +8683,8 @@ public protocol RoomListProtocol : AnyObject {
     
     func entriesWithDynamicAdapters(pageSize: UInt32, listener: RoomListEntriesListener)  -> RoomListEntriesWithDynamicAdaptersResult
     
+    func entriesWithDynamicAdaptersWith(pageSize: UInt32, enableLatestEventSorter: Bool, listener: RoomListEntriesListener)  -> RoomListEntriesWithDynamicAdaptersResult
+    
     func loadingState(listener: RoomListLoadingStateListener) throws  -> RoomListLoadingStateResult
     
     func room(roomId: String) throws  -> Room
@@ -8734,6 +8736,16 @@ open func entriesWithDynamicAdapters(pageSize: UInt32, listener: RoomListEntries
     return try!  FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_roomlist_entries_with_dynamic_adapters(self.uniffiClonePointer(),
         FfiConverterUInt32.lower(pageSize),
+        FfiConverterCallbackInterfaceRoomListEntriesListener.lower(listener),$0
+    )
+})
+}
+    
+open func entriesWithDynamicAdaptersWith(pageSize: UInt32, enableLatestEventSorter: Bool, listener: RoomListEntriesListener) -> RoomListEntriesWithDynamicAdaptersResult {
+    return try!  FfiConverterTypeRoomListEntriesWithDynamicAdaptersResult.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_roomlist_entries_with_dynamic_adapters_with(self.uniffiClonePointer(),
+        FfiConverterUInt32.lower(pageSize),
+        FfiConverterBool.lower(enableLatestEventSorter),
         FfiConverterCallbackInterfaceRoomListEntriesListener.lower(listener),$0
     )
 })
@@ -39467,6 +39479,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_entries_with_dynamic_adapters() != 36097) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_entries_with_dynamic_adapters_with() != 21746) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlist_loading_state() != 21585) {
