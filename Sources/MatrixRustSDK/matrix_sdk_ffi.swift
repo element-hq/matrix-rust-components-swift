@@ -754,8 +754,8 @@ public protocol ClientProtocol : AnyObject {
     func getProfile(userId: String) async throws  -> UserProfile
     
     /**
-     * Gets the list of recently used emojis from the `io.element.recent_emoji`
-     * global account data.
+     * Gets the list of recently used emojis from the
+     * `io.element.recent_emoji` global account data.
      */
     func getRecentEmojis() async throws  -> [RecentEmoji]
     
@@ -1734,8 +1734,8 @@ open func getProfile(userId: String)async throws  -> UserProfile {
 }
     
     /**
-     * Gets the list of recently used emojis from the `io.element.recent_emoji`
-     * global account data.
+     * Gets the list of recently used emojis from the
+     * `io.element.recent_emoji` global account data.
      */
 open func getRecentEmojis()async throws  -> [RecentEmoji] {
     return
@@ -3513,6 +3513,15 @@ public protocol EncryptionProtocol : AnyObject {
     
     func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, progressListener: EnableRecoveryProgressListener) async throws  -> String
     
+    /**
+     * Does the user have other devices that the current device can verify
+     * against?
+     *
+     * The device must be signed by the user's cross-signing key, must have an
+     * identity, and must not be a dehydrated device.
+     */
+    func hasDevicesToVerifyAgainst() async throws  -> Bool
+    
     func isLastDevice() async throws  -> Bool
     
     func recover(recoveryKey: String) async throws 
@@ -3741,6 +3750,30 @@ open func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, prog
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeRecoveryError.lift
+        )
+}
+    
+    /**
+     * Does the user have other devices that the current device can verify
+     * against?
+     *
+     * The device must be signed by the user's cross-signing key, must have an
+     * identity, and must not be a dehydrated device.
+     */
+open func hasDevicesToVerifyAgainst()async throws  -> Bool {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_has_devices_to_verify_against(
+                    self.uniffiClonePointer()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError.lift
         )
 }
     
@@ -6287,6 +6320,12 @@ public protocol RoomProtocol : AnyObject {
     func loadComposerDraft(threadRoot: String?) async throws  -> ComposerDraft?
     
     /**
+     * Either loads the event associated with the `event_id` from the event
+     * cache or fetches it from the homeserver.
+     */
+    func loadOrFetchEvent(eventId: String) async throws  -> TimelineEvent
+    
+    /**
      * Mark a room as read, by attaching a read receipt on the latest event.
      *
      * Note: this does NOT unset the unread flag; it's the caller's
@@ -7310,6 +7349,27 @@ open func loadComposerDraft(threadRoot: String?)async throws  -> ComposerDraft? 
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterOptionTypeComposerDraft.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * Either loads the event associated with the `event_id` from the event
+     * cache or fetches it from the homeserver.
+     */
+open func loadOrFetchEvent(eventId: String)async throws  -> TimelineEvent {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_load_or_fetch_event(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(eventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeTimelineEvent.lift,
             errorHandler: FfiConverterTypeClientError.lift
         )
 }
@@ -13095,6 +13155,12 @@ public protocol TimelineEventProtocol : AnyObject {
     
     func senderId()  -> String
     
+    /**
+     * Returns the thread root event id for the event, if it's part of a
+     * thread.
+     */
+    func threadRootEventId()  -> String?
+    
     func timestamp()  -> Timestamp
     
 }
@@ -13157,6 +13223,17 @@ open func eventType()throws  -> TimelineEventType {
 open func senderId() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_timelineevent_sender_id(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+    /**
+     * Returns the thread root event id for the event, if it's part of a
+     * thread.
+     */
+open func threadRootEventId() -> String? {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_timelineevent_thread_root_event_id(self.uniffiClonePointer(),$0
     )
 })
 }
@@ -26074,6 +26151,8 @@ public enum MessageLikeEventType {
     case unstablePollEnd
     case unstablePollResponse
     case unstablePollStart
+    case other(String
+    )
 }
 
 
@@ -26129,6 +26208,9 @@ public struct FfiConverterTypeMessageLikeEventType: FfiConverterRustBuffer {
         case 22: return .unstablePollResponse
         
         case 23: return .unstablePollStart
+        
+        case 24: return .other(try FfiConverterString.read(from: &buf)
+        )
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -26229,6 +26311,11 @@ public struct FfiConverterTypeMessageLikeEventType: FfiConverterRustBuffer {
         case .unstablePollStart:
             writeInt(&buf, Int32(23))
         
+        
+        case let .other(v1):
+            writeInt(&buf, Int32(24))
+            FfiConverterString.write(v1, into: &buf)
+            
         }
     }
 }
@@ -26416,6 +26503,11 @@ public enum MsgLikeKind {
      */
     case unableToDecrypt(msg: EncryptedMessage
     )
+    /**
+     * A custom message like event.
+     */
+    case other(eventType: MessageLikeEventType
+    )
 }
 
 
@@ -26438,6 +26530,9 @@ public struct FfiConverterTypeMsgLikeKind: FfiConverterRustBuffer {
         case 4: return .redacted
         
         case 5: return .unableToDecrypt(msg: try FfiConverterTypeEncryptedMessage.read(from: &buf)
+        )
+        
+        case 6: return .other(eventType: try FfiConverterTypeMessageLikeEventType.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -26478,6 +26573,11 @@ public struct FfiConverterTypeMsgLikeKind: FfiConverterRustBuffer {
         case let .unableToDecrypt(msg):
             writeInt(&buf, Int32(5))
             FfiConverterTypeEncryptedMessage.write(msg, into: &buf)
+            
+        
+        case let .other(eventType):
+            writeInt(&buf, Int32(6))
+            FfiConverterTypeMessageLikeEventType.write(eventType, into: &buf)
             
         }
     }
@@ -28909,6 +29009,7 @@ public enum RoomListEntriesDynamicFilterKind {
     case any(filters: [RoomListEntriesDynamicFilterKind]
     )
     case nonSpace
+    case space
     case nonLeft
     case joined
     case unread
@@ -28942,32 +29043,34 @@ public struct FfiConverterTypeRoomListEntriesDynamicFilterKind: FfiConverterRust
         
         case 3: return .nonSpace
         
-        case 4: return .nonLeft
+        case 4: return .space
         
-        case 5: return .joined
+        case 5: return .nonLeft
         
-        case 6: return .unread
+        case 6: return .joined
         
-        case 7: return .favourite
+        case 7: return .unread
         
-        case 8: return .lowPriority
+        case 8: return .favourite
         
-        case 9: return .nonLowPriority
+        case 9: return .lowPriority
         
-        case 10: return .invite
+        case 10: return .nonLowPriority
         
-        case 11: return .category(expect: try FfiConverterTypeRoomListFilterCategory.read(from: &buf)
+        case 11: return .invite
+        
+        case 12: return .category(expect: try FfiConverterTypeRoomListFilterCategory.read(from: &buf)
         )
         
-        case 12: return .none
+        case 13: return .none
         
-        case 13: return .normalizedMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
+        case 14: return .normalizedMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
         )
         
-        case 14: return .fuzzyMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
+        case 15: return .fuzzyMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
         )
         
-        case 15: return .deduplicateVersions
+        case 16: return .deduplicateVersions
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -28991,55 +29094,59 @@ public struct FfiConverterTypeRoomListEntriesDynamicFilterKind: FfiConverterRust
             writeInt(&buf, Int32(3))
         
         
-        case .nonLeft:
+        case .space:
             writeInt(&buf, Int32(4))
         
         
-        case .joined:
+        case .nonLeft:
             writeInt(&buf, Int32(5))
         
         
-        case .unread:
+        case .joined:
             writeInt(&buf, Int32(6))
         
         
-        case .favourite:
+        case .unread:
             writeInt(&buf, Int32(7))
         
         
-        case .lowPriority:
+        case .favourite:
             writeInt(&buf, Int32(8))
         
         
-        case .nonLowPriority:
+        case .lowPriority:
             writeInt(&buf, Int32(9))
         
         
-        case .invite:
+        case .nonLowPriority:
             writeInt(&buf, Int32(10))
         
         
-        case let .category(expect):
+        case .invite:
             writeInt(&buf, Int32(11))
+        
+        
+        case let .category(expect):
+            writeInt(&buf, Int32(12))
             FfiConverterTypeRoomListFilterCategory.write(expect, into: &buf)
             
         
         case .none:
-            writeInt(&buf, Int32(12))
+            writeInt(&buf, Int32(13))
         
         
         case let .normalizedMatchRoomName(pattern):
-            writeInt(&buf, Int32(13))
-            FfiConverterString.write(pattern, into: &buf)
-            
-        
-        case let .fuzzyMatchRoomName(pattern):
             writeInt(&buf, Int32(14))
             FfiConverterString.write(pattern, into: &buf)
             
         
-        case .deduplicateVersions:
+        case let .fuzzyMatchRoomName(pattern):
             writeInt(&buf, Int32(15))
+            FfiConverterString.write(pattern, into: &buf)
+            
+        
+        case .deduplicateVersions:
+            writeInt(&buf, Int32(16))
         
         }
     }
@@ -38707,7 +38814,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_profile() != 60062) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recent_emojis() != 64362) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recent_emojis() != 43545) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recently_visited_rooms() != 22399) {
@@ -38996,6 +39103,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_recovery() != 64351) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_has_devices_to_verify_against() != 7561) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_is_last_device() != 27955) {
@@ -39296,6 +39406,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_load_composer_draft() != 62856) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_load_or_fetch_event() != 12703) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_mark_as_read() != 57806) {
@@ -39830,6 +39943,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timelineevent_sender_id() != 18142) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timelineevent_thread_root_event_id() != 56465) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timelineevent_timestamp() != 50929) {
