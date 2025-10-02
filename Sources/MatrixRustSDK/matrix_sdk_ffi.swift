@@ -4847,6 +4847,157 @@ public func FfiConverterTypeLazyTimelineItemProvider_lower(_ value: LazyTimeline
 
 
 /**
+ * The `LeaveSpaceHandle` processes rooms to be left in the order they were
+ * provided by the [`SpaceService`] and annotates them with extra data to
+ * inform the leave process e.g. if the current user is the last room admin.
+ *
+ * Once the upstream client decides what rooms should actually be left, the
+ * handle provides a method to execute that too.
+ */
+public protocol LeaveSpaceHandleProtocol : AnyObject {
+    
+    /**
+     * Bulk leave the given rooms. Stops when encountering an error.
+     */
+    func leave(roomIds: [String]) async throws 
+    
+    /**
+     * A list of rooms to be left which next to normal [`SpaceRoom`] data also
+     * include leave specific information.
+     */
+    func rooms()  -> [LeaveSpaceRoom]
+    
+}
+
+/**
+ * The `LeaveSpaceHandle` processes rooms to be left in the order they were
+ * provided by the [`SpaceService`] and annotates them with extra data to
+ * inform the leave process e.g. if the current user is the last room admin.
+ *
+ * Once the upstream client decides what rooms should actually be left, the
+ * handle provides a method to execute that too.
+ */
+open class LeaveSpaceHandle:
+    LeaveSpaceHandleProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_leavespacehandle(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_leavespacehandle(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Bulk leave the given rooms. Stops when encountering an error.
+     */
+open func leave(roomIds: [String])async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_leavespacehandle_leave(
+                    self.uniffiClonePointer(),
+                    FfiConverterSequenceString.lower(roomIds)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError.lift
+        )
+}
+    
+    /**
+     * A list of rooms to be left which next to normal [`SpaceRoom`] data also
+     * include leave specific information.
+     */
+open func rooms() -> [LeaveSpaceRoom] {
+    return try!  FfiConverterSequenceTypeLeaveSpaceRoom.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_leavespacehandle_rooms(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+
+}
+
+public struct FfiConverterTypeLeaveSpaceHandle: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = LeaveSpaceHandle
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> LeaveSpaceHandle {
+        return LeaveSpaceHandle(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: LeaveSpaceHandle) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LeaveSpaceHandle {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: LeaveSpaceHandle, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeLeaveSpaceHandle_lift(_ pointer: UnsafeMutableRawPointer) throws -> LeaveSpaceHandle {
+    return try FfiConverterTypeLeaveSpaceHandle.lift(pointer)
+}
+
+public func FfiConverterTypeLeaveSpaceHandle_lower(_ value: LeaveSpaceHandle) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeLeaveSpaceHandle.lower(value)
+}
+
+
+
+
+/**
  * A file handle that takes ownership of a media file on disk. When the handle
  * is dropped, the file will be removed from the disk.
  */
@@ -11319,6 +11470,17 @@ public protocol SpaceServiceProtocol : AnyObject {
     func joinedSpaces() async  -> [SpaceRoom]
     
     /**
+     * Start a space leave process returning a [`LeaveSpaceHandle`] from which
+     * rooms can be retrieved in reversed BFS order starting from the requested
+     * `space_id` graph node. If the room is unknown then an error will be
+     * returned.
+     *
+     * Once the rooms to be left are chosen the handle can be used to leave
+     * them.
+     */
+    func leaveSpace(spaceId: String) async throws  -> LeaveSpaceHandle
+    
+    /**
      * Returns a `SpaceRoomList` for the given space ID.
      */
     func spaceRoomList(spaceId: String) async throws  -> SpaceRoomList
@@ -11399,6 +11561,32 @@ open func joinedSpaces()async  -> [SpaceRoom] {
             liftFunc: FfiConverterSequenceTypeSpaceRoom.lift,
             errorHandler: nil
             
+        )
+}
+    
+    /**
+     * Start a space leave process returning a [`LeaveSpaceHandle`] from which
+     * rooms can be retrieved in reversed BFS order starting from the requested
+     * `space_id` graph node. If the room is unknown then an error will be
+     * returned.
+     *
+     * Once the rooms to be left are chosen the handle can be used to leave
+     * them.
+     */
+open func leaveSpace(spaceId: String)async throws  -> LeaveSpaceHandle {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceservice_leave_space(
+                    self.uniffiClonePointer(),
+                    FfiConverterString.lower(spaceId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeLeaveSpaceHandle.lift,
+            errorHandler: FfiConverterTypeClientError.lift
         )
 }
     
@@ -15926,6 +16114,81 @@ public func FfiConverterTypeLastLocation_lift(_ buf: RustBuffer) throws -> LastL
 
 public func FfiConverterTypeLastLocation_lower(_ value: LastLocation) -> RustBuffer {
     return FfiConverterTypeLastLocation.lower(value)
+}
+
+
+/**
+ * Space leaving specific room that groups normal [`SpaceRoom`] details with
+ * information about the leaving user's role.
+ */
+public struct LeaveSpaceRoom {
+    /**
+     * The underlying [`SpaceRoom`]
+     */
+    public var spaceRoom: SpaceRoom
+    /**
+     * Whether the user is the last admin in the room. This helps clients
+     * better inform the user about the consequences of leaving the room.
+     */
+    public var isLastAdmin: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The underlying [`SpaceRoom`]
+         */spaceRoom: SpaceRoom, 
+        /**
+         * Whether the user is the last admin in the room. This helps clients
+         * better inform the user about the consequences of leaving the room.
+         */isLastAdmin: Bool) {
+        self.spaceRoom = spaceRoom
+        self.isLastAdmin = isLastAdmin
+    }
+}
+
+
+
+extension LeaveSpaceRoom: Equatable, Hashable {
+    public static func ==(lhs: LeaveSpaceRoom, rhs: LeaveSpaceRoom) -> Bool {
+        if lhs.spaceRoom != rhs.spaceRoom {
+            return false
+        }
+        if lhs.isLastAdmin != rhs.isLastAdmin {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(spaceRoom)
+        hasher.combine(isLastAdmin)
+    }
+}
+
+
+public struct FfiConverterTypeLeaveSpaceRoom: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LeaveSpaceRoom {
+        return
+            try LeaveSpaceRoom(
+                spaceRoom: FfiConverterTypeSpaceRoom.read(from: &buf), 
+                isLastAdmin: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LeaveSpaceRoom, into buf: inout [UInt8]) {
+        FfiConverterTypeSpaceRoom.write(value.spaceRoom, into: &buf)
+        FfiConverterBool.write(value.isLastAdmin, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeLeaveSpaceRoom_lift(_ buf: RustBuffer) throws -> LeaveSpaceRoom {
+    return try FfiConverterTypeLeaveSpaceRoom.lift(buf)
+}
+
+public func FfiConverterTypeLeaveSpaceRoom_lower(_ value: LeaveSpaceRoom) -> RustBuffer {
+    return FfiConverterTypeLeaveSpaceRoom.lower(value)
 }
 
 
@@ -28329,9 +28592,15 @@ public enum RecoveryError {
     case Client(source: ClientError
     )
     /**
-     * Error in the secret storage subsystem.
+     * Error in the secret storage subsystem, except for when importing a
+     * secret.
      */
     case SecretStorage(errorMessage: String
+    )
+    /**
+     * Error when importing a secret from secret storage.
+     */
+    case Import(errorMessage: String
     )
 }
 
@@ -28351,6 +28620,9 @@ public struct FfiConverterTypeRecoveryError: FfiConverterRustBuffer {
             source: try FfiConverterTypeClientError.read(from: &buf)
             )
         case 3: return .SecretStorage(
+            errorMessage: try FfiConverterString.read(from: &buf)
+            )
+        case 4: return .Import(
             errorMessage: try FfiConverterString.read(from: &buf)
             )
 
@@ -28376,6 +28648,11 @@ public struct FfiConverterTypeRecoveryError: FfiConverterRustBuffer {
         
         case let .SecretStorage(errorMessage):
             writeInt(&buf, Int32(3))
+            FfiConverterString.write(errorMessage, into: &buf)
+            
+        
+        case let .Import(errorMessage):
+            writeInt(&buf, Int32(4))
             FfiConverterString.write(errorMessage, into: &buf)
             
         }
@@ -37362,6 +37639,28 @@ fileprivate struct FfiConverterSequenceTypeKnockRequest: FfiConverterRustBuffer 
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeLeaveSpaceRoom: FfiConverterRustBuffer {
+    typealias SwiftType = [LeaveSpaceRoom]
+
+    public static func write(_ value: [LeaveSpaceRoom], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeLeaveSpaceRoom.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [LeaveSpaceRoom] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [LeaveSpaceRoom]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeLeaveSpaceRoom.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypeLiveLocationShare: FfiConverterRustBuffer {
     typealias SwiftType = [LiveLocationShare]
 
@@ -39201,6 +39500,12 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_get_shields() != 12518) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_leavespacehandle_leave() != 54036) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_leavespacehandle_rooms() != 50920) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediafilehandle_path() != 16357) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -39787,6 +40092,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_joined_spaces() != 54285) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_leave_space() != 7949) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_space_room_list() != 6768) {
