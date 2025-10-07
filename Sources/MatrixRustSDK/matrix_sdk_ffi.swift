@@ -20191,9 +20191,14 @@ public struct SpaceRoom {
      */
     public var canonicalAlias: String?
     /**
-     * The name of the room, if any.
+     * The room's name from the room state event if received from sync, or one
+     * that's been computed otherwise.
      */
-    public var name: String?
+    public var displayName: String
+    /**
+     * Room name as defined by the room state event only.
+     */
+    public var rawName: String?
     /**
      * The topic of the room, if any.
      */
@@ -20256,8 +20261,12 @@ public struct SpaceRoom {
          * The canonical alias of the room, if any.
          */canonicalAlias: String?, 
         /**
-         * The name of the room, if any.
-         */name: String?, 
+         * The room's name from the room state event if received from sync, or one
+         * that's been computed otherwise.
+         */displayName: String, 
+        /**
+         * Room name as defined by the room state event only.
+         */rawName: String?, 
         /**
          * The topic of the room, if any.
          */topic: String?, 
@@ -20299,7 +20308,8 @@ public struct SpaceRoom {
          */via: [String]) {
         self.roomId = roomId
         self.canonicalAlias = canonicalAlias
-        self.name = name
+        self.displayName = displayName
+        self.rawName = rawName
         self.topic = topic
         self.avatarUrl = avatarUrl
         self.roomType = roomType
@@ -20325,7 +20335,10 @@ extension SpaceRoom: Equatable, Hashable {
         if lhs.canonicalAlias != rhs.canonicalAlias {
             return false
         }
-        if lhs.name != rhs.name {
+        if lhs.displayName != rhs.displayName {
+            return false
+        }
+        if lhs.rawName != rhs.rawName {
             return false
         }
         if lhs.topic != rhs.topic {
@@ -20370,7 +20383,8 @@ extension SpaceRoom: Equatable, Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(roomId)
         hasher.combine(canonicalAlias)
-        hasher.combine(name)
+        hasher.combine(displayName)
+        hasher.combine(rawName)
         hasher.combine(topic)
         hasher.combine(avatarUrl)
         hasher.combine(roomType)
@@ -20393,7 +20407,8 @@ public struct FfiConverterTypeSpaceRoom: FfiConverterRustBuffer {
             try SpaceRoom(
                 roomId: FfiConverterString.read(from: &buf), 
                 canonicalAlias: FfiConverterOptionString.read(from: &buf), 
-                name: FfiConverterOptionString.read(from: &buf), 
+                displayName: FfiConverterString.read(from: &buf), 
+                rawName: FfiConverterOptionString.read(from: &buf), 
                 topic: FfiConverterOptionString.read(from: &buf), 
                 avatarUrl: FfiConverterOptionString.read(from: &buf), 
                 roomType: FfiConverterTypeRoomType.read(from: &buf), 
@@ -20412,7 +20427,8 @@ public struct FfiConverterTypeSpaceRoom: FfiConverterRustBuffer {
     public static func write(_ value: SpaceRoom, into buf: inout [UInt8]) {
         FfiConverterString.write(value.roomId, into: &buf)
         FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
-        FfiConverterOptionString.write(value.name, into: &buf)
+        FfiConverterString.write(value.displayName, into: &buf)
+        FfiConverterOptionString.write(value.rawName, into: &buf)
         FfiConverterOptionString.write(value.topic, into: &buf)
         FfiConverterOptionString.write(value.avatarUrl, into: &buf)
         FfiConverterTypeRoomType.write(value.roomType, into: &buf)
