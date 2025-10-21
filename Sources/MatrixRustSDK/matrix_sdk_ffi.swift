@@ -460,6 +460,19 @@ fileprivate struct FfiConverterInt64: FfiConverterPrimitive {
     }
 }
 
+fileprivate struct FfiConverterFloat: FfiConverterPrimitive {
+    typealias FfiType = Float
+    typealias SwiftType = Float
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Float {
+        return try lift(readFloat(&buf))
+    }
+
+    public static func write(_ value: Float, into buf: inout [UInt8]) {
+        writeFloat(&buf, lower(value))
+    }
+}
+
 fileprivate struct FfiConverterDouble: FfiConverterPrimitive {
     typealias FfiType = Double
     typealias SwiftType = Double
@@ -6745,6 +6758,15 @@ public protocol RoomProtocol : AnyObject {
     
     func subscribeToRoomInfoUpdates(listener: RoomInfoListener)  -> TaskHandle
     
+    /**
+     * Subscribe to all send queue updates in this room.
+     *
+     * The given listener will be immediately called with
+     * `RoomSendQueueUpdate::NewLocalEvent` for each local echo existing in
+     * the queue.
+     */
+    func subscribeToSendQueueUpdates(listener: SendQueueListener) async throws  -> TaskHandle
+    
     func subscribeToTypingNotifications(listener: TypingNotificationsListener)  -> TaskHandle
     
     /**
@@ -8327,6 +8349,30 @@ open func subscribeToRoomInfoUpdates(listener: RoomInfoListener) -> TaskHandle {
         FfiConverterCallbackInterfaceRoomInfoListener.lower(listener),$0
     )
 })
+}
+    
+    /**
+     * Subscribe to all send queue updates in this room.
+     *
+     * The given listener will be immediately called with
+     * `RoomSendQueueUpdate::NewLocalEvent` for each local echo existing in
+     * the queue.
+     */
+open func subscribeToSendQueueUpdates(listener: SendQueueListener)async throws  -> TaskHandle {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_send_queue_updates(
+                    self.uniffiClonePointer(),
+                    FfiConverterCallbackInterfaceSendQueueListener.lower(listener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeTaskHandle.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func subscribeToTypingNotifications(listener: TypingNotificationsListener) -> TaskHandle {
@@ -12710,7 +12756,7 @@ public protocol TimelineProtocol : AnyObject {
     
     func sendVideo(params: UploadParameters, thumbnailSource: UploadSource?, videoInfo: VideoInfo) throws  -> SendAttachmentJoinHandle
     
-    func sendVoiceMessage(params: UploadParameters, audioInfo: AudioInfo, waveform: [UInt16]) throws  -> SendAttachmentJoinHandle
+    func sendVoiceMessage(params: UploadParameters, audioInfo: AudioInfo, waveform: [Float]) throws  -> SendAttachmentJoinHandle
     
     func subscribeToBackPaginationStatus(listener: PaginationStatusListener) async throws  -> TaskHandle
     
@@ -13229,12 +13275,12 @@ open func sendVideo(params: UploadParameters, thumbnailSource: UploadSource?, vi
 })
 }
     
-open func sendVoiceMessage(params: UploadParameters, audioInfo: AudioInfo, waveform: [UInt16])throws  -> SendAttachmentJoinHandle {
+open func sendVoiceMessage(params: UploadParameters, audioInfo: AudioInfo, waveform: [Float])throws  -> SendAttachmentJoinHandle {
     return try  FfiConverterTypeSendAttachmentJoinHandle.lift(try rustCallWithError(FfiConverterTypeRoomError.lift) {
     uniffi_matrix_sdk_ffi_fn_method_timeline_send_voice_message(self.uniffiClonePointer(),
         FfiConverterTypeUploadParameters.lower(params),
         FfiConverterTypeAudioInfo.lower(audioInfo),
-        FfiConverterSequenceUInt16.lower(waveform),$0
+        FfiConverterSequenceFloat.lower(waveform),$0
     )
 })
 }
@@ -28352,6 +28398,10 @@ public enum QrLoginProgress {
     case waitingForToken(userCode: String
     )
     /**
+     * We are syncing secrets.
+     */
+    case syncingSecrets
+    /**
      * The login has successfully finished.
      */
     case done
@@ -28373,7 +28423,9 @@ public struct FfiConverterTypeQrLoginProgress: FfiConverterRustBuffer {
         case 3: return .waitingForToken(userCode: try FfiConverterString.read(from: &buf)
         )
         
-        case 4: return .done
+        case 4: return .syncingSecrets
+        
+        case 5: return .done
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -28398,8 +28450,12 @@ public struct FfiConverterTypeQrLoginProgress: FfiConverterRustBuffer {
             FfiConverterString.write(userCode, into: &buf)
             
         
-        case .done:
+        case .syncingSecrets:
             writeInt(&buf, Int32(4))
+        
+        
+        case .done:
+            writeInt(&buf, Int32(5))
         
         }
     }
@@ -30333,6 +30389,197 @@ public func FfiConverterTypeRoomPreset_lower(_ value: RoomPreset) -> RustBuffer 
 
 
 extension RoomPreset: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * An update to a room send queue.
+ */
+
+public enum RoomSendQueueUpdate {
+    
+    /**
+     * A new local event is being sent.
+     */
+    case newLocalEvent(
+        /**
+         * Transaction id used to identify this event.
+         */transactionId: String
+    )
+    /**
+     * A local event that hadn't been sent to the server yet has been cancelled
+     * before sending.
+     */
+    case cancelledLocalEvent(
+        /**
+         * Transaction id used to identify this event.
+         */transactionId: String
+    )
+    /**
+     * A local event's content has been replaced with something else.
+     */
+    case replacedLocalEvent(
+        /**
+         * Transaction id used to identify this event.
+         */transactionId: String
+    )
+    /**
+     * An error happened when an event was being sent.
+     *
+     * The event has not been removed from the queue. All the send queues
+     * will be disabled after this happens, and must be manually re-enabled.
+     */
+    case sendError(
+        /**
+         * Transaction id used to identify this event.
+         */transactionId: String, 
+        /**
+         * Error received while sending the event.
+         */error: QueueWedgeError, 
+        /**
+         * Whether the error is considered recoverable or not.
+         *
+         * An error that's recoverable will disable the room's send queue,
+         * while an unrecoverable error will be parked, until the user
+         * decides to cancel sending it.
+         */isRecoverable: Bool
+    )
+    /**
+     * The event has been unwedged and sending is now being retried.
+     */
+    case retryEvent(
+        /**
+         * Transaction id used to identify this event.
+         */transactionId: String
+    )
+    /**
+     * The event has been sent to the server, and the query returned
+     * successfully.
+     */
+    case sentEvent(
+        /**
+         * Transaction id used to identify this event.
+         */transactionId: String, 
+        /**
+         * Received event id from the send response.
+         */eventId: String
+    )
+    /**
+     * A media upload (consisting of a file and possibly a thumbnail) has made
+     * progress.
+     */
+    case mediaUpload(
+        /**
+         * The media event this uploaded media relates to.
+         */relatedTo: String, 
+        /**
+         * The final media source for the file if it has finished uploading.
+         */file: MediaSource?, 
+        /**
+         * The index of the media within the transaction. A file and its
+         * thumbnail share the same index. Will always be 0 for non-gallery
+         * media uploads.
+         */index: UInt64, 
+        /**
+         * The combined upload progress across the file and, if existing, its
+         * thumbnail. For gallery uploads, the progress is reported per indexed
+         * gallery item.
+         */progress: AbstractProgress
+    )
+}
+
+
+public struct FfiConverterTypeRoomSendQueueUpdate: FfiConverterRustBuffer {
+    typealias SwiftType = RoomSendQueueUpdate
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomSendQueueUpdate {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .newLocalEvent(transactionId: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .cancelledLocalEvent(transactionId: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .replacedLocalEvent(transactionId: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 4: return .sendError(transactionId: try FfiConverterString.read(from: &buf), error: try FfiConverterTypeQueueWedgeError.read(from: &buf), isRecoverable: try FfiConverterBool.read(from: &buf)
+        )
+        
+        case 5: return .retryEvent(transactionId: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 6: return .sentEvent(transactionId: try FfiConverterString.read(from: &buf), eventId: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 7: return .mediaUpload(relatedTo: try FfiConverterString.read(from: &buf), file: try FfiConverterOptionTypeMediaSource.read(from: &buf), index: try FfiConverterUInt64.read(from: &buf), progress: try FfiConverterTypeAbstractProgress.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RoomSendQueueUpdate, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .newLocalEvent(transactionId):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(transactionId, into: &buf)
+            
+        
+        case let .cancelledLocalEvent(transactionId):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(transactionId, into: &buf)
+            
+        
+        case let .replacedLocalEvent(transactionId):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(transactionId, into: &buf)
+            
+        
+        case let .sendError(transactionId,error,isRecoverable):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(transactionId, into: &buf)
+            FfiConverterTypeQueueWedgeError.write(error, into: &buf)
+            FfiConverterBool.write(isRecoverable, into: &buf)
+            
+        
+        case let .retryEvent(transactionId):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(transactionId, into: &buf)
+            
+        
+        case let .sentEvent(transactionId,eventId):
+            writeInt(&buf, Int32(6))
+            FfiConverterString.write(transactionId, into: &buf)
+            FfiConverterString.write(eventId, into: &buf)
+            
+        
+        case let .mediaUpload(relatedTo,file,index,progress):
+            writeInt(&buf, Int32(7))
+            FfiConverterString.write(relatedTo, into: &buf)
+            FfiConverterOptionTypeMediaSource.write(file, into: &buf)
+            FfiConverterUInt64.write(index, into: &buf)
+            FfiConverterTypeAbstractProgress.write(progress, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeRoomSendQueueUpdate_lift(_ buf: RustBuffer) throws -> RoomSendQueueUpdate {
+    return try FfiConverterTypeRoomSendQueueUpdate.lift(buf)
+}
+
+public func FfiConverterTypeRoomSendQueueUpdate_lower(_ value: RoomSendQueueUpdate) -> RustBuffer {
+    return FfiConverterTypeRoomSendQueueUpdate.lower(value)
+}
+
 
 
 
@@ -34826,6 +35073,94 @@ extension FfiConverterCallbackInterfaceRoomListServiceSyncIndicatorListener : Ff
 
 
 /**
+ * A listener to send queue updates in a specific room.
+ */
+public protocol SendQueueListener : AnyObject {
+    
+    /**
+     * Called every time the send queue dispatches an update for the given
+     * room.
+     */
+    func onUpdate(update: RoomSendQueueUpdate) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceSendQueueListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceSendQueueListener = UniffiVTableCallbackInterfaceSendQueueListener(
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            update: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSendQueueListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     update: try FfiConverterTypeRoomSendQueueUpdate.lift(update)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceSendQueueListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface SendQueueListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitSendQueueListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_sendqueuelistener(&UniffiCallbackInterfaceSendQueueListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceSendQueueListener {
+    fileprivate static var handleMap = UniffiHandleMap<SendQueueListener>()
+}
+
+extension FfiConverterCallbackInterfaceSendQueueListener : FfiConverter {
+    typealias SwiftType = SendQueueListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
+/**
  * A listener to the global (client-wide) error reporter of the send queue.
  */
 public protocol SendQueueRoomErrorListener : AnyObject {
@@ -37504,6 +37839,28 @@ fileprivate struct FfiConverterSequenceUInt16: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterSequenceFloat: FfiConverterRustBuffer {
+    typealias SwiftType = [Float]
+
+    public static func write(_ value: [Float], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterFloat.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Float] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Float]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterFloat.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
     typealias SwiftType = [String]
 
@@ -39880,6 +40237,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_room_info_updates() != 48209) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_send_queue_updates() != 17661) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_typing_notifications() != 38524) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -40276,7 +40636,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 52974) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_voice_message() != 17589) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_voice_message() != 41701) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_back_pagination_status() != 46161) {
@@ -40450,6 +40810,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservicesyncindicatorlistener_on_update() != 36937) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_sendqueuelistener_on_update() != 24843) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_sendqueueroomerrorlistener_on_error() != 38224) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -40529,6 +40892,7 @@ private var initializationResult: InitializationResult = {
     uniffiCallbackInitRoomListLoadingStateListener()
     uniffiCallbackInitRoomListServiceStateListener()
     uniffiCallbackInitRoomListServiceSyncIndicatorListener()
+    uniffiCallbackInitSendQueueListener()
     uniffiCallbackInitSendQueueRoomErrorListener()
     uniffiCallbackInitSessionVerificationControllerDelegate()
     uniffiCallbackInitSpaceRoomListEntriesListener()
