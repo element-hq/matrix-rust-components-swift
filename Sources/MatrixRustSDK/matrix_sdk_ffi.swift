@@ -588,6 +588,144 @@ fileprivate struct FfiConverterDuration: FfiConverterRustBuffer {
 
 
 
+/**
+ * Used to pass back the [`CheckCode`] entered by the user to verify that the
+ * secure channel is indeed secure.
+ */
+public protocol CheckCodeSenderProtocol : AnyObject {
+    
+    /**
+     * Send the [`CheckCode`].
+     *
+     * Calling this method more than once will result in an error.
+     *
+     * # Arguments
+     *
+     * * `check_code` - The check code in digits representation.
+     */
+    func send(code: UInt8) async throws 
+    
+}
+
+/**
+ * Used to pass back the [`CheckCode`] entered by the user to verify that the
+ * secure channel is indeed secure.
+ */
+open class CheckCodeSender:
+    CheckCodeSenderProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_checkcodesender(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_checkcodesender(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * Send the [`CheckCode`].
+     *
+     * Calling this method more than once will result in an error.
+     *
+     * # Arguments
+     *
+     * * `check_code` - The check code in digits representation.
+     */
+open func send(code: UInt8)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_checkcodesender_send(
+                    self.uniffiClonePointer(),
+                    FfiConverterUInt8.lower(code)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeHumanQrLoginError.lift
+        )
+}
+    
+
+}
+
+public struct FfiConverterTypeCheckCodeSender: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = CheckCodeSender
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> CheckCodeSender {
+        return CheckCodeSender(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: CheckCodeSender) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CheckCodeSender {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: CheckCodeSender, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeCheckCodeSender_lift(_ pointer: UnsafeMutableRawPointer) throws -> CheckCodeSender {
+    return try FfiConverterTypeCheckCodeSender.lift(pointer)
+}
+
+public func FfiConverterTypeCheckCodeSender_lower(_ value: CheckCodeSender) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeCheckCodeSender.lower(value)
+}
+
+
+
+
 public protocol ClientProtocol : AnyObject {
     
     /**
@@ -892,19 +1030,14 @@ public protocol ClientProtocol : AnyObject {
     func loginWithOidcCallback(callbackUrl: String) async throws 
     
     /**
-     * Log in using the provided [`QrCodeData`]. The `Client` must be built
-     * by providing [`QrCodeData::server_name`] as the server name for this
-     * login to succeed.
+     * Log in using a QR code.
      *
-     * This method uses the login mechanism described in [MSC4108]. As such
-     * this method requires OAuth 2.0 support as well as sliding sync support.
+     * # Arguments
      *
-     * The usage of the progress_listener is required to transfer the
-     * [`CheckCode`] to the existing client.
-     *
-     * [MSC4108]: https://github.com/matrix-org/matrix-spec-proposals/pull/4108
+     * * `oidc_configuration` - The data to restore or register the client with
+     * the server.
      */
-    func loginWithQrCode(qrCodeData: QrCodeData, oidcConfiguration: OidcConfiguration, progressListener: QrLoginProgressListener) async throws 
+    func loginWithQrCode(oidcConfiguration: OidcConfiguration)  -> LoginWithQrCodeHandler
     
     /**
      * Log the current user out.
@@ -1083,6 +1216,16 @@ public protocol ClientProtocol : AnyObject {
      * the enablement status.
      */
     func subscribeToSendQueueStatus(listener: SendQueueRoomErrorListener)  -> TaskHandle
+    
+    /**
+     * Subscribe to the global send queue update reporter, at the
+     * client-wide level.
+     *
+     * The given listener will be immediately called with
+     * `RoomSendQueueUpdate::NewLocalEvent` for each local echo existing in
+     * the queue.
+     */
+    func subscribeToSendQueueUpdates(listener: SendQueueRoomUpdateListener) async throws  -> TaskHandle
     
     func syncService()  -> SyncServiceBuilder
     
@@ -2154,33 +2297,19 @@ open func loginWithOidcCallback(callbackUrl: String)async throws  {
 }
     
     /**
-     * Log in using the provided [`QrCodeData`]. The `Client` must be built
-     * by providing [`QrCodeData::server_name`] as the server name for this
-     * login to succeed.
+     * Log in using a QR code.
      *
-     * This method uses the login mechanism described in [MSC4108]. As such
-     * this method requires OAuth 2.0 support as well as sliding sync support.
+     * # Arguments
      *
-     * The usage of the progress_listener is required to transfer the
-     * [`CheckCode`] to the existing client.
-     *
-     * [MSC4108]: https://github.com/matrix-org/matrix-spec-proposals/pull/4108
+     * * `oidc_configuration` - The data to restore or register the client with
+     * the server.
      */
-open func loginWithQrCode(qrCodeData: QrCodeData, oidcConfiguration: OidcConfiguration, progressListener: QrLoginProgressListener)async throws  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_login_with_qr_code(
-                    self.uniffiClonePointer(),
-                    FfiConverterTypeQrCodeData.lower(qrCodeData),FfiConverterTypeOidcConfiguration.lower(oidcConfiguration),FfiConverterCallbackInterfaceQrLoginProgressListener.lower(progressListener)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
-            errorHandler: FfiConverterTypeHumanQrLoginError.lift
-        )
+open func loginWithQrCode(oidcConfiguration: OidcConfiguration) -> LoginWithQrCodeHandler {
+    return try!  FfiConverterTypeLoginWithQrCodeHandler.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_login_with_qr_code(self.uniffiClonePointer(),
+        FfiConverterTypeOidcConfiguration.lower(oidcConfiguration),$0
+    )
+})
 }
     
     /**
@@ -2722,6 +2851,31 @@ open func subscribeToSendQueueStatus(listener: SendQueueRoomErrorListener) -> Ta
         FfiConverterCallbackInterfaceSendQueueRoomErrorListener.lower(listener),$0
     )
 })
+}
+    
+    /**
+     * Subscribe to the global send queue update reporter, at the
+     * client-wide level.
+     *
+     * The given listener will be immediately called with
+     * `RoomSendQueueUpdate::NewLocalEvent` for each local echo existing in
+     * the queue.
+     */
+open func subscribeToSendQueueUpdates(listener: SendQueueRoomUpdateListener)async throws  -> TaskHandle {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_send_queue_updates(
+                    self.uniffiClonePointer(),
+                    FfiConverterCallbackInterfaceSendQueueRoomUpdateListener.lower(listener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_pointer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_pointer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_pointer,
+            liftFunc: FfiConverterTypeTaskHandle.lift,
+            errorHandler: FfiConverterTypeClientError.lift
+        )
 }
     
 open func syncService() -> SyncServiceBuilder {
@@ -5005,6 +5159,231 @@ public func FfiConverterTypeLeaveSpaceHandle_lift(_ pointer: UnsafeMutableRawPoi
 
 public func FfiConverterTypeLeaveSpaceHandle_lower(_ value: LeaveSpaceHandle) -> UnsafeMutableRawPointer {
     return FfiConverterTypeLeaveSpaceHandle.lower(value)
+}
+
+
+
+
+/**
+ * Handler for logging in with a QR code.
+ */
+public protocol LoginWithQrCodeHandlerProtocol : AnyObject {
+    
+    /**
+     * This method allows you to log in by generating a QR code.
+     *
+     * This device needs to call this method and handle its progress updates to
+     * generate a QR code which the existing device can scan and grant the
+     * log in.
+     *
+     * This method uses the login mechanism described in [MSC4108]. As such,
+     * it requires OAuth 2.0 support as well as Sliding Sync support.
+     *
+     * For the reverse flow where the existing device generates the QR code
+     * for this device to scan, use [`LoginWithQrCodeHandler::scan`].
+     *
+     * # Arguments
+     *
+     * * `progress_listener` - A progress listener that must also be used to
+     * obtain the [`QrCodeData`] and collect the [`CheckCode`] from the user.
+     *
+     * [MSC4108]: https://github.com/matrix-org/matrix-spec-proposals/pull/4108
+     */
+    func generate(progressListener: GeneratedQrLoginProgressListener) async throws 
+    
+    /**
+     * This method allows you to log in with a scanned QR code.
+     *
+     * The existing device needs to display the QR code which this device can
+     * scan, call this method and handle its progress updates to log in.
+     *
+     * For the login to succeed, the [`Client`] associated with the
+     * [`LoginWithQrCodeHandler`] must have been built with
+     * [`QrCodeData::server_name`] as the server name.
+     *
+     * This method uses the login mechanism described in [MSC4108]. As such,
+     * it requires OAuth 2.0 support as well as Sliding Sync support.
+     *
+     * For the reverse flow where this device generates the QR code for the
+     * existing device to scan, use [`LoginWithQrCodeHandler::generate`].
+     *
+     * # Arguments
+     *
+     * * `qr_code_data` - The [`QrCodeData`] scanned from the QR code.
+     * * `progress_listener` - A progress listener that must also be used to
+     * transfer the [`CheckCode`] to the existing device.
+     *
+     * [MSC4108]: https://github.com/matrix-org/matrix-spec-proposals/pull/4108
+     */
+    func scan(qrCodeData: QrCodeData, progressListener: QrLoginProgressListener) async throws 
+    
+}
+
+/**
+ * Handler for logging in with a QR code.
+ */
+open class LoginWithQrCodeHandler:
+    LoginWithQrCodeHandlerProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_loginwithqrcodehandler(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_loginwithqrcodehandler(pointer, $0) }
+    }
+
+    
+
+    
+    /**
+     * This method allows you to log in by generating a QR code.
+     *
+     * This device needs to call this method and handle its progress updates to
+     * generate a QR code which the existing device can scan and grant the
+     * log in.
+     *
+     * This method uses the login mechanism described in [MSC4108]. As such,
+     * it requires OAuth 2.0 support as well as Sliding Sync support.
+     *
+     * For the reverse flow where the existing device generates the QR code
+     * for this device to scan, use [`LoginWithQrCodeHandler::scan`].
+     *
+     * # Arguments
+     *
+     * * `progress_listener` - A progress listener that must also be used to
+     * obtain the [`QrCodeData`] and collect the [`CheckCode`] from the user.
+     *
+     * [MSC4108]: https://github.com/matrix-org/matrix-spec-proposals/pull/4108
+     */
+open func generate(progressListener: GeneratedQrLoginProgressListener)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_loginwithqrcodehandler_generate(
+                    self.uniffiClonePointer(),
+                    FfiConverterCallbackInterfaceGeneratedQrLoginProgressListener.lower(progressListener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeHumanQrLoginError.lift
+        )
+}
+    
+    /**
+     * This method allows you to log in with a scanned QR code.
+     *
+     * The existing device needs to display the QR code which this device can
+     * scan, call this method and handle its progress updates to log in.
+     *
+     * For the login to succeed, the [`Client`] associated with the
+     * [`LoginWithQrCodeHandler`] must have been built with
+     * [`QrCodeData::server_name`] as the server name.
+     *
+     * This method uses the login mechanism described in [MSC4108]. As such,
+     * it requires OAuth 2.0 support as well as Sliding Sync support.
+     *
+     * For the reverse flow where this device generates the QR code for the
+     * existing device to scan, use [`LoginWithQrCodeHandler::generate`].
+     *
+     * # Arguments
+     *
+     * * `qr_code_data` - The [`QrCodeData`] scanned from the QR code.
+     * * `progress_listener` - A progress listener that must also be used to
+     * transfer the [`CheckCode`] to the existing device.
+     *
+     * [MSC4108]: https://github.com/matrix-org/matrix-spec-proposals/pull/4108
+     */
+open func scan(qrCodeData: QrCodeData, progressListener: QrLoginProgressListener)async throws  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_loginwithqrcodehandler_scan(
+                    self.uniffiClonePointer(),
+                    FfiConverterTypeQrCodeData.lower(qrCodeData),FfiConverterCallbackInterfaceQrLoginProgressListener.lower(progressListener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeHumanQrLoginError.lift
+        )
+}
+    
+
+}
+
+public struct FfiConverterTypeLoginWithQrCodeHandler: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = LoginWithQrCodeHandler
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> LoginWithQrCodeHandler {
+        return LoginWithQrCodeHandler(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: LoginWithQrCodeHandler) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LoginWithQrCodeHandler {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: LoginWithQrCodeHandler, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+public func FfiConverterTypeLoginWithQrCodeHandler_lift(_ pointer: UnsafeMutableRawPointer) throws -> LoginWithQrCodeHandler {
+    return try FfiConverterTypeLoginWithQrCodeHandler.lift(pointer)
+}
+
+public func FfiConverterTypeLoginWithQrCodeHandler_lower(_ value: LoginWithQrCodeHandler) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeLoginWithQrCodeHandler.lower(value)
 }
 
 
@@ -14846,6 +15225,10 @@ public struct ComposerDraft {
      * The type of draft.
      */
     public var draftType: ComposerDraftType
+    /**
+     * Attachments associated with this draft.
+     */
+    public var attachments: [DraftAttachment]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -14859,35 +15242,17 @@ public struct ComposerDraft {
          */htmlText: String?, 
         /**
          * The type of draft.
-         */draftType: ComposerDraftType) {
+         */draftType: ComposerDraftType, 
+        /**
+         * Attachments associated with this draft.
+         */attachments: [DraftAttachment]) {
         self.plainText = plainText
         self.htmlText = htmlText
         self.draftType = draftType
+        self.attachments = attachments
     }
 }
 
-
-
-extension ComposerDraft: Equatable, Hashable {
-    public static func ==(lhs: ComposerDraft, rhs: ComposerDraft) -> Bool {
-        if lhs.plainText != rhs.plainText {
-            return false
-        }
-        if lhs.htmlText != rhs.htmlText {
-            return false
-        }
-        if lhs.draftType != rhs.draftType {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(plainText)
-        hasher.combine(htmlText)
-        hasher.combine(draftType)
-    }
-}
 
 
 public struct FfiConverterTypeComposerDraft: FfiConverterRustBuffer {
@@ -14896,7 +15261,8 @@ public struct FfiConverterTypeComposerDraft: FfiConverterRustBuffer {
             try ComposerDraft(
                 plainText: FfiConverterString.read(from: &buf), 
                 htmlText: FfiConverterOptionString.read(from: &buf), 
-                draftType: FfiConverterTypeComposerDraftType.read(from: &buf)
+                draftType: FfiConverterTypeComposerDraftType.read(from: &buf), 
+                attachments: FfiConverterSequenceTypeDraftAttachment.read(from: &buf)
         )
     }
 
@@ -14904,6 +15270,7 @@ public struct FfiConverterTypeComposerDraft: FfiConverterRustBuffer {
         FfiConverterString.write(value.plainText, into: &buf)
         FfiConverterOptionString.write(value.htmlText, into: &buf)
         FfiConverterTypeComposerDraftType.write(value.draftType, into: &buf)
+        FfiConverterSequenceTypeDraftAttachment.write(value.attachments, into: &buf)
     }
 }
 
@@ -23536,6 +23903,93 @@ extension DateDividerMode: Equatable, Hashable {}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * An attachment stored with a composer draft.
+ */
+
+public enum DraftAttachment {
+    
+    case audio(audioInfo: AudioInfo, source: UploadSource
+    )
+    case file(fileInfo: FileInfo, source: UploadSource
+    )
+    case image(imageInfo: ImageInfo, source: UploadSource, thumbnailSource: UploadSource?
+    )
+    case video(videoInfo: VideoInfo, source: UploadSource, thumbnailSource: UploadSource?
+    )
+}
+
+
+public struct FfiConverterTypeDraftAttachment: FfiConverterRustBuffer {
+    typealias SwiftType = DraftAttachment
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DraftAttachment {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .audio(audioInfo: try FfiConverterTypeAudioInfo.read(from: &buf), source: try FfiConverterTypeUploadSource.read(from: &buf)
+        )
+        
+        case 2: return .file(fileInfo: try FfiConverterTypeFileInfo.read(from: &buf), source: try FfiConverterTypeUploadSource.read(from: &buf)
+        )
+        
+        case 3: return .image(imageInfo: try FfiConverterTypeImageInfo.read(from: &buf), source: try FfiConverterTypeUploadSource.read(from: &buf), thumbnailSource: try FfiConverterOptionTypeUploadSource.read(from: &buf)
+        )
+        
+        case 4: return .video(videoInfo: try FfiConverterTypeVideoInfo.read(from: &buf), source: try FfiConverterTypeUploadSource.read(from: &buf), thumbnailSource: try FfiConverterOptionTypeUploadSource.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: DraftAttachment, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .audio(audioInfo,source):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeAudioInfo.write(audioInfo, into: &buf)
+            FfiConverterTypeUploadSource.write(source, into: &buf)
+            
+        
+        case let .file(fileInfo,source):
+            writeInt(&buf, Int32(2))
+            FfiConverterTypeFileInfo.write(fileInfo, into: &buf)
+            FfiConverterTypeUploadSource.write(source, into: &buf)
+            
+        
+        case let .image(imageInfo,source,thumbnailSource):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeImageInfo.write(imageInfo, into: &buf)
+            FfiConverterTypeUploadSource.write(source, into: &buf)
+            FfiConverterOptionTypeUploadSource.write(thumbnailSource, into: &buf)
+            
+        
+        case let .video(videoInfo,source,thumbnailSource):
+            writeInt(&buf, Int32(4))
+            FfiConverterTypeVideoInfo.write(videoInfo, into: &buf)
+            FfiConverterTypeUploadSource.write(source, into: &buf)
+            FfiConverterOptionTypeUploadSource.write(thumbnailSource, into: &buf)
+            
+        }
+    }
+}
+
+
+public func FfiConverterTypeDraftAttachment_lift(_ buf: RustBuffer) throws -> DraftAttachment {
+    return try FfiConverterTypeDraftAttachment.lift(buf)
+}
+
+public func FfiConverterTypeDraftAttachment_lower(_ value: DraftAttachment) -> RustBuffer {
+    return FfiConverterTypeDraftAttachment.lower(value)
+}
+
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum EditedContent {
     
@@ -25073,6 +25527,121 @@ public func FfiConverterTypeGalleryItemType_lower(_ value: GalleryItemType) -> R
 
 
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Enum describing the progress of logging in by generating a QR code and
+ * having an existing device scan it.
+ */
+
+public enum GeneratedQrLoginProgress {
+    
+    /**
+     * The login process is starting.
+     */
+    case starting
+    /**
+     * We have established the secure channel and now need to display the
+     * QR code so that the existing device can scan it.
+     */
+    case qrReady(qrCode: QrCodeData
+    )
+    /**
+     * The existing device has scanned the QR code and is displaying the
+     * checkcode. We now need to ask the user to enter the checkcode so that
+     * we can verify that the channel is indeed secure.
+     */
+    case qrScanned(checkCodeSender: CheckCodeSender
+    )
+    /**
+     * We are waiting for the login and for the OAuth 2.0 authorization server
+     * to give us an access token.
+     */
+    case waitingForToken(userCode: String
+    )
+    /**
+     * We are syncing secrets.
+     */
+    case syncingSecrets
+    /**
+     * The login has successfully finished.
+     */
+    case done
+}
+
+
+public struct FfiConverterTypeGeneratedQrLoginProgress: FfiConverterRustBuffer {
+    typealias SwiftType = GeneratedQrLoginProgress
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> GeneratedQrLoginProgress {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .starting
+        
+        case 2: return .qrReady(qrCode: try FfiConverterTypeQrCodeData.read(from: &buf)
+        )
+        
+        case 3: return .qrScanned(checkCodeSender: try FfiConverterTypeCheckCodeSender.read(from: &buf)
+        )
+        
+        case 4: return .waitingForToken(userCode: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 5: return .syncingSecrets
+        
+        case 6: return .done
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: GeneratedQrLoginProgress, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .starting:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .qrReady(qrCode):
+            writeInt(&buf, Int32(2))
+            FfiConverterTypeQrCodeData.write(qrCode, into: &buf)
+            
+        
+        case let .qrScanned(checkCodeSender):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeCheckCodeSender.write(checkCodeSender, into: &buf)
+            
+        
+        case let .waitingForToken(userCode):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(userCode, into: &buf)
+            
+        
+        case .syncingSecrets:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .done:
+            writeInt(&buf, Int32(6))
+        
+        }
+    }
+}
+
+
+public func FfiConverterTypeGeneratedQrLoginProgress_lift(_ buf: RustBuffer) throws -> GeneratedQrLoginProgress {
+    return try FfiConverterTypeGeneratedQrLoginProgress.lift(buf)
+}
+
+public func FfiConverterTypeGeneratedQrLoginProgress_lower(_ value: GeneratedQrLoginProgress) -> RustBuffer {
+    return FfiConverterTypeGeneratedQrLoginProgress.lower(value)
+}
+
+
+
+
 
 public enum HumanQrLoginError {
 
@@ -25087,6 +25656,8 @@ public enum HumanQrLoginError {
     case SlidingSyncNotAvailable
     case OidcMetadataInvalid
     case OtherDeviceNotSignedIn
+    case CheckCodeAlreadySent
+    case CheckCodeCannotBeSent
 }
 
 
@@ -25109,6 +25680,8 @@ public struct FfiConverterTypeHumanQrLoginError: FfiConverterRustBuffer {
         case 7: return .SlidingSyncNotAvailable
         case 8: return .OidcMetadataInvalid
         case 9: return .OtherDeviceNotSignedIn
+        case 10: return .CheckCodeAlreadySent
+        case 11: return .CheckCodeCannotBeSent
 
          default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -25155,6 +25728,14 @@ public struct FfiConverterTypeHumanQrLoginError: FfiConverterRustBuffer {
         
         case .OtherDeviceNotSignedIn:
             writeInt(&buf, Int32(9))
+        
+        
+        case .CheckCodeAlreadySent:
+            writeInt(&buf, Int32(10))
+        
+        
+        case .CheckCodeCannotBeSent:
+            writeInt(&buf, Int32(11))
         
         }
     }
@@ -28368,7 +28949,8 @@ extension QrCodeDecodeError: Foundation.LocalizedError {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
- * Enum describing the progress of the QR-code login.
+ * Enum describing the progress of logging in by scanning a QR code that was
+ * generated on an existing device.
  */
 
 public enum QrLoginProgress {
@@ -33680,6 +34262,87 @@ extension FfiConverterCallbackInterfaceEnableRecoveryProgressListener : FfiConve
 
 
 
+public protocol GeneratedQrLoginProgressListener : AnyObject {
+    
+    func onUpdate(state: GeneratedQrLoginProgress) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceGeneratedQrLoginProgressListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceGeneratedQrLoginProgressListener = UniffiVTableCallbackInterfaceGeneratedQrLoginProgressListener(
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            state: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceGeneratedQrLoginProgressListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     state: try FfiConverterTypeGeneratedQrLoginProgress.lift(state)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceGeneratedQrLoginProgressListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface GeneratedQrLoginProgressListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitGeneratedQrLoginProgressListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_generatedqrloginprogresslistener(&UniffiCallbackInterfaceGeneratedQrLoginProgressListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceGeneratedQrLoginProgressListener {
+    fileprivate static var handleMap = UniffiHandleMap<GeneratedQrLoginProgressListener>()
+}
+
+extension FfiConverterCallbackInterfaceGeneratedQrLoginProgressListener : FfiConverter {
+    typealias SwiftType = GeneratedQrLoginProgressListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
 public protocol IdentityStatusChangeListener : AnyObject {
     
     func call(identityStatusChange: [IdentityStatusChange]) 
@@ -35227,6 +35890,95 @@ fileprivate struct FfiConverterCallbackInterfaceSendQueueRoomErrorListener {
 
 extension FfiConverterCallbackInterfaceSendQueueRoomErrorListener : FfiConverter {
     typealias SwiftType = SendQueueRoomErrorListener
+    typealias FfiType = UInt64
+
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+
+
+/**
+ * A listener to the global (client-wide) update reporter of the send queue.
+ */
+public protocol SendQueueRoomUpdateListener : AnyObject {
+    
+    /**
+     * Called every time the send queue emits an update for a given room.
+     */
+    func onUpdate(roomId: String, update: RoomSendQueueUpdate) 
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceSendQueueRoomUpdateListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceSendQueueRoomUpdateListener = UniffiVTableCallbackInterfaceSendQueueRoomUpdateListener(
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            roomId: RustBuffer,
+            update: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSendQueueRoomUpdateListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     roomId: try FfiConverterString.lift(roomId),
+                     update: try FfiConverterTypeRoomSendQueueUpdate.lift(update)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            let result = try? FfiConverterCallbackInterfaceSendQueueRoomUpdateListener.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface SendQueueRoomUpdateListener: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitSendQueueRoomUpdateListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_sendqueueroomupdatelistener(&UniffiCallbackInterfaceSendQueueRoomUpdateListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+fileprivate struct FfiConverterCallbackInterfaceSendQueueRoomUpdateListener {
+    fileprivate static var handleMap = UniffiHandleMap<SendQueueRoomUpdateListener>()
+}
+
+extension FfiConverterCallbackInterfaceSendQueueRoomUpdateListener : FfiConverter {
+    typealias SwiftType = SendQueueRoomUpdateListener
     typealias FfiType = UInt64
 
     public static func lift(_ handle: UInt64) throws -> SwiftType {
@@ -38411,6 +39163,28 @@ fileprivate struct FfiConverterSequenceTypeAllowRule: FfiConverterRustBuffer {
     }
 }
 
+fileprivate struct FfiConverterSequenceTypeDraftAttachment: FfiConverterRustBuffer {
+    typealias SwiftType = [DraftAttachment]
+
+    public static func write(_ value: [DraftAttachment], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeDraftAttachment.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [DraftAttachment] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [DraftAttachment]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeDraftAttachment.read(from: &buf))
+        }
+        return seq
+    }
+}
+
 fileprivate struct FfiConverterSequenceTypeFilterTimelineEventType: FfiConverterRustBuffer {
     typealias SwiftType = [FilterTimelineEventType]
 
@@ -39424,6 +40198,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roommessageeventcontentwithoutrelation_with_mentions() != 8867) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_checkcodesender_send() != 50179) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_abort_oidc_auth() != 53440) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -39571,7 +40348,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_oidc_callback() != 32591) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_qr_code() != 3481) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_qr_code() != 2487) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_logout() != 42911) {
@@ -39665,6 +40442,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_send_queue_status() != 57403) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_send_queue_updates() != 33603) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_sync_service() != 52812) {
@@ -39902,6 +40682,12 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_leavespacehandle_rooms() != 50920) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_loginwithqrcodehandler_generate() != 7203) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_loginwithqrcodehandler_scan() != 26140) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediafilehandle_path() != 16357) {
@@ -40759,6 +41545,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_enablerecoveryprogresslistener_on_update() != 13538) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_generatedqrloginprogresslistener_on_update() != 28731) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_identitystatuschangelistener_call() != 57311) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -40814,6 +41603,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sendqueueroomerrorlistener_on_error() != 38224) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_sendqueueroomupdatelistener_on_update() != 11544) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_receive_verification_request() != 3417) {
@@ -40875,6 +41667,7 @@ private var initializationResult: InitializationResult = {
     uniffiCallbackInitClientDelegate()
     uniffiCallbackInitClientSessionDelegate()
     uniffiCallbackInitEnableRecoveryProgressListener()
+    uniffiCallbackInitGeneratedQrLoginProgressListener()
     uniffiCallbackInitIdentityStatusChangeListener()
     uniffiCallbackInitIgnoredUsersListener()
     uniffiCallbackInitKnockRequestsListener()
@@ -40894,6 +41687,7 @@ private var initializationResult: InitializationResult = {
     uniffiCallbackInitRoomListServiceSyncIndicatorListener()
     uniffiCallbackInitSendQueueListener()
     uniffiCallbackInitSendQueueRoomErrorListener()
+    uniffiCallbackInitSendQueueRoomUpdateListener()
     uniffiCallbackInitSessionVerificationControllerDelegate()
     uniffiCallbackInitSpaceRoomListEntriesListener()
     uniffiCallbackInitSpaceRoomListPaginationStateListener()

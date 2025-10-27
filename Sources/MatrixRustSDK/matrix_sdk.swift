@@ -1867,6 +1867,12 @@ public enum QrCodeLoginError {
      */
     case SecretImport(message: String)
     
+    /**
+     * The other party told us to use a different homeserver but we failed to
+     * reset the server URL.
+     */
+    case ServerReset(message: String)
+    
 }
 
 
@@ -1916,6 +1922,10 @@ public struct FfiConverterTypeQRCodeLoginError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
+        case 10: return .ServerReset(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
 
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -1945,6 +1955,8 @@ public struct FfiConverterTypeQRCodeLoginError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(8))
         case .SecretImport(_ /* message is ignored*/):
             writeInt(&buf, Int32(9))
+        case .ServerReset(_ /* message is ignored*/):
+            writeInt(&buf, Int32(10))
 
         
         }
