@@ -728,6 +728,7 @@ open class CheckCodeSender: CheckCodeSenderProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_checkcodesender(handle, $0) }
     }
 
@@ -1407,6 +1408,7 @@ open class Client: ClientProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_client(handle, $0) }
     }
 
@@ -3346,6 +3348,7 @@ public convenience init() {
 }
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_clientbuilder(handle, $0) }
     }
 
@@ -3845,6 +3848,7 @@ open class Encryption: EncryptionProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_encryption(handle, $0) }
     }
 
@@ -4338,6 +4342,7 @@ open class HomeserverLoginDetails: HomeserverLoginDetailsProtocol, @unchecked Se
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_homeserverlogindetails(handle, $0) }
     }
 
@@ -4525,6 +4530,7 @@ open class IdentityResetHandle: IdentityResetHandleProtocol, @unchecked Sendable
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_identityresethandle(handle, $0) }
     }
 
@@ -4686,6 +4692,7 @@ open class InReplyToDetails: InReplyToDetailsProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_inreplytodetails(handle, $0) }
     }
 
@@ -4834,6 +4841,7 @@ open class KnockRequestActions: KnockRequestActionsProtocol, @unchecked Sendable
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_knockrequestactions(handle, $0) }
     }
 
@@ -5044,6 +5052,7 @@ open class LazyTimelineItemProvider: LazyTimelineItemProviderProtocol, @unchecke
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_lazytimelineitemprovider(handle, $0) }
     }
 
@@ -5215,6 +5224,7 @@ open class LeaveSpaceHandle: LeaveSpaceHandleProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_leavespacehandle(handle, $0) }
     }
 
@@ -5402,6 +5412,7 @@ open class LoginWithQrCodeHandler: LoginWithQrCodeHandlerProtocol, @unchecked Se
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_loginwithqrcodehandler(handle, $0) }
     }
 
@@ -5596,6 +5607,7 @@ open class MediaFileHandle: MediaFileHandleProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_mediafilehandle(handle, $0) }
     }
 
@@ -5721,6 +5733,7 @@ open class MediaSource: MediaSourceProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_mediasource(handle, $0) }
     }
 
@@ -5885,6 +5898,7 @@ open class NotificationClient: NotificationClientProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_notificationclient(handle, $0) }
     }
 
@@ -6195,6 +6209,7 @@ open class NotificationSettings: NotificationSettingsProtocol, @unchecked Sendab
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_notificationsettings(handle, $0) }
     }
 
@@ -6784,6 +6799,7 @@ open class QrCodeData: QrCodeDataProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_qrcodedata(handle, $0) }
     }
 
@@ -7483,6 +7499,7 @@ open class Room: RoomProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_room(handle, $0) }
     }
 
@@ -9450,6 +9467,7 @@ open class RoomDirectorySearch: RoomDirectorySearchProtocol, @unchecked Sendable
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roomdirectorysearch(handle, $0) }
     }
 
@@ -9670,6 +9688,7 @@ open class RoomList: RoomListProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roomlist(handle, $0) }
     }
 
@@ -9816,6 +9835,7 @@ open class RoomListDynamicEntriesController: RoomListDynamicEntriesControllerPro
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roomlistdynamicentriescontroller(handle, $0) }
     }
 
@@ -9944,6 +9964,7 @@ open class RoomListEntriesWithDynamicAdaptersResult: RoomListEntriesWithDynamicA
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roomlistentrieswithdynamicadaptersresult(handle, $0) }
     }
 
@@ -10071,6 +10092,7 @@ open class RoomListService: RoomListServiceProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roomlistservice(handle, $0) }
     }
 
@@ -10239,6 +10261,7 @@ open class RoomMembersIterator: RoomMembersIteratorProtocol, @unchecked Sendable
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roommembersiterator(handle, $0) }
     }
 
@@ -10359,6 +10382,7 @@ open class RoomMessageEventContentWithoutRelation: RoomMessageEventContentWithou
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roommessageeventcontentwithoutrelation(handle, $0) }
     }
 
@@ -10600,6 +10624,7 @@ open class RoomPowerLevels: RoomPowerLevelsProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roompowerlevels(handle, $0) }
     }
 
@@ -11004,6 +11029,7 @@ open class RoomPreview: RoomPreviewProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roompreview(handle, $0) }
     }
 
@@ -11218,6 +11244,7 @@ open class SendAttachmentJoinHandle: SendAttachmentJoinHandleProtocol, @unchecke
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_sendattachmentjoinhandle(handle, $0) }
     }
 
@@ -11367,6 +11394,7 @@ open class SendGalleryJoinHandle: SendGalleryJoinHandleProtocol, @unchecked Send
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_sendgalleryjoinhandle(handle, $0) }
     }
 
@@ -11536,6 +11564,7 @@ open class SendHandle: SendHandleProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_sendhandle(handle, $0) }
     }
 
@@ -11741,6 +11770,7 @@ open class SessionVerificationController: SessionVerificationControllerProtocol,
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_sessionverificationcontroller(handle, $0) }
     }
 
@@ -12018,6 +12048,7 @@ open class SessionVerificationEmoji: SessionVerificationEmojiProtocol, @unchecke
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_sessionverificationemoji(handle, $0) }
     }
 
@@ -12193,6 +12224,7 @@ open class SpaceRoomList: SpaceRoomListProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_spaceroomlist(handle, $0) }
     }
 
@@ -12427,6 +12459,7 @@ open class SpaceService: SpaceServiceProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_spaceservice(handle, $0) }
     }
 
@@ -12663,6 +12696,7 @@ public convenience init(file: String, line: UInt32?, level: LogLevel, target: St
 }
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_span(handle, $0) }
     }
 
@@ -12868,6 +12902,7 @@ public convenience init(dataPath: String, cachePath: String) {
 }
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_sqlitestorebuilder(handle, $0) }
     }
 
@@ -13073,6 +13108,7 @@ open class SsoHandler: SsoHandlerProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_ssohandler(handle, $0) }
     }
 
@@ -13224,6 +13260,7 @@ open class SyncService: SyncServiceProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_syncservice(handle, $0) }
     }
 
@@ -13414,6 +13451,7 @@ open class SyncServiceBuilder: SyncServiceBuilderProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_syncservicebuilder(handle, $0) }
     }
 
@@ -13579,6 +13617,7 @@ open class TaskHandle: TaskHandleProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_taskhandle(handle, $0) }
     }
 
@@ -13702,6 +13741,7 @@ open class ThreadSummary: ThreadSummaryProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_threadsummary(handle, $0) }
     }
 
@@ -13980,6 +14020,7 @@ open class Timeline: TimelineProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_timeline(handle, $0) }
     }
 
@@ -14653,6 +14694,7 @@ open class TimelineEvent: TimelineEventProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_timelineevent(handle, $0) }
     }
 
@@ -14798,6 +14840,7 @@ open class TimelineEventTypeFilter: TimelineEventTypeFilterProtocol, @unchecked 
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_timelineeventtypefilter(handle, $0) }
     }
 
@@ -14926,6 +14969,7 @@ open class TimelineItem: TimelineItemProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_timelineitem(handle, $0) }
     }
 
@@ -15068,6 +15112,7 @@ open class UnreadNotificationsCount: UnreadNotificationsCountProtocol, @unchecke
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_unreadnotificationscount(handle, $0) }
     }
 
@@ -15257,6 +15302,7 @@ open class UserIdentity: UserIdentityProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_useridentity(handle, $0) }
     }
 
@@ -15480,6 +15526,7 @@ open class WidgetDriver: WidgetDriverProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_widgetdriver(handle, $0) }
     }
 
@@ -15622,6 +15669,7 @@ open class WidgetDriverHandle: WidgetDriverHandleProtocol, @unchecked Sendable {
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_ffi_fn_free_widgetdriverhandle(handle, $0) }
     }
 

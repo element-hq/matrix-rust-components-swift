@@ -572,6 +572,7 @@ open class OAuthAuthorizationData: OAuthAuthorizationDataProtocol, @unchecked Se
     // No primary constructor declared for this class.
 
     deinit {
+        guard handle != 0 else { return }
         try! rustCall { uniffi_matrix_sdk_fn_free_oauthauthorizationdata(handle, $0) }
     }
 
