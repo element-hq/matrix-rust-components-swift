@@ -72,17 +72,6 @@ struct Release: AsyncParsableCommand {
         let destination = package.directory.appending(component: "Sources/MatrixRustSDK", directoryHint: .isDirectory)
         try Zsh.run(command: "rsync -a --delete '\(source.path())' '\(destination.path())'")
         
-        // Temporary workaround for https://github.com/mozilla/uniffi-rs/issues/2717
-        let enumerator = FileManager.default.enumerator(at: destination, includingPropertiesForKeys: nil, options: .skipsSubdirectoryDescendants)
-        while let fileURL = enumerator?.nextObject() as? URL {
-            guard fileURL.pathExtension == "swift" else { continue }
-            let fileName = fileURL.lastPathComponent
-            let command = """
-            gsed -i -E -z "s/(deinit[^{]*\\{[^\\n]*\\n)([[:space:]]*)(try! rustCall)/\\1\\2guard handle != 0 else { return }\\n\\2\\3/g" \(fileName)
-            """
-            try Zsh.run(command: command, directory: destination)
-        }
-        
         try await package.updateManifest(with: product, checksum: checksum)
     }
     
