@@ -20569,6 +20569,10 @@ public struct RoomPowerLevelsValues: Equatable, Hashable {
      * The level required to change the room's topic.
      */
     public var roomTopic: Int64
+    /**
+     * The level required to change the space's children.
+     */
+    public var spaceChild: Int64
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -20602,7 +20606,10 @@ public struct RoomPowerLevelsValues: Equatable, Hashable {
          */roomAvatar: Int64, 
         /**
          * The level required to change the room's topic.
-         */roomTopic: Int64) {
+         */roomTopic: Int64, 
+        /**
+         * The level required to change the space's children.
+         */spaceChild: Int64) {
         self.ban = ban
         self.invite = invite
         self.kick = kick
@@ -20613,6 +20620,7 @@ public struct RoomPowerLevelsValues: Equatable, Hashable {
         self.roomName = roomName
         self.roomAvatar = roomAvatar
         self.roomTopic = roomTopic
+        self.spaceChild = spaceChild
     }
 
     
@@ -20638,7 +20646,8 @@ public struct FfiConverterTypeRoomPowerLevelsValues: FfiConverterRustBuffer {
                 usersDefault: FfiConverterInt64.read(from: &buf), 
                 roomName: FfiConverterInt64.read(from: &buf), 
                 roomAvatar: FfiConverterInt64.read(from: &buf), 
-                roomTopic: FfiConverterInt64.read(from: &buf)
+                roomTopic: FfiConverterInt64.read(from: &buf), 
+                spaceChild: FfiConverterInt64.read(from: &buf)
         )
     }
 
@@ -20653,6 +20662,7 @@ public struct FfiConverterTypeRoomPowerLevelsValues: FfiConverterRustBuffer {
         FfiConverterInt64.write(value.roomName, into: &buf)
         FfiConverterInt64.write(value.roomAvatar, into: &buf)
         FfiConverterInt64.write(value.roomTopic, into: &buf)
+        FfiConverterInt64.write(value.spaceChild, into: &buf)
     }
 }
 
