@@ -14145,7 +14145,7 @@ public protocol TimelineProtocol: AnyObject, Sendable {
     func getEventTimelineItemByEventId(eventId: String) async throws  -> EventTimelineItem
     
     /**
-     * Returns the [`EventId`] of the latest event in the timeline.
+     * Returns the latest [`EventId`] in the timeline.
      */
     func latestEventId() async  -> String?
     
@@ -14470,7 +14470,7 @@ open func getEventTimelineItemByEventId(eventId: String)async throws  -> EventTi
 }
     
     /**
-     * Returns the [`EventId`] of the latest event in the timeline.
+     * Returns the latest [`EventId`] in the timeline.
      */
 open func latestEventId()async  -> String?  {
     return
@@ -29803,7 +29803,8 @@ public enum OtherState: Equatable, Hashable {
     case roomGuestAccess
     case roomHistoryVisibility(historyVisibility: HistoryVisibility?
     )
-    case roomJoinRules
+    case roomJoinRules(joinRule: JoinRule?
+    )
     case roomName(name: String?
     )
     case roomPinnedEvents(change: RoomPinnedEventsChange
@@ -29862,7 +29863,8 @@ public struct FfiConverterTypeOtherState: FfiConverterRustBuffer {
         case 10: return .roomHistoryVisibility(historyVisibility: try FfiConverterOptionTypeHistoryVisibility.read(from: &buf)
         )
         
-        case 11: return .roomJoinRules
+        case 11: return .roomJoinRules(joinRule: try FfiConverterOptionTypeJoinRule.read(from: &buf)
+        )
         
         case 12: return .roomName(name: try FfiConverterOptionString.read(from: &buf)
         )
@@ -29941,9 +29943,10 @@ public struct FfiConverterTypeOtherState: FfiConverterRustBuffer {
             FfiConverterOptionTypeHistoryVisibility.write(historyVisibility, into: &buf)
             
         
-        case .roomJoinRules:
+        case let .roomJoinRules(joinRule):
             writeInt(&buf, Int32(11))
-        
+            FfiConverterOptionTypeJoinRule.write(joinRule, into: &buf)
+            
         
         case let .roomName(name):
             writeInt(&buf, Int32(12))
@@ -46305,7 +46308,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_event_id() != 33999) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_latest_event_id() != 20608) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_latest_event_id() != 18266) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_load_reply_details() != 54225) {
