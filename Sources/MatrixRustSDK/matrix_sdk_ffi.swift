@@ -3845,11 +3845,13 @@ public protocol EncryptionProtocol: AnyObject, Sendable {
      * This method always tries to fetch the identity from the store, which we
      * only have if the user is tracked, meaning that we are both members
      * of the same encrypted room. If no user is found locally, a request will
-     * be made to the homeserver.
+     * be made to the homeserver unless `fallback_to_server` is set to `false`.
      *
      * # Arguments
      *
      * * `user_id` - The ID of the user that the identity belongs to.
+     * * `fallback_to_server` - Should we request the user identity from the
+     * homeserver if one isn't found locally.
      *
      * Returns a `UserIdentity` if one is found. Returns an error if there
      * was an issue with the crypto store or with the request to the
@@ -3857,7 +3859,7 @@ public protocol EncryptionProtocol: AnyObject, Sendable {
      *
      * This will always return `None` if the client hasn't been logged in.
      */
-    func userIdentity(userId: String) async throws  -> UserIdentity?
+    func userIdentity(userId: String, fallbackToServer: Bool) async throws  -> UserIdentity?
     
     func verificationState()  -> VerificationState
     
@@ -4197,11 +4199,13 @@ open func resetRecoveryKey()async throws  -> String  {
      * This method always tries to fetch the identity from the store, which we
      * only have if the user is tracked, meaning that we are both members
      * of the same encrypted room. If no user is found locally, a request will
-     * be made to the homeserver.
+     * be made to the homeserver unless `fallback_to_server` is set to `false`.
      *
      * # Arguments
      *
      * * `user_id` - The ID of the user that the identity belongs to.
+     * * `fallback_to_server` - Should we request the user identity from the
+     * homeserver if one isn't found locally.
      *
      * Returns a `UserIdentity` if one is found. Returns an error if there
      * was an issue with the crypto store or with the request to the
@@ -4209,13 +4213,13 @@ open func resetRecoveryKey()async throws  -> String  {
      *
      * This will always return `None` if the client hasn't been logged in.
      */
-open func userIdentity(userId: String)async throws  -> UserIdentity?  {
+open func userIdentity(userId: String, fallbackToServer: Bool)async throws  -> UserIdentity?  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_encryption_user_identity(
                     self.uniffiCloneHandle(),
-                    FfiConverterString.lower(userId)
+                    FfiConverterString.lower(userId),FfiConverterBool.lower(fallbackToServer)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
@@ -12672,6 +12676,13 @@ public func FfiConverterTypeSpaceRoomList_lower(_ value: SpaceRoomList) -> UInt6
  */
 public protocol SpaceServiceProtocol: AnyObject, Sendable {
     
+    func addChildToSpace(childId: String, spaceId: String) async throws 
+    
+    /**
+     * Returns all known direct-parents of a given space room ID.
+     */
+    func joinedParentsOfChild(childId: String) async throws  -> [SpaceRoom]
+    
     /**
      * Returns a list of all the top-level joined spaces. It will eagerly
      * compute the latest version and also notify subscribers if there were
@@ -12689,6 +12700,8 @@ public protocol SpaceServiceProtocol: AnyObject, Sendable {
      * them.
      */
     func leaveSpace(spaceId: String) async throws  -> LeaveSpaceHandle
+    
+    func removeChildFromSpace(childId: String, spaceId: String) async throws 
     
     /**
      * Returns a `SpaceRoomList` for the given space ID.
@@ -12758,6 +12771,43 @@ open class SpaceService: SpaceServiceProtocol, @unchecked Sendable {
     
 
     
+open func addChildToSpace(childId: String, spaceId: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceservice_add_child_to_space(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(childId),FfiConverterString.lower(spaceId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Returns all known direct-parents of a given space room ID.
+     */
+open func joinedParentsOfChild(childId: String)async throws  -> [SpaceRoom]  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceservice_joined_parents_of_child(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(childId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeSpaceRoom.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
     /**
      * Returns a list of all the top-level joined spaces. It will eagerly
      * compute the latest version and also notify subscribers if there were
@@ -12803,6 +12853,23 @@ open func leaveSpace(spaceId: String)async throws  -> LeaveSpaceHandle  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
             liftFunc: FfiConverterTypeLeaveSpaceHandle_lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+open func removeChildFromSpace(childId: String, spaceId: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceservice_remove_child_from_space(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(childId),FfiConverterString.lower(spaceId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -27634,7 +27701,7 @@ public enum LatestEventValue {
     case none
     case remote(timestamp: Timestamp, sender: String, isOwn: Bool, profile: ProfileDetails, content: TimelineItemContent
     )
-    case local(timestamp: Timestamp, content: TimelineItemContent, isSending: Bool
+    case local(timestamp: Timestamp, sender: String, profile: ProfileDetails, content: TimelineItemContent, isSending: Bool
     )
 
 
@@ -27660,7 +27727,7 @@ public struct FfiConverterTypeLatestEventValue: FfiConverterRustBuffer {
         case 2: return .remote(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), sender: try FfiConverterString.read(from: &buf), isOwn: try FfiConverterBool.read(from: &buf), profile: try FfiConverterTypeProfileDetails.read(from: &buf), content: try FfiConverterTypeTimelineItemContent.read(from: &buf)
         )
         
-        case 3: return .local(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), content: try FfiConverterTypeTimelineItemContent.read(from: &buf), isSending: try FfiConverterBool.read(from: &buf)
+        case 3: return .local(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), sender: try FfiConverterString.read(from: &buf), profile: try FfiConverterTypeProfileDetails.read(from: &buf), content: try FfiConverterTypeTimelineItemContent.read(from: &buf), isSending: try FfiConverterBool.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -27684,9 +27751,11 @@ public struct FfiConverterTypeLatestEventValue: FfiConverterRustBuffer {
             FfiConverterTypeTimelineItemContent.write(content, into: &buf)
             
         
-        case let .local(timestamp,content,isSending):
+        case let .local(timestamp,sender,profile,content,isSending):
             writeInt(&buf, Int32(3))
             FfiConverterTypeTimestamp.write(timestamp, into: &buf)
+            FfiConverterString.write(sender, into: &buf)
+            FfiConverterTypeProfileDetails.write(profile, into: &buf)
             FfiConverterTypeTimelineItemContent.write(content, into: &buf)
             FfiConverterBool.write(isSending, into: &buf)
             
@@ -45516,7 +45585,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_reset_recovery_key() != 20380) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_user_identity() != 20644) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_user_identity() != 17575) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_verification_state() != 29114) {
@@ -46203,10 +46272,19 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_subscribe_to_space_updates() != 26327) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_add_child_to_space() != 31295) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_joined_parents_of_child() != 18724) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_joined_spaces() != 54285) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_leave_space() != 7949) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_remove_child_from_space() != 14438) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_space_room_list() != 6768) {
