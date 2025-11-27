@@ -12679,6 +12679,15 @@ public protocol SpaceServiceProtocol: AnyObject, Sendable {
     func addChildToSpace(childId: String, spaceId: String) async throws 
     
     /**
+     * Returns a flattened list containing all the spaces where the user has
+     * permission to send `m.space.child` state events.
+     *
+     * Note: Unlike [`Self::joined_spaces()`], this method does not recompute
+     * the space graph, nor does it notify subscribers about changes.
+     */
+    func editableSpaces() async  -> [SpaceRoom]
+    
+    /**
      * Returns all known direct-parents of a given space room ID.
      */
     func joinedParentsOfChild(childId: String) async throws  -> [SpaceRoom]
@@ -12785,6 +12794,31 @@ open func addChildToSpace(childId: String, spaceId: String)async throws   {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Returns a flattened list containing all the spaces where the user has
+     * permission to send `m.space.child` state events.
+     *
+     * Note: Unlike [`Self::joined_spaces()`], this method does not recompute
+     * the space graph, nor does it notify subscribers about changes.
+     */
+open func editableSpaces()async  -> [SpaceRoom]  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceservice_editable_spaces(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeSpaceRoom.lift,
+            errorHandler: nil
+            
         )
 }
     
@@ -13040,7 +13074,7 @@ open class Span: SpanProtocol, @unchecked Sendable {
      * unless you *want* the span to be attached to all further events created
      * on that thread.
      */
-public convenience init(file: String, line: UInt32?, level: LogLevel, target: String, name: String) {
+public convenience init(file: String, line: UInt32?, level: LogLevel, target: String, name: String, bridgeTraceId: String?) {
     let handle =
         try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_constructor_span_new(
@@ -13048,7 +13082,8 @@ public convenience init(file: String, line: UInt32?, level: LogLevel, target: St
         FfiConverterOptionUInt32.lower(line),
         FfiConverterTypeLogLevel_lower(level),
         FfiConverterString.lower(target),
-        FfiConverterString.lower(name),$0
+        FfiConverterString.lower(name),
+        FfiConverterOptionString.lower(bridgeTraceId),$0
     )
 }
     self.init(unsafeFromHandle: handle)
@@ -13063,6 +13098,21 @@ public convenience init(file: String, line: UInt32?, level: LogLevel, target: St
 public static func current() -> Span  {
     return try!  FfiConverterTypeSpan_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_constructor_span_current($0
+    )
+})
+}
+    
+    /**
+     * Creates a [`Span`] that acts as a bridge between the client spans and
+     * the SDK ones, allowing them to be joined in Sentry. This function
+     * will only return a valid span if the `sentry` feature is enabled,
+     * otherwise it will return a noop span.
+     */
+public static func newBridgeSpan(target: String, parentTraceId: String?) -> Span  {
+    return try!  FfiConverterTypeSpan_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_constructor_span_new_bridge_span(
+        FfiConverterString.lower(target),
+        FfiConverterOptionString.lower(parentTraceId),$0
     )
 })
 }
@@ -27077,6 +27127,11 @@ public enum HumanQrGrantLoginError: Swift.Error, Equatable, Hashable, Foundation
     case MissingSecretsBackup(message: String)
     
     /**
+     * The rendezvous session was not found and might have expired.
+     */
+    case NotFound(message: String)
+    
+    /**
      * The device could not be created.
      */
     case UnableToCreateDevice(message: String)
@@ -27129,11 +27184,15 @@ public struct FfiConverterTypeHumanQrGrantLoginError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 5: return .UnableToCreateDevice(
+        case 5: return .NotFound(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 6: return .Unknown(
+        case 6: return .UnableToCreateDevice(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 7: return .Unknown(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -27156,10 +27215,12 @@ public struct FfiConverterTypeHumanQrGrantLoginError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(3))
         case .MissingSecretsBackup(_ /* message is ignored*/):
             writeInt(&buf, Int32(4))
-        case .UnableToCreateDevice(_ /* message is ignored*/):
+        case .NotFound(_ /* message is ignored*/):
             writeInt(&buf, Int32(5))
-        case .Unknown(_ /* message is ignored*/):
+        case .UnableToCreateDevice(_ /* message is ignored*/):
             writeInt(&buf, Int32(6))
+        case .Unknown(_ /* message is ignored*/):
+            writeInt(&buf, Int32(7))
 
         
         }
@@ -27197,6 +27258,7 @@ public enum HumanQrLoginError: Swift.Error, Equatable, Hashable, Foundation.Loca
     case OtherDeviceNotSignedIn
     case CheckCodeAlreadySent
     case CheckCodeCannotBeSent
+    case NotFound
 
     
 
@@ -27235,6 +27297,7 @@ public struct FfiConverterTypeHumanQrLoginError: FfiConverterRustBuffer {
         case 9: return .OtherDeviceNotSignedIn
         case 10: return .CheckCodeAlreadySent
         case 11: return .CheckCodeCannotBeSent
+        case 12: return .NotFound
 
          default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -27289,6 +27352,10 @@ public struct FfiConverterTypeHumanQrLoginError: FfiConverterRustBuffer {
         
         case .CheckCodeCannotBeSent:
             writeInt(&buf, Int32(11))
+        
+        
+        case .NotFound:
+            writeInt(&buf, Int32(12))
         
         }
     }
@@ -46275,6 +46342,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_add_child_to_space() != 31295) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_editable_spaces() != 62969) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_joined_parents_of_child() != 18724) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -46530,7 +46600,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_constructor_span_current() != 53698) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_constructor_span_new() != 14105) {
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_span_new() != 8957) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_span_new_bridge_span() != 63835) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_sqlitestorebuilder_new() != 51363) {

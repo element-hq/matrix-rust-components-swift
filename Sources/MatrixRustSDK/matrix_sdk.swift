@@ -1841,6 +1841,11 @@ public enum QrCodeLoginError: Swift.Error, Equatable, Hashable, Foundation.Local
     case SecureChannel(message: String)
     
     /**
+     * The rendezvous session was not found and might have expired.
+     */
+    case NotFound(message: String)
+    
+    /**
      * The cross-process refresh lock failed to be initialized.
      */
     case CrossProcessRefreshLock(message: String)
@@ -1918,27 +1923,31 @@ public struct FfiConverterTypeQRCodeLoginError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 5: return .CrossProcessRefreshLock(
+        case 5: return .NotFound(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 6: return .UserIdDiscovery(
+        case 6: return .CrossProcessRefreshLock(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 7: return .SessionTokens(
+        case 7: return .UserIdDiscovery(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 8: return .DeviceKeyUpload(
+        case 8: return .SessionTokens(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 9: return .SecretImport(
+        case 9: return .DeviceKeyUpload(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 10: return .ServerReset(
+        case 10: return .SecretImport(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 11: return .ServerReset(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -1961,18 +1970,20 @@ public struct FfiConverterTypeQRCodeLoginError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(3))
         case .SecureChannel(_ /* message is ignored*/):
             writeInt(&buf, Int32(4))
-        case .CrossProcessRefreshLock(_ /* message is ignored*/):
+        case .NotFound(_ /* message is ignored*/):
             writeInt(&buf, Int32(5))
-        case .UserIdDiscovery(_ /* message is ignored*/):
+        case .CrossProcessRefreshLock(_ /* message is ignored*/):
             writeInt(&buf, Int32(6))
-        case .SessionTokens(_ /* message is ignored*/):
+        case .UserIdDiscovery(_ /* message is ignored*/):
             writeInt(&buf, Int32(7))
-        case .DeviceKeyUpload(_ /* message is ignored*/):
+        case .SessionTokens(_ /* message is ignored*/):
             writeInt(&buf, Int32(8))
-        case .SecretImport(_ /* message is ignored*/):
+        case .DeviceKeyUpload(_ /* message is ignored*/):
             writeInt(&buf, Int32(9))
-        case .ServerReset(_ /* message is ignored*/):
+        case .SecretImport(_ /* message is ignored*/):
             writeInt(&buf, Int32(10))
+        case .ServerReset(_ /* message is ignored*/):
+            writeInt(&buf, Int32(11))
 
         
         }
