@@ -1176,11 +1176,20 @@ public protocol ClientProtocol: AnyObject, Sendable {
     /**
      * Empty the server version and unstable features cache.
      *
-     * Since the SDK caches server info (versions, unstable features,
-     * well-known etc), it's possible to have a stale entry in the cache.
-     * This functions makes it possible to force reset it.
+     * Since the SDK caches the supported versions, it's possible to have a
+     * stale entry in the cache. This functions makes it possible to force
+     * reset it.
      */
-    func resetServerInfo() async throws 
+    func resetSupportedVersions() async throws 
+    
+    /**
+     * Empty the well-known cache.
+     *
+     * Since the SDK caches the well-known, it's possible to have a stale
+     * entry in the cache. This functions makes it possible to force reset
+     * it.
+     */
+    func resetWellKnown() async throws 
     
     /**
      * Resolves the given room alias to a room ID (and a list of servers), if
@@ -2570,15 +2579,39 @@ open func removeAvatar()async throws   {
     /**
      * Empty the server version and unstable features cache.
      *
-     * Since the SDK caches server info (versions, unstable features,
-     * well-known etc), it's possible to have a stale entry in the cache.
-     * This functions makes it possible to force reset it.
+     * Since the SDK caches the supported versions, it's possible to have a
+     * stale entry in the cache. This functions makes it possible to force
+     * reset it.
      */
-open func resetServerInfo()async throws   {
+open func resetSupportedVersions()async throws   {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_reset_server_info(
+                uniffi_matrix_sdk_ffi_fn_method_client_reset_supported_versions(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Empty the well-known cache.
+     *
+     * Since the SDK caches the well-known, it's possible to have a stale
+     * entry in the cache. This functions makes it possible to force reset
+     * it.
+     */
+open func resetWellKnown()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_reset_well_known(
                     self.uniffiCloneHandle()
                     
                 )
@@ -18734,10 +18767,11 @@ public struct NotificationRoomInfo: Equatable, Hashable {
     public var joinedMembersCount: UInt64
     public var isEncrypted: Bool?
     public var isDirect: Bool
+    public var isSpace: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, topic: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, isEncrypted: Bool?, isDirect: Bool) {
+    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, topic: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, isEncrypted: Bool?, isDirect: Bool, isSpace: Bool) {
         self.displayName = displayName
         self.avatarUrl = avatarUrl
         self.canonicalAlias = canonicalAlias
@@ -18746,6 +18780,7 @@ public struct NotificationRoomInfo: Equatable, Hashable {
         self.joinedMembersCount = joinedMembersCount
         self.isEncrypted = isEncrypted
         self.isDirect = isDirect
+        self.isSpace = isSpace
     }
 
     
@@ -18769,7 +18804,8 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
                 joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
                 joinedMembersCount: FfiConverterUInt64.read(from: &buf), 
                 isEncrypted: FfiConverterOptionBool.read(from: &buf), 
-                isDirect: FfiConverterBool.read(from: &buf)
+                isDirect: FfiConverterBool.read(from: &buf), 
+                isSpace: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -18782,6 +18818,7 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.joinedMembersCount, into: &buf)
         FfiConverterOptionBool.write(value.isEncrypted, into: &buf)
         FfiConverterBool.write(value.isDirect, into: &buf)
+        FfiConverterBool.write(value.isSpace, into: &buf)
     }
 }
 
@@ -22033,12 +22070,12 @@ public struct TimelineConfiguration {
     public var dateDividerMode: DateDividerMode
     /**
      * Should the read receipts and read markers be tracked for the timeline
-     * items in this instance?
+     * items in this instance and on which event types?
      *
      * As this has a non negligible performance impact, make sure to enable it
      * only when you need it.
      */
-    public var trackReadReceipts: Bool
+    public var trackReadReceipts: TimelineReadReceiptTracking
     /**
      * Whether this timeline instance should report UTDs through the client's
      * delegate.
@@ -22064,11 +22101,11 @@ public struct TimelineConfiguration {
          */dateDividerMode: DateDividerMode, 
         /**
          * Should the read receipts and read markers be tracked for the timeline
-         * items in this instance?
+         * items in this instance and on which event types?
          *
          * As this has a non negligible performance impact, make sure to enable it
          * only when you need it.
-         */trackReadReceipts: Bool, 
+         */trackReadReceipts: TimelineReadReceiptTracking, 
         /**
          * Whether this timeline instance should report UTDs through the client's
          * delegate.
@@ -22099,7 +22136,7 @@ public struct FfiConverterTypeTimelineConfiguration: FfiConverterRustBuffer {
                 filter: FfiConverterTypeTimelineFilter.read(from: &buf), 
                 internalIdPrefix: FfiConverterOptionString.read(from: &buf), 
                 dateDividerMode: FfiConverterTypeDateDividerMode.read(from: &buf), 
-                trackReadReceipts: FfiConverterBool.read(from: &buf), 
+                trackReadReceipts: FfiConverterTypeTimelineReadReceiptTracking.read(from: &buf), 
                 reportUtds: FfiConverterBool.read(from: &buf)
         )
     }
@@ -22109,7 +22146,7 @@ public struct FfiConverterTypeTimelineConfiguration: FfiConverterRustBuffer {
         FfiConverterTypeTimelineFilter.write(value.filter, into: &buf)
         FfiConverterOptionString.write(value.internalIdPrefix, into: &buf)
         FfiConverterTypeDateDividerMode.write(value.dateDividerMode, into: &buf)
-        FfiConverterBool.write(value.trackReadReceipts, into: &buf)
+        FfiConverterTypeTimelineReadReceiptTracking.write(value.trackReadReceipts, into: &buf)
         FfiConverterBool.write(value.reportUtds, into: &buf)
     }
 }
@@ -45418,7 +45455,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_remove_avatar() != 29033) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_reset_server_info() != 16333) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_reset_supported_versions() != 32820) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_reset_well_known() != 61934) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_resolve_room_alias() != 3551) {
