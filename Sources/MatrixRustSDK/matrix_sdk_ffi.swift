@@ -1029,6 +1029,11 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func getSessionVerificationController() async throws  -> SessionVerificationController
     
     /**
+     * Returns the sizes of the existing stores, if known.
+     */
+    func getStoreSizes() async throws  -> StoreSizes
+    
+    /**
      * Allows generic GET requests to be made through the SDK's internal HTTP
      * client. This is useful when the caller's native HTTP client wouldn't
      * have the same configuration (such as certificates, proxies, etc.) This
@@ -1058,6 +1063,11 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * Checks if the server supports the LiveKit RTC focus for placing calls.
      */
     func isLivekitRtcSupported() async throws  -> Bool
+    
+    /**
+     * Checks if the server supports login using a QR code.
+     */
+    func isLoginWithQrCodeSupported() async throws  -> Bool
     
     /**
      * Checks if the server supports the report room API.
@@ -1155,6 +1165,12 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * they will see all values.
      */
     func observeRoomAccountDataEvent(roomId: String, eventType: RoomAccountDataEventType, listener: RoomAccountDataListener) throws  -> TaskHandle
+    
+    /**
+     * Perform database optimizations if any are available, i.e. vacuuming in
+     * SQLite.
+     */
+    func optimizeStores() async throws 
     
     /**
      * Register a handler for notifications generated from sync responses.
@@ -2139,6 +2155,26 @@ open func getSessionVerificationController()async throws  -> SessionVerification
 }
     
     /**
+     * Returns the sizes of the existing stores, if known.
+     */
+open func getStoreSizes()async throws  -> StoreSizes  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_get_store_sizes(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeStoreSizes_lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
      * Allows generic GET requests to be made through the SDK's internal HTTP
      * client. This is useful when the caller's native HTTP client wouldn't
      * have the same configuration (such as certificates, proxies, etc.) This
@@ -2239,6 +2275,26 @@ open func isLivekitRtcSupported()async throws  -> Bool  {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_is_livekit_rtc_supported(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Checks if the server supports login using a QR code.
+     */
+open func isLoginWithQrCodeSupported()async throws  -> Bool  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_is_login_with_qr_code_supported(
                     self.uniffiCloneHandle()
                     
                 )
@@ -2526,6 +2582,27 @@ open func observeRoomAccountDataEvent(roomId: String, eventType: RoomAccountData
         FfiConverterCallbackInterfaceRoomAccountDataListener_lower(listener),$0
     )
 })
+}
+    
+    /**
+     * Perform database optimizations if any are available, i.e. vacuuming in
+     * SQLite.
+     */
+open func optimizeStores()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_optimize_stores(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
 }
     
     /**
@@ -14308,12 +14385,21 @@ public protocol TimelineProtocol: AnyObject, Sendable {
     func loadReplyDetails(eventIdStr: String) async throws  -> InReplyToDetails
     
     /**
-     * Mark the room as read by trying to attach an *unthreaded* read receipt
-     * to the latest room event.
+     * Mark the timeline as read by attempting to send a read receipt on the
+     * latest visible event.
      *
-     * This works even if the latest event belongs to a thread, as a threaded
-     * reply also belongs to the unthreaded timeline. No threaded receipt
-     * will be sent here (see also #3123).
+     * The latest visible event is determined from the timeline's focus kind
+     * and whether or not it hides threaded events. If no latest event can
+     * be determined and the timeline is live, the room's unread marker is
+     * unset instead.
+     *
+     * # Arguments
+     *
+     * * `receipt_type` - The type of receipt to send. When using
+     * [`ReceiptType::FullyRead`], an unthreaded receipt will be sent. This
+     * works even if the latest event belongs to a thread, as a threaded
+     * reply also belongs to the unthreaded timeline. Otherwise the receipt
+     * thread will be determined based on the timeline's focus kind.
      */
     func markAsRead(receiptType: ReceiptType) async throws 
     
@@ -14664,12 +14750,21 @@ open func loadReplyDetails(eventIdStr: String)async throws  -> InReplyToDetails 
 }
     
     /**
-     * Mark the room as read by trying to attach an *unthreaded* read receipt
-     * to the latest room event.
+     * Mark the timeline as read by attempting to send a read receipt on the
+     * latest visible event.
      *
-     * This works even if the latest event belongs to a thread, as a threaded
-     * reply also belongs to the unthreaded timeline. No threaded receipt
-     * will be sent here (see also #3123).
+     * The latest visible event is determined from the timeline's focus kind
+     * and whether or not it hides threaded events. If no latest event can
+     * be determined and the timeline is live, the room's unread marker is
+     * unset instead.
+     *
+     * # Arguments
+     *
+     * * `receipt_type` - The type of receipt to send. When using
+     * [`ReceiptType::FullyRead`], an unthreaded receipt will be sent. This
+     * works even if the latest event belongs to a thread, as a threaded
+     * reply also belongs to the unthreaded timeline. Otherwise the receipt
+     * thread will be determined based on the timeline's focus kind.
      */
 open func markAsRead(receiptType: ReceiptType)async throws   {
     return
@@ -21742,6 +21837,94 @@ public func FfiConverterTypeSpaceRoom_lift(_ buf: RustBuffer) throws -> SpaceRoo
 #endif
 public func FfiConverterTypeSpaceRoom_lower(_ value: SpaceRoom) -> RustBuffer {
     return FfiConverterTypeSpaceRoom.lower(value)
+}
+
+
+/**
+ * Contains the disk size of the different stores, if known. It won't be
+ * available for in-memory stores.
+ */
+public struct StoreSizes: Equatable, Hashable {
+    /**
+     * The size of the CryptoStore.
+     */
+    public var cryptoStore: UInt64?
+    /**
+     * The size of the StateStore.
+     */
+    public var stateStore: UInt64?
+    /**
+     * The size of the EventCacheStore.
+     */
+    public var eventCacheStore: UInt64?
+    /**
+     * The size of the MediaStore.
+     */
+    public var mediaStore: UInt64?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The size of the CryptoStore.
+         */cryptoStore: UInt64?, 
+        /**
+         * The size of the StateStore.
+         */stateStore: UInt64?, 
+        /**
+         * The size of the EventCacheStore.
+         */eventCacheStore: UInt64?, 
+        /**
+         * The size of the MediaStore.
+         */mediaStore: UInt64?) {
+        self.cryptoStore = cryptoStore
+        self.stateStore = stateStore
+        self.eventCacheStore = eventCacheStore
+        self.mediaStore = mediaStore
+    }
+
+    
+}
+
+#if compiler(>=6)
+extension StoreSizes: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeStoreSizes: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StoreSizes {
+        return
+            try StoreSizes(
+                cryptoStore: FfiConverterOptionUInt64.read(from: &buf), 
+                stateStore: FfiConverterOptionUInt64.read(from: &buf), 
+                eventCacheStore: FfiConverterOptionUInt64.read(from: &buf), 
+                mediaStore: FfiConverterOptionUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: StoreSizes, into buf: inout [UInt8]) {
+        FfiConverterOptionUInt64.write(value.cryptoStore, into: &buf)
+        FfiConverterOptionUInt64.write(value.stateStore, into: &buf)
+        FfiConverterOptionUInt64.write(value.eventCacheStore, into: &buf)
+        FfiConverterOptionUInt64.write(value.mediaStore, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStoreSizes_lift(_ buf: RustBuffer) throws -> StoreSizes {
+    return try FfiConverterTypeStoreSizes.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStoreSizes_lower(_ value: StoreSizes) -> RustBuffer {
+    return FfiConverterTypeStoreSizes.lower(value)
 }
 
 
@@ -45389,6 +45572,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_session_verification_controller() != 55934) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_store_sizes() != 30209) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_url() != 32541) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -45405,6 +45591,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_is_livekit_rtc_supported() != 34863) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_login_with_qr_code_supported() != 17812) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_is_report_room_api_supported() != 17934) {
@@ -45447,6 +45636,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_observe_room_account_data_event() != 15699) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_optimize_stores() != 18852) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_register_notification_handler() != 47103) {
@@ -46502,7 +46694,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_load_reply_details() != 54225) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_mark_as_read() != 16621) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_mark_as_read() != 20604) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_paginate_backwards() != 36829) {
