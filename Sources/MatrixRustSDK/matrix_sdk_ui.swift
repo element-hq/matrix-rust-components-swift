@@ -508,6 +508,8 @@ public enum EventItemOrigin: Equatable, Hashable {
 
 
 
+
+
 }
 
 #if compiler(>=6)
@@ -598,6 +600,8 @@ public enum RoomPinnedEventsChange: Equatable, Hashable {
 
 
 
+
+
 }
 
 #if compiler(>=6)
@@ -667,6 +671,8 @@ public enum SpaceRoomListPaginationState: Equatable, Hashable {
     case idle(endReached: Bool
     )
     case loading
+
+
 
 
 
@@ -747,6 +753,8 @@ public enum TimelineReadReceiptTracking: Equatable, Hashable {
      * Disable read receipt tracking.
      */
     case disabled
+
+
 
 
 
