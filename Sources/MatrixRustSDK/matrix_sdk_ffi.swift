@@ -7220,6 +7220,12 @@ public protocol QrCodeDataProtocol: AnyObject, Sendable {
      */
     func serverName()  -> String?
     
+    /**
+     * Serialize the [`QrCodeData`] into a byte vector for encoding as a QR
+     * code.
+     */
+    func toBytes()  -> Data
+    
 }
 /**
  * Data for the QR code login mechanism.
@@ -7303,6 +7309,18 @@ public static func fromBytes(bytes: Data)throws  -> QrCodeData  {
 open func serverName() -> String?  {
     return try!  FfiConverterOptionString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_qrcodedata_server_name(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * Serialize the [`QrCodeData`] into a byte vector for encoding as a QR
+     * code.
+     */
+open func toBytes() -> Data  {
+    return try!  FfiConverterData.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_qrcodedata_to_bytes(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -46654,6 +46672,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_qrcodedata_server_name() != 52906) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_qrcodedata_to_bytes() != 22532) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_knockrequestactions_accept() != 60529) {
