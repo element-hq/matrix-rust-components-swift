@@ -36512,6 +36512,10 @@ public enum TraceLogPacks: Equatable, Hashable {
      * Enables all the logs relevant to sync profiling.
      */
     case syncProfiling
+    /**
+     * Enables all the logs relevant to the latest events.
+     */
+    case latestEvents
 
 
 
@@ -36543,6 +36547,8 @@ public struct FfiConverterTypeTraceLogPacks: FfiConverterRustBuffer {
         
         case 5: return .syncProfiling
         
+        case 6: return .latestEvents
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -36569,6 +36575,10 @@ public struct FfiConverterTypeTraceLogPacks: FfiConverterRustBuffer {
         
         case .syncProfiling:
             writeInt(&buf, Int32(5))
+        
+        
+        case .latestEvents:
+            writeInt(&buf, Int32(6))
         
         }
     }
