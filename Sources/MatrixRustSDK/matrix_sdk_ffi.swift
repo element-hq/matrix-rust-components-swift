@@ -12928,6 +12928,12 @@ public protocol SpaceServiceProtocol: AnyObject, Sendable {
     func editableSpaces() async  -> [SpaceRoom]
     
     /**
+     * Returns the corresponding `SpaceRoom` for the given room ID, or `None`
+     * if it isn't known.
+     */
+    func getSpaceRoom(roomId: String) async throws  -> SpaceRoom?
+    
+    /**
      * Returns all known direct-parents of a given space room ID.
      */
     func joinedParentsOfChild(childId: String) async throws  -> [SpaceRoom]
@@ -13063,6 +13069,27 @@ open func editableSpaces()async  -> [SpaceRoom]  {
             liftFunc: FfiConverterSequenceTypeSpaceRoom.lift,
             errorHandler: nil
             
+        )
+}
+    
+    /**
+     * Returns the corresponding `SpaceRoom` for the given room ID, or `None`
+     * if it isn't known.
+     */
+open func getSpaceRoom(roomId: String)async throws  -> SpaceRoom?  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceservice_get_space_room(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(roomId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeSpaceRoom.lift,
+            errorHandler: FfiConverterTypeClientError_lift
         )
 }
     
@@ -47207,6 +47234,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_editable_spaces() != 1160) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_get_space_room() != 38097) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_joined_parents_of_child() != 40037) {
