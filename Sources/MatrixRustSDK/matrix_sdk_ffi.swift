@@ -28469,7 +28469,7 @@ public enum LatestEventValue {
     case none
     case remote(timestamp: Timestamp, sender: String, isOwn: Bool, profile: ProfileDetails, content: TimelineItemContent
     )
-    case local(timestamp: Timestamp, sender: String, profile: ProfileDetails, content: TimelineItemContent, isSending: Bool
+    case local(timestamp: Timestamp, sender: String, profile: ProfileDetails, content: TimelineItemContent, state: LatestEventValueLocalState
     )
 
 
@@ -28497,7 +28497,7 @@ public struct FfiConverterTypeLatestEventValue: FfiConverterRustBuffer {
         case 2: return .remote(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), sender: try FfiConverterString.read(from: &buf), isOwn: try FfiConverterBool.read(from: &buf), profile: try FfiConverterTypeProfileDetails.read(from: &buf), content: try FfiConverterTypeTimelineItemContent.read(from: &buf)
         )
         
-        case 3: return .local(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), sender: try FfiConverterString.read(from: &buf), profile: try FfiConverterTypeProfileDetails.read(from: &buf), content: try FfiConverterTypeTimelineItemContent.read(from: &buf), isSending: try FfiConverterBool.read(from: &buf)
+        case 3: return .local(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), sender: try FfiConverterString.read(from: &buf), profile: try FfiConverterTypeProfileDetails.read(from: &buf), content: try FfiConverterTypeTimelineItemContent.read(from: &buf), state: try FfiConverterTypeLatestEventValueLocalState.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -28521,13 +28521,13 @@ public struct FfiConverterTypeLatestEventValue: FfiConverterRustBuffer {
             FfiConverterTypeTimelineItemContent.write(content, into: &buf)
             
         
-        case let .local(timestamp,sender,profile,content,isSending):
+        case let .local(timestamp,sender,profile,content,state):
             writeInt(&buf, Int32(3))
             FfiConverterTypeTimestamp.write(timestamp, into: &buf)
             FfiConverterString.write(sender, into: &buf)
             FfiConverterTypeProfileDetails.write(profile, into: &buf)
             FfiConverterTypeTimelineItemContent.write(content, into: &buf)
-            FfiConverterBool.write(isSending, into: &buf)
+            FfiConverterTypeLatestEventValueLocalState.write(state, into: &buf)
             
         }
     }
