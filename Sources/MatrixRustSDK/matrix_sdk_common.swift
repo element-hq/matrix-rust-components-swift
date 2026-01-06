@@ -482,10 +482,6 @@ public enum ShieldStateCode: Equatable, Hashable {
      */
     case unverifiedIdentity
     /**
-     * An unencrypted event in an encrypted room.
-     */
-    case sentInClear
-    /**
      * The sender was previously verified but changed their identity.
      */
     case verificationViolation
@@ -523,11 +519,9 @@ public struct FfiConverterTypeShieldStateCode: FfiConverterRustBuffer {
         
         case 4: return .unverifiedIdentity
         
-        case 5: return .sentInClear
+        case 5: return .verificationViolation
         
-        case 6: return .verificationViolation
-        
-        case 7: return .mismatchedSender
+        case 6: return .mismatchedSender
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -553,16 +547,12 @@ public struct FfiConverterTypeShieldStateCode: FfiConverterRustBuffer {
             writeInt(&buf, Int32(4))
         
         
-        case .sentInClear:
+        case .verificationViolation:
             writeInt(&buf, Int32(5))
         
         
-        case .verificationViolation:
-            writeInt(&buf, Int32(6))
-        
-        
         case .mismatchedSender:
-            writeInt(&buf, Int32(7))
+            writeInt(&buf, Int32(6))
         
         }
     }

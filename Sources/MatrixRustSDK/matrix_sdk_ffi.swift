@@ -5456,7 +5456,7 @@ public protocol LazyTimelineItemProviderProtocol: AnyObject, Sendable {
     /**
      * Returns the shields for this event timeline item.
      */
-    func getShields(strict: Bool)  -> ShieldState?
+    func getShields(strict: Bool)  -> ShieldState
     
 }
 /**
@@ -5549,8 +5549,8 @@ open func getSendHandle() -> SendHandle?  {
     /**
      * Returns the shields for this event timeline item.
      */
-open func getShields(strict: Bool) -> ShieldState?  {
-    return try!  FfiConverterOptionTypeShieldState.lift(try! rustCall() {
+open func getShields(strict: Bool) -> ShieldState  {
+    return try!  FfiConverterTypeShieldState_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_lazytimelineitemprovider_get_shields(
             self.uniffiCloneHandle(),
         FfiConverterBool.lower(strict),$0
@@ -17264,6 +17264,8 @@ public struct EventTimelineItem {
     public var eventOrTransactionId: EventOrTransactionId
     public var sender: String
     public var senderProfile: ProfileDetails
+    public var forwarder: String?
+    public var forwarderProfile: ProfileDetails?
     public var isOwn: Bool
     public var isEditable: Bool
     public var content: TimelineItemContent
@@ -17280,11 +17282,13 @@ public struct EventTimelineItem {
     public init(
         /**
          * Indicates that an event is remote.
-         */isRemote: Bool, eventOrTransactionId: EventOrTransactionId, sender: String, senderProfile: ProfileDetails, isOwn: Bool, isEditable: Bool, content: TimelineItemContent, timestamp: Timestamp, localSendState: EventSendState?, localCreatedAt: UInt64?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, lazyProvider: LazyTimelineItemProvider) {
+         */isRemote: Bool, eventOrTransactionId: EventOrTransactionId, sender: String, senderProfile: ProfileDetails, forwarder: String?, forwarderProfile: ProfileDetails?, isOwn: Bool, isEditable: Bool, content: TimelineItemContent, timestamp: Timestamp, localSendState: EventSendState?, localCreatedAt: UInt64?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, lazyProvider: LazyTimelineItemProvider) {
         self.isRemote = isRemote
         self.eventOrTransactionId = eventOrTransactionId
         self.sender = sender
         self.senderProfile = senderProfile
+        self.forwarder = forwarder
+        self.forwarderProfile = forwarderProfile
         self.isOwn = isOwn
         self.isEditable = isEditable
         self.content = content
@@ -17317,6 +17321,8 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
                 eventOrTransactionId: FfiConverterTypeEventOrTransactionId.read(from: &buf), 
                 sender: FfiConverterString.read(from: &buf), 
                 senderProfile: FfiConverterTypeProfileDetails.read(from: &buf), 
+                forwarder: FfiConverterOptionString.read(from: &buf), 
+                forwarderProfile: FfiConverterOptionTypeProfileDetails.read(from: &buf), 
                 isOwn: FfiConverterBool.read(from: &buf), 
                 isEditable: FfiConverterBool.read(from: &buf), 
                 content: FfiConverterTypeTimelineItemContent.read(from: &buf), 
@@ -17335,6 +17341,8 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
         FfiConverterTypeEventOrTransactionId.write(value.eventOrTransactionId, into: &buf)
         FfiConverterString.write(value.sender, into: &buf)
         FfiConverterTypeProfileDetails.write(value.senderProfile, into: &buf)
+        FfiConverterOptionString.write(value.forwarder, into: &buf)
+        FfiConverterOptionTypeProfileDetails.write(value.forwarderProfile, into: &buf)
         FfiConverterBool.write(value.isOwn, into: &buf)
         FfiConverterBool.write(value.isEditable, into: &buf)
         FfiConverterTypeTimelineItemContent.write(value.content, into: &buf)
@@ -34905,16 +34913,16 @@ public func FfiConverterTypeSessionVerificationData_lower(_ value: SessionVerifi
 public enum ShieldState: Equatable, Hashable {
     
     /**
-     * A red shield with a tooltip containing the associated message should be
-     * presented.
+     * A red shield with a tooltip containing a message appropriate to the
+     * associated code should be presented.
      */
-    case red(code: ShieldStateCode, message: String
+    case red(code: TimelineEventShieldStateCode
     )
     /**
-     * A grey shield with a tooltip containing the associated message should be
-     * presented.
+     * A grey shield with a tooltip containing a message appropriate to the
+     * associated code should be presented.
      */
-    case grey(code: ShieldStateCode, message: String
+    case grey(code: TimelineEventShieldStateCode
     )
     /**
      * No shield should be presented.
@@ -34941,10 +34949,10 @@ public struct FfiConverterTypeShieldState: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .red(code: try FfiConverterTypeShieldStateCode.read(from: &buf), message: try FfiConverterString.read(from: &buf)
+        case 1: return .red(code: try FfiConverterTypeTimelineEventShieldStateCode.read(from: &buf)
         )
         
-        case 2: return .grey(code: try FfiConverterTypeShieldStateCode.read(from: &buf), message: try FfiConverterString.read(from: &buf)
+        case 2: return .grey(code: try FfiConverterTypeTimelineEventShieldStateCode.read(from: &buf)
         )
         
         case 3: return .none
@@ -34957,16 +34965,14 @@ public struct FfiConverterTypeShieldState: FfiConverterRustBuffer {
         switch value {
         
         
-        case let .red(code,message):
+        case let .red(code):
             writeInt(&buf, Int32(1))
-            FfiConverterTypeShieldStateCode.write(code, into: &buf)
-            FfiConverterString.write(message, into: &buf)
+            FfiConverterTypeTimelineEventShieldStateCode.write(code, into: &buf)
             
         
-        case let .grey(code,message):
+        case let .grey(code):
             writeInt(&buf, Int32(2))
-            FfiConverterTypeShieldStateCode.write(code, into: &buf)
-            FfiConverterString.write(message, into: &buf)
+            FfiConverterTypeTimelineEventShieldStateCode.write(code, into: &buf)
             
         
         case .none:
@@ -44156,6 +44162,30 @@ fileprivate struct FfiConverterOptionTypeOidcPrompt: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeProfileDetails: FfiConverterRustBuffer {
+    typealias SwiftType = ProfileDetails?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeProfileDetails.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeProfileDetails.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypePublicRoomJoinRule: FfiConverterRustBuffer {
     typealias SwiftType = PublicRoomJoinRule?
 
@@ -44244,30 +44274,6 @@ fileprivate struct FfiConverterOptionTypeRoomNotificationMode: FfiConverterRustB
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeRoomNotificationMode.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-fileprivate struct FfiConverterOptionTypeShieldState: FfiConverterRustBuffer {
-    typealias SwiftType = ShieldState?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeShieldState.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeShieldState.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -47596,7 +47602,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_get_send_handle() != 279) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_get_shields() != 46064) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_get_shields() != 41889) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sendattachmentjoinhandle_cancel() != 5666) {
@@ -47970,7 +47976,6 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitVerificationStateListener()
     uniffiCallbackInitWidgetCapabilitiesProvider()
     uniffiEnsureMatrixSdkBaseInitialized()
-    uniffiEnsureMatrixSdkCommonInitialized()
     uniffiEnsureMatrixSdkCryptoInitialized()
     uniffiEnsureMatrixSdkInitialized()
     uniffiEnsureMatrixSdkUiInitialized()

@@ -810,6 +810,133 @@ public func FfiConverterTypeSpaceRoomListPaginationState_lower(_ value: SpaceRoo
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * Extends [`ShieldStateCode`] to allow for a `SentInClear` code.
+ */
+
+public enum TimelineEventShieldStateCode: Equatable, Hashable {
+    
+    /**
+     * Not enough information available to check the authenticity.
+     */
+    case authenticityNotGuaranteed
+    /**
+     * The sending device isn't yet known by the Client.
+     */
+    case unknownDevice
+    /**
+     * The sending device hasn't been verified by the sender.
+     */
+    case unsignedDevice
+    /**
+     * The sender hasn't been verified by the Client's user.
+     */
+    case unverifiedIdentity
+    /**
+     * The sender was previously verified but changed their identity.
+     */
+    case verificationViolation
+    /**
+     * The `sender` field on the event does not match the owner of the device
+     * that established the Megolm session.
+     */
+    case mismatchedSender
+    /**
+     * An unencrypted event in an encrypted room.
+     */
+    case sentInClear
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension TimelineEventShieldStateCode: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTimelineEventShieldStateCode: FfiConverterRustBuffer {
+    typealias SwiftType = TimelineEventShieldStateCode
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineEventShieldStateCode {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .authenticityNotGuaranteed
+        
+        case 2: return .unknownDevice
+        
+        case 3: return .unsignedDevice
+        
+        case 4: return .unverifiedIdentity
+        
+        case 5: return .verificationViolation
+        
+        case 6: return .mismatchedSender
+        
+        case 7: return .sentInClear
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: TimelineEventShieldStateCode, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .authenticityNotGuaranteed:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .unknownDevice:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .unsignedDevice:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .unverifiedIdentity:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .verificationViolation:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .mismatchedSender:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .sentInClear:
+            writeInt(&buf, Int32(7))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTimelineEventShieldStateCode_lift(_ buf: RustBuffer) throws -> TimelineEventShieldStateCode {
+    return try FfiConverterTypeTimelineEventShieldStateCode.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTimelineEventShieldStateCode_lower(_ value: TimelineEventShieldStateCode) -> RustBuffer {
+    return FfiConverterTypeTimelineEventShieldStateCode.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * The level of read receipt tracking for the timeline.
  */
 
