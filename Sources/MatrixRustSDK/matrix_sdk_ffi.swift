@@ -17121,10 +17121,11 @@ public struct CreateRoomParameters: Equatable, Hashable {
     public var joinRuleOverride: JoinRule?
     public var historyVisibilityOverride: RoomHistoryVisibility?
     public var canonicalAlias: String?
+    public var isSpace: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(name: String?, topic: String? = nil, isEncrypted: Bool, isDirect: Bool = false, visibility: RoomVisibility, preset: RoomPreset, invite: [String]? = nil, avatar: String? = nil, powerLevelContentOverride: PowerLevels? = nil, joinRuleOverride: JoinRule? = nil, historyVisibilityOverride: RoomHistoryVisibility? = nil, canonicalAlias: String? = nil) {
+    public init(name: String?, topic: String? = nil, isEncrypted: Bool, isDirect: Bool = false, visibility: RoomVisibility, preset: RoomPreset, invite: [String]? = nil, avatar: String? = nil, powerLevelContentOverride: PowerLevels? = nil, joinRuleOverride: JoinRule? = nil, historyVisibilityOverride: RoomHistoryVisibility? = nil, canonicalAlias: String? = nil, isSpace: Bool = false) {
         self.name = name
         self.topic = topic
         self.isEncrypted = isEncrypted
@@ -17137,6 +17138,7 @@ public struct CreateRoomParameters: Equatable, Hashable {
         self.joinRuleOverride = joinRuleOverride
         self.historyVisibilityOverride = historyVisibilityOverride
         self.canonicalAlias = canonicalAlias
+        self.isSpace = isSpace
     }
 
     
@@ -17166,7 +17168,8 @@ public struct FfiConverterTypeCreateRoomParameters: FfiConverterRustBuffer {
                 powerLevelContentOverride: FfiConverterOptionTypePowerLevels.read(from: &buf), 
                 joinRuleOverride: FfiConverterOptionTypeJoinRule.read(from: &buf), 
                 historyVisibilityOverride: FfiConverterOptionTypeRoomHistoryVisibility.read(from: &buf), 
-                canonicalAlias: FfiConverterOptionString.read(from: &buf)
+                canonicalAlias: FfiConverterOptionString.read(from: &buf), 
+                isSpace: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -17183,6 +17186,7 @@ public struct FfiConverterTypeCreateRoomParameters: FfiConverterRustBuffer {
         FfiConverterOptionTypeJoinRule.write(value.joinRuleOverride, into: &buf)
         FfiConverterOptionTypeRoomHistoryVisibility.write(value.historyVisibilityOverride, into: &buf)
         FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
+        FfiConverterBool.write(value.isSpace, into: &buf)
     }
 }
 

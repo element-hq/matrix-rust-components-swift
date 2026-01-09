@@ -1589,6 +1589,15 @@ public enum Intent: Equatable, Hashable {
      * The user wants to start a call in a "Direct Message" (DM) room.
      */
     case startCallDm
+    /**
+     * The user wants to start a voice call in a "Direct Message" (DM) room.
+     */
+    case startCallDmVoice
+    /**
+     * The user wants to join an existing  voice call that is a "Direct
+     * Message" (DM) room.
+     */
+    case joinExistingDmVoice
 
 
 
@@ -1618,6 +1627,10 @@ public struct FfiConverterTypeIntent: FfiConverterRustBuffer {
         
         case 4: return .startCallDm
         
+        case 5: return .startCallDmVoice
+        
+        case 6: return .joinExistingDmVoice
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -1640,6 +1653,14 @@ public struct FfiConverterTypeIntent: FfiConverterRustBuffer {
         
         case .startCallDm:
             writeInt(&buf, Int32(4))
+        
+        
+        case .startCallDmVoice:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .joinExistingDmVoice:
+            writeInt(&buf, Int32(6))
         
         }
     }
