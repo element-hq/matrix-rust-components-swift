@@ -13068,9 +13068,25 @@ public protocol SpaceServiceProtocol: AnyObject, Sendable {
     func removeChildFromSpace(childId: String, spaceId: String) async throws 
     
     /**
+     * Space filters provide access to a custom subset of the space graph that
+     * can be used in tandem with the [`crate::RoomListService`] to narrow
+     * down the presented rooms.
+     *
+     * They are limited to the first 2 levels of the graph, with the first
+     * level only containing direct descendants while the second holds the rest
+     * of them recursively.
+     */
+    func spaceFilters() async  -> [SpaceFilter]
+    
+    /**
      * Returns a `SpaceRoomList` for the given space ID.
      */
     func spaceRoomList(spaceId: String) async throws  -> SpaceRoomList
+    
+    /**
+     * Subscribe to changes or updates to the space filters.
+     */
+    func subscribeToSpaceFilters(listener: SpaceServiceSpaceFiltersListener) async  -> TaskHandle
     
     /**
      * Subscribes to updates on the joined spaces list. If space rooms are
@@ -13273,6 +13289,33 @@ open func removeChildFromSpace(childId: String, spaceId: String)async throws   {
 }
     
     /**
+     * Space filters provide access to a custom subset of the space graph that
+     * can be used in tandem with the [`crate::RoomListService`] to narrow
+     * down the presented rooms.
+     *
+     * They are limited to the first 2 levels of the graph, with the first
+     * level only containing direct descendants while the second holds the rest
+     * of them recursively.
+     */
+open func spaceFilters()async  -> [SpaceFilter]  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceservice_space_filters(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeSpaceFilter.lift,
+            errorHandler: nil
+            
+        )
+}
+    
+    /**
      * Returns a `SpaceRoomList` for the given space ID.
      */
 open func spaceRoomList(spaceId: String)async throws  -> SpaceRoomList  {
@@ -13289,6 +13332,27 @@ open func spaceRoomList(spaceId: String)async throws  -> SpaceRoomList  {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
             liftFunc: FfiConverterTypeSpaceRoomList_lift,
             errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Subscribe to changes or updates to the space filters.
+     */
+open func subscribeToSpaceFilters(listener: SpaceServiceSpaceFiltersListener)async  -> TaskHandle  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceservice_subscribe_to_space_filters(
+                    self.uniffiCloneHandle(),
+                    FfiConverterCallbackInterfaceSpaceServiceSpaceFiltersListener_lower(listener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
+            liftFunc: FfiConverterTypeTaskHandle_lift,
+            errorHandler: nil
+            
         )
 }
     
@@ -18527,10 +18591,6 @@ public struct LeaveSpaceRoom: Equatable, Hashable {
      * better inform the user about the consequences of leaving the room.
      */
     public var isLastAdmin: Bool
-    /**
-     * The amount of joined members in the room.
-     */
-    public var joinedMembersCount: UInt64
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -18541,13 +18601,9 @@ public struct LeaveSpaceRoom: Equatable, Hashable {
         /**
          * Whether the user is the last admin in the room. This helps clients
          * better inform the user about the consequences of leaving the room.
-         */isLastAdmin: Bool, 
-        /**
-         * The amount of joined members in the room.
-         */joinedMembersCount: UInt64) {
+         */isLastAdmin: Bool) {
         self.spaceRoom = spaceRoom
         self.isLastAdmin = isLastAdmin
-        self.joinedMembersCount = joinedMembersCount
     }
 
     
@@ -18567,15 +18623,13 @@ public struct FfiConverterTypeLeaveSpaceRoom: FfiConverterRustBuffer {
         return
             try LeaveSpaceRoom(
                 spaceRoom: FfiConverterTypeSpaceRoom.read(from: &buf), 
-                isLastAdmin: FfiConverterBool.read(from: &buf), 
-                joinedMembersCount: FfiConverterUInt64.read(from: &buf)
+                isLastAdmin: FfiConverterBool.read(from: &buf)
         )
     }
 
     public static func write(_ value: LeaveSpaceRoom, into buf: inout [UInt8]) {
         FfiConverterTypeSpaceRoom.write(value.spaceRoom, into: &buf)
         FfiConverterBool.write(value.isLastAdmin, into: &buf)
-        FfiConverterUInt64.write(value.joinedMembersCount, into: &buf)
     }
 }
 
@@ -22407,6 +22461,88 @@ public func FfiConverterTypeSimplePushRule_lift(_ buf: RustBuffer) throws -> Sim
 #endif
 public func FfiConverterTypeSimplePushRule_lower(_ value: SimplePushRule) -> RustBuffer {
     return FfiConverterTypeSimplePushRule.lower(value)
+}
+
+
+public struct SpaceFilter: Equatable, Hashable {
+    /**
+     * The underlying [`SpaceRoom`]
+     */
+    public var spaceRoom: SpaceRoom
+    /**
+     * The level of the space filter in the tree/hierarchy.
+     * At this point in time the filters are limited to the first 2 levels.
+     */
+    public var level: UInt8
+    /**
+     * The room identifiers of the descendants of this space.
+     * For top level spaces (level 0) these will be direct descendants while
+     * for first level spaces they will be all other descendants, recursively.
+     */
+    public var descendants: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The underlying [`SpaceRoom`]
+         */spaceRoom: SpaceRoom, 
+        /**
+         * The level of the space filter in the tree/hierarchy.
+         * At this point in time the filters are limited to the first 2 levels.
+         */level: UInt8, 
+        /**
+         * The room identifiers of the descendants of this space.
+         * For top level spaces (level 0) these will be direct descendants while
+         * for first level spaces they will be all other descendants, recursively.
+         */descendants: [String]) {
+        self.spaceRoom = spaceRoom
+        self.level = level
+        self.descendants = descendants
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SpaceFilter: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSpaceFilter: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SpaceFilter {
+        return
+            try SpaceFilter(
+                spaceRoom: FfiConverterTypeSpaceRoom.read(from: &buf), 
+                level: FfiConverterUInt8.read(from: &buf), 
+                descendants: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SpaceFilter, into buf: inout [UInt8]) {
+        FfiConverterTypeSpaceRoom.write(value.spaceRoom, into: &buf)
+        FfiConverterUInt8.write(value.level, into: &buf)
+        FfiConverterSequenceString.write(value.descendants, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSpaceFilter_lift(_ buf: RustBuffer) throws -> SpaceFilter {
+    return try FfiConverterTypeSpaceFilter.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSpaceFilter_lower(_ value: SpaceFilter) -> RustBuffer {
+    return FfiConverterTypeSpaceFilter.lower(value)
 }
 
 
@@ -33531,6 +33667,8 @@ public enum RoomListEntriesDynamicFilterKind: Equatable, Hashable {
     )
     case any(filters: [RoomListEntriesDynamicFilterKind]
     )
+    case identifiers(identifiers: [String]
+    )
     case nonSpace
     case space
     case nonLeft
@@ -33576,38 +33714,41 @@ public struct FfiConverterTypeRoomListEntriesDynamicFilterKind: FfiConverterRust
         case 2: return .any(filters: try FfiConverterSequenceTypeRoomListEntriesDynamicFilterKind.read(from: &buf)
         )
         
-        case 3: return .nonSpace
-        
-        case 4: return .space
-        
-        case 5: return .nonLeft
-        
-        case 6: return .joined
-        
-        case 7: return .unread
-        
-        case 8: return .favourite
-        
-        case 9: return .lowPriority
-        
-        case 10: return .nonLowPriority
-        
-        case 11: return .nonFavorite
-        
-        case 12: return .invite
-        
-        case 13: return .category(expect: try FfiConverterTypeRoomListFilterCategory.read(from: &buf)
+        case 3: return .identifiers(identifiers: try FfiConverterSequenceString.read(from: &buf)
         )
         
-        case 14: return .none
+        case 4: return .nonSpace
         
-        case 15: return .normalizedMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
+        case 5: return .space
+        
+        case 6: return .nonLeft
+        
+        case 7: return .joined
+        
+        case 8: return .unread
+        
+        case 9: return .favourite
+        
+        case 10: return .lowPriority
+        
+        case 11: return .nonLowPriority
+        
+        case 12: return .nonFavorite
+        
+        case 13: return .invite
+        
+        case 14: return .category(expect: try FfiConverterTypeRoomListFilterCategory.read(from: &buf)
         )
         
-        case 16: return .fuzzyMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
+        case 15: return .none
+        
+        case 16: return .normalizedMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
         )
         
-        case 17: return .deduplicateVersions
+        case 17: return .fuzzyMatchRoomName(pattern: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 18: return .deduplicateVersions
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -33627,67 +33768,72 @@ public struct FfiConverterTypeRoomListEntriesDynamicFilterKind: FfiConverterRust
             FfiConverterSequenceTypeRoomListEntriesDynamicFilterKind.write(filters, into: &buf)
             
         
-        case .nonSpace:
+        case let .identifiers(identifiers):
             writeInt(&buf, Int32(3))
+            FfiConverterSequenceString.write(identifiers, into: &buf)
+            
         
-        
-        case .space:
+        case .nonSpace:
             writeInt(&buf, Int32(4))
         
         
-        case .nonLeft:
+        case .space:
             writeInt(&buf, Int32(5))
         
         
-        case .joined:
+        case .nonLeft:
             writeInt(&buf, Int32(6))
         
         
-        case .unread:
+        case .joined:
             writeInt(&buf, Int32(7))
         
         
-        case .favourite:
+        case .unread:
             writeInt(&buf, Int32(8))
         
         
-        case .lowPriority:
+        case .favourite:
             writeInt(&buf, Int32(9))
         
         
-        case .nonLowPriority:
+        case .lowPriority:
             writeInt(&buf, Int32(10))
         
         
-        case .nonFavorite:
+        case .nonLowPriority:
             writeInt(&buf, Int32(11))
         
         
-        case .invite:
+        case .nonFavorite:
             writeInt(&buf, Int32(12))
         
         
-        case let .category(expect):
+        case .invite:
             writeInt(&buf, Int32(13))
+        
+        
+        case let .category(expect):
+            writeInt(&buf, Int32(14))
             FfiConverterTypeRoomListFilterCategory.write(expect, into: &buf)
             
         
         case .none:
-            writeInt(&buf, Int32(14))
+            writeInt(&buf, Int32(15))
         
         
         case let .normalizedMatchRoomName(pattern):
-            writeInt(&buf, Int32(15))
-            FfiConverterString.write(pattern, into: &buf)
-            
-        
-        case let .fuzzyMatchRoomName(pattern):
             writeInt(&buf, Int32(16))
             FfiConverterString.write(pattern, into: &buf)
             
         
-        case .deduplicateVersions:
+        case let .fuzzyMatchRoomName(pattern):
             writeInt(&buf, Int32(17))
+            FfiConverterString.write(pattern, into: &buf)
+            
+        
+        case .deduplicateVersions:
+            writeInt(&buf, Int32(18))
         
         }
     }
@@ -35633,6 +35779,162 @@ public func FfiConverterTypeSlidingSyncVersionBuilder_lift(_ buf: RustBuffer) th
 #endif
 public func FfiConverterTypeSlidingSyncVersionBuilder_lower(_ value: SlidingSyncVersionBuilder) -> RustBuffer {
     return FfiConverterTypeSlidingSyncVersionBuilder.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum SpaceFilterUpdate: Equatable, Hashable {
+    
+    case append(values: [SpaceFilter]
+    )
+    case clear
+    case pushFront(value: SpaceFilter
+    )
+    case pushBack(value: SpaceFilter
+    )
+    case popFront
+    case popBack
+    case insert(index: UInt32, value: SpaceFilter
+    )
+    case set(index: UInt32, value: SpaceFilter
+    )
+    case remove(index: UInt32
+    )
+    case truncate(length: UInt32
+    )
+    case reset(values: [SpaceFilter]
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SpaceFilterUpdate: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSpaceFilterUpdate: FfiConverterRustBuffer {
+    typealias SwiftType = SpaceFilterUpdate
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SpaceFilterUpdate {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .append(values: try FfiConverterSequenceTypeSpaceFilter.read(from: &buf)
+        )
+        
+        case 2: return .clear
+        
+        case 3: return .pushFront(value: try FfiConverterTypeSpaceFilter.read(from: &buf)
+        )
+        
+        case 4: return .pushBack(value: try FfiConverterTypeSpaceFilter.read(from: &buf)
+        )
+        
+        case 5: return .popFront
+        
+        case 6: return .popBack
+        
+        case 7: return .insert(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeSpaceFilter.read(from: &buf)
+        )
+        
+        case 8: return .set(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeSpaceFilter.read(from: &buf)
+        )
+        
+        case 9: return .remove(index: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 10: return .truncate(length: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 11: return .reset(values: try FfiConverterSequenceTypeSpaceFilter.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SpaceFilterUpdate, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .append(values):
+            writeInt(&buf, Int32(1))
+            FfiConverterSequenceTypeSpaceFilter.write(values, into: &buf)
+            
+        
+        case .clear:
+            writeInt(&buf, Int32(2))
+        
+        
+        case let .pushFront(value):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeSpaceFilter.write(value, into: &buf)
+            
+        
+        case let .pushBack(value):
+            writeInt(&buf, Int32(4))
+            FfiConverterTypeSpaceFilter.write(value, into: &buf)
+            
+        
+        case .popFront:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .popBack:
+            writeInt(&buf, Int32(6))
+        
+        
+        case let .insert(index,value):
+            writeInt(&buf, Int32(7))
+            FfiConverterUInt32.write(index, into: &buf)
+            FfiConverterTypeSpaceFilter.write(value, into: &buf)
+            
+        
+        case let .set(index,value):
+            writeInt(&buf, Int32(8))
+            FfiConverterUInt32.write(index, into: &buf)
+            FfiConverterTypeSpaceFilter.write(value, into: &buf)
+            
+        
+        case let .remove(index):
+            writeInt(&buf, Int32(9))
+            FfiConverterUInt32.write(index, into: &buf)
+            
+        
+        case let .truncate(length):
+            writeInt(&buf, Int32(10))
+            FfiConverterUInt32.write(length, into: &buf)
+            
+        
+        case let .reset(values):
+            writeInt(&buf, Int32(11))
+            FfiConverterSequenceTypeSpaceFilter.write(values, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSpaceFilterUpdate_lift(_ buf: RustBuffer) throws -> SpaceFilterUpdate {
+    return try FfiConverterTypeSpaceFilterUpdate.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSpaceFilterUpdate_lower(_ value: SpaceFilterUpdate) -> RustBuffer {
+    return FfiConverterTypeSpaceFilterUpdate.lower(value)
 }
 
 
@@ -42436,6 +42738,130 @@ public func FfiConverterCallbackInterfaceSpaceServiceJoinedSpacesListener_lower(
 
 
 
+public protocol SpaceServiceSpaceFiltersListener: AnyObject, Sendable {
+    
+    func onUpdate(filterUpdates: [SpaceFilterUpdate]) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceSpaceServiceSpaceFiltersListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // This creates 1-element array, since this seems to be the only way to construct a const
+    // pointer that we can pass to the Rust code.
+    static let vtable: [UniffiVTableCallbackInterfaceSpaceServiceSpaceFiltersListener] = [UniffiVTableCallbackInterfaceSpaceServiceSpaceFiltersListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceSpaceServiceSpaceFiltersListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface SpaceServiceSpaceFiltersListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceSpaceServiceSpaceFiltersListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface SpaceServiceSpaceFiltersListener: handle missing in uniffiClone")
+            }
+        },
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            filterUpdates: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSpaceServiceSpaceFiltersListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     filterUpdates: try FfiConverterSequenceTypeSpaceFilterUpdate.lift(filterUpdates)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )]
+}
+
+private func uniffiCallbackInitSpaceServiceSpaceFiltersListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_spaceservicespacefilterslistener(UniffiCallbackInterfaceSpaceServiceSpaceFiltersListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceSpaceServiceSpaceFiltersListener {
+    fileprivate static let handleMap = UniffiHandleMap<SpaceServiceSpaceFiltersListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceSpaceServiceSpaceFiltersListener : FfiConverter {
+    typealias SwiftType = SpaceServiceSpaceFiltersListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceSpaceServiceSpaceFiltersListener_lift(_ handle: UInt64) throws -> SpaceServiceSpaceFiltersListener {
+    return try FfiConverterCallbackInterfaceSpaceServiceSpaceFiltersListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceSpaceServiceSpaceFiltersListener_lower(_ v: SpaceServiceSpaceFiltersListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceSpaceServiceSpaceFiltersListener.lower(v)
+}
+
+
+
+
 /**
  * A listener for notifications generated from sync responses.
  *
@@ -45713,6 +46139,31 @@ fileprivate struct FfiConverterSequenceTypeSimplePushRule: FfiConverterRustBuffe
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeSpaceFilter: FfiConverterRustBuffer {
+    typealias SwiftType = [SpaceFilter]
+
+    public static func write(_ value: [SpaceFilter], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeSpaceFilter.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SpaceFilter] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [SpaceFilter]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeSpaceFilter.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeSpaceRoom: FfiConverterRustBuffer {
     typealias SwiftType = [SpaceRoom]
 
@@ -46130,6 +46581,31 @@ fileprivate struct FfiConverterSequenceTypeSlidingSyncVersion: FfiConverterRustB
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeSlidingSyncVersion.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeSpaceFilterUpdate: FfiConverterRustBuffer {
+    typealias SwiftType = [SpaceFilterUpdate]
+
+    public static func write(_ value: [SpaceFilterUpdate], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeSpaceFilterUpdate.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SpaceFilterUpdate] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [SpaceFilterUpdate]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeSpaceFilterUpdate.read(from: &buf))
         }
         return seq
     }
@@ -48090,7 +48566,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_remove_child_from_space() != 22535) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_space_filters() != 30843) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_space_room_list() != 14788) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_subscribe_to_space_filters() != 16708) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservice_subscribe_to_top_level_joined_spaces() != 59416) {
@@ -48471,6 +48953,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceservicejoinedspaceslistener_on_update() != 21383) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceservicespacefilterslistener_on_update() != 50983) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicestateobserver_on_update() != 7272) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -48522,6 +49007,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitSpaceRoomListPaginationStateListener()
     uniffiCallbackInitSpaceRoomListSpaceListener()
     uniffiCallbackInitSpaceServiceJoinedSpacesListener()
+    uniffiCallbackInitSpaceServiceSpaceFiltersListener()
     uniffiCallbackInitSyncNotificationListener()
     uniffiCallbackInitSyncServiceStateObserver()
     uniffiCallbackInitTimelineListener()
