@@ -18587,10 +18587,14 @@ public struct LeaveSpaceRoom: Equatable, Hashable {
      */
     public var spaceRoom: SpaceRoom
     /**
-     * Whether the user is the last admin in the room. This helps clients
+     * Whether the user is the last owner in the room. This helps clients
      * better inform the user about the consequences of leaving the room.
      */
-    public var isLastAdmin: Bool
+    public var isLastOwner: Bool
+    /**
+     * If the room creators have infinite PL.
+     */
+    public var areCreatorsPrivileged: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -18599,11 +18603,15 @@ public struct LeaveSpaceRoom: Equatable, Hashable {
          * The underlying [`SpaceRoom`]
          */spaceRoom: SpaceRoom, 
         /**
-         * Whether the user is the last admin in the room. This helps clients
+         * Whether the user is the last owner in the room. This helps clients
          * better inform the user about the consequences of leaving the room.
-         */isLastAdmin: Bool) {
+         */isLastOwner: Bool, 
+        /**
+         * If the room creators have infinite PL.
+         */areCreatorsPrivileged: Bool) {
         self.spaceRoom = spaceRoom
-        self.isLastAdmin = isLastAdmin
+        self.isLastOwner = isLastOwner
+        self.areCreatorsPrivileged = areCreatorsPrivileged
     }
 
     
@@ -18623,13 +18631,15 @@ public struct FfiConverterTypeLeaveSpaceRoom: FfiConverterRustBuffer {
         return
             try LeaveSpaceRoom(
                 spaceRoom: FfiConverterTypeSpaceRoom.read(from: &buf), 
-                isLastAdmin: FfiConverterBool.read(from: &buf)
+                isLastOwner: FfiConverterBool.read(from: &buf), 
+                areCreatorsPrivileged: FfiConverterBool.read(from: &buf)
         )
     }
 
     public static func write(_ value: LeaveSpaceRoom, into buf: inout [UInt8]) {
         FfiConverterTypeSpaceRoom.write(value.spaceRoom, into: &buf)
-        FfiConverterBool.write(value.isLastAdmin, into: &buf)
+        FfiConverterBool.write(value.isLastOwner, into: &buf)
+        FfiConverterBool.write(value.areCreatorsPrivileged, into: &buf)
     }
 }
 

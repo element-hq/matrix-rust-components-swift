@@ -458,6 +458,344 @@ fileprivate struct FfiConverterString: FfiConverter {
 }
 
 
+
+
+/**
+ * Enum for the algorithm-specific secrets for the room key backup.
+ */
+public protocol BackupSecretsProtocol: AnyObject, Sendable {
+    
+}
+/**
+ * Enum for the algorithm-specific secrets for the room key backup.
+ */
+open class BackupSecrets: BackupSecretsProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_crypto_fn_clone_backupsecrets(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_crypto_fn_free_backupsecrets(handle, $0) }
+    }
+
+    
+
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeBackupSecrets: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = BackupSecrets
+
+    public static func lift(_ handle: UInt64) throws -> BackupSecrets {
+        return BackupSecrets(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: BackupSecrets) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BackupSecrets {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: BackupSecrets, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBackupSecrets_lift(_ handle: UInt64) throws -> BackupSecrets {
+    return try FfiConverterTypeBackupSecrets.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBackupSecrets_lower(_ value: BackupSecrets) -> UInt64 {
+    return FfiConverterTypeBackupSecrets.lower(value)
+}
+
+
+
+
+
+
+/**
+ * Data for the secrets bundle containing the cross-signing keys.
+ */
+public protocol CrossSigningSecretsProtocol: AnyObject, Sendable {
+    
+}
+/**
+ * Data for the secrets bundle containing the cross-signing keys.
+ */
+open class CrossSigningSecrets: CrossSigningSecretsProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_crypto_fn_clone_crosssigningsecrets(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_crypto_fn_free_crosssigningsecrets(handle, $0) }
+    }
+
+    
+
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCrossSigningSecrets: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = CrossSigningSecrets
+
+    public static func lift(_ handle: UInt64) throws -> CrossSigningSecrets {
+        return CrossSigningSecrets(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: CrossSigningSecrets) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CrossSigningSecrets {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: CrossSigningSecrets, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCrossSigningSecrets_lift(_ handle: UInt64) throws -> CrossSigningSecrets {
+    return try FfiConverterTypeCrossSigningSecrets.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCrossSigningSecrets_lower(_ value: CrossSigningSecrets) -> UInt64 {
+    return FfiConverterTypeCrossSigningSecrets.lower(value)
+}
+
+
+
+
+
+
+/**
+ * Struct containing the bundle of secrets to fully activate a new devices for
+ * end-to-end encryption.
+ */
+public protocol SecretsBundleProtocol: AnyObject, Sendable {
+    
+}
+/**
+ * Struct containing the bundle of secrets to fully activate a new devices for
+ * end-to-end encryption.
+ */
+open class SecretsBundle: SecretsBundleProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_crypto_fn_clone_secretsbundle(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_crypto_fn_free_secretsbundle(handle, $0) }
+    }
+
+    
+
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSecretsBundle: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = SecretsBundle
+
+    public static func lift(_ handle: UInt64) throws -> SecretsBundle {
+        return SecretsBundle(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: SecretsBundle) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SecretsBundle {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: SecretsBundle, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecretsBundle_lift(_ handle: UInt64) throws -> SecretsBundle {
+    return try FfiConverterTypeSecretsBundle.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecretsBundle_lower(_ value: SecretsBundle) -> UInt64 {
+    return FfiConverterTypeSecretsBundle.lower(value)
+}
+
+
+
+
 /**
  * Settings for decrypting messages
  */
