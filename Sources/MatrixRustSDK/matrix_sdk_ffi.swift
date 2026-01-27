@@ -15827,6 +15827,136 @@ public func FfiConverterTypeTimelineEvent_lower(_ value: TimelineEvent) -> UInt6
 
 
 
+/**
+ * A timeline filter that includes or excludes events based on their type or
+ * content.
+ */
+public protocol TimelineEventFilterProtocol: AnyObject, Sendable {
+    
+}
+/**
+ * A timeline filter that includes or excludes events based on their type or
+ * content.
+ */
+open class TimelineEventFilter: TimelineEventFilterProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_timelineeventfilter(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_timelineeventfilter(handle, $0) }
+    }
+
+    
+public static func exclude(conditions: [FilterTimelineEventCondition]) -> TimelineEventFilter  {
+    return try!  FfiConverterTypeTimelineEventFilter_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_constructor_timelineeventfilter_exclude(
+        FfiConverterSequenceTypeFilterTimelineEventCondition.lower(conditions),$0
+    )
+})
+}
+    
+public static func include(conditions: [FilterTimelineEventCondition]) -> TimelineEventFilter  {
+    return try!  FfiConverterTypeTimelineEventFilter_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_constructor_timelineeventfilter_include(
+        FfiConverterSequenceTypeFilterTimelineEventCondition.lower(conditions),$0
+    )
+})
+}
+    
+
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTimelineEventFilter: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = TimelineEventFilter
+
+    public static func lift(_ handle: UInt64) throws -> TimelineEventFilter {
+        return TimelineEventFilter(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: TimelineEventFilter) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineEventFilter {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: TimelineEventFilter, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTimelineEventFilter_lift(_ handle: UInt64) throws -> TimelineEventFilter {
+    return try FfiConverterTypeTimelineEventFilter.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTimelineEventFilter_lower(_ value: TimelineEventFilter) -> UInt64 {
+    return FfiConverterTypeTimelineEventFilter.lower(value)
+}
+
+
+
+
+
+
 public protocol TimelineEventTypeFilterProtocol: AnyObject, Sendable {
     
 }
@@ -27476,6 +27606,97 @@ public func FfiConverterTypeEventSendState_lower(_ value: EventSendState) -> Rus
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * A condition that matches on an event's type or content.
+ */
+
+public enum FilterTimelineEventCondition: Equatable, Hashable {
+    
+    /**
+     * The event has the specified event type.
+     */
+    case eventType(eventType: FilterTimelineEventType
+    )
+    /**
+     * The event is an `m.room.member` event that represents a membership
+     * change (join, leave, etc.).
+     */
+    case membershipChange
+    /**
+     * The event is an `m.room.member` event that represents a profile
+     * change (displayname or avatar URL).
+     */
+    case profileChange
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension FilterTimelineEventCondition: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFilterTimelineEventCondition: FfiConverterRustBuffer {
+    typealias SwiftType = FilterTimelineEventCondition
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FilterTimelineEventCondition {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .eventType(eventType: try FfiConverterTypeFilterTimelineEventType.read(from: &buf)
+        )
+        
+        case 2: return .membershipChange
+        
+        case 3: return .profileChange
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: FilterTimelineEventCondition, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .eventType(eventType):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeFilterTimelineEventType.write(eventType, into: &buf)
+            
+        
+        case .membershipChange:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .profileChange:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterTimelineEventCondition_lift(_ buf: RustBuffer) throws -> FilterTimelineEventCondition {
+    return try FfiConverterTypeFilterTimelineEventCondition.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterTimelineEventCondition_lower(_ value: FilterTimelineEventCondition) -> RustBuffer {
+    return FfiConverterTypeFilterTimelineEventCondition.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum FilterTimelineEventType: Equatable, Hashable {
     
@@ -37259,6 +37480,11 @@ public enum TimelineFilter {
      */
     case eventTypeFilter(filter: TimelineEventTypeFilter
     )
+    /**
+     * Show only events which match this event filter.
+     */
+    case eventFilter(filter: TimelineEventFilter
+    )
 
 
 
@@ -37288,6 +37514,9 @@ public struct FfiConverterTypeTimelineFilter: FfiConverterRustBuffer {
         case 3: return .eventTypeFilter(filter: try FfiConverterTypeTimelineEventTypeFilter.read(from: &buf)
         )
         
+        case 4: return .eventFilter(filter: try FfiConverterTypeTimelineEventFilter.read(from: &buf)
+        )
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -37308,6 +37537,11 @@ public struct FfiConverterTypeTimelineFilter: FfiConverterRustBuffer {
         case let .eventTypeFilter(filter):
             writeInt(&buf, Int32(3))
             FfiConverterTypeTimelineEventTypeFilter.write(filter, into: &buf)
+            
+        
+        case let .eventFilter(filter):
+            writeInt(&buf, Int32(4))
+            FfiConverterTypeTimelineEventFilter.write(filter, into: &buf)
             
         }
     }
@@ -46324,6 +46558,31 @@ fileprivate struct FfiConverterSequenceTypeDraftAttachment: FfiConverterRustBuff
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFilterTimelineEventCondition: FfiConverterRustBuffer {
+    typealias SwiftType = [FilterTimelineEventCondition]
+
+    public static func write(_ value: [FilterTimelineEventCondition], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFilterTimelineEventCondition.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FilterTimelineEventCondition] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FilterTimelineEventCondition]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFilterTimelineEventCondition.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeFilterTimelineEventType: FfiConverterRustBuffer {
     typealias SwiftType = [FilterTimelineEventType]
 
@@ -48814,6 +49073,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_sqlitestorebuilder_new() != 604) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_timelineeventfilter_exclude() != 53140) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_timelineeventfilter_include() != 40738) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_timelineeventtypefilter_exclude() != 17142) {
