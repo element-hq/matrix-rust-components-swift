@@ -810,6 +810,100 @@ public func FfiConverterTypeSpaceRoomListPaginationState_lower(_ value: SpaceRoo
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * Options for controlling the behaviour of [`TimelineFocus::Event`]
+ * for threaded events.
+ */
+
+public enum TimelineEventFocusThreadMode: Equatable, Hashable {
+    
+    /**
+     * Force the timeline into threaded mode. When the focused event is part of
+     * a thread, the timeline will be focused on that thread's root. Otherwise,
+     * the timeline will treat the target event itself as the thread root.
+     * Threaded events will never be hidden.
+     */
+    case forceThread
+    /**
+     * Automatically determine if the target event is
+     * part of a thread or not. If the event is part of a thread, the timeline
+     * will be filtered to on-thread events.
+     */
+    case automatic(
+        /**
+         * When the target event is not part of a thread, whether to
+         * hide in-thread replies from the live timeline. Has no effect
+         * when the target event is part of a thread.
+         *
+         * This should be set to true when the client can create
+         * [`TimelineFocus::Thread`]-focused timelines from the thread roots
+         * themselves and doesn't use the [`Self::ForceThread`] mode.
+         */hideThreadedEvents: Bool
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension TimelineEventFocusThreadMode: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTimelineEventFocusThreadMode: FfiConverterRustBuffer {
+    typealias SwiftType = TimelineEventFocusThreadMode
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineEventFocusThreadMode {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .forceThread
+        
+        case 2: return .automatic(hideThreadedEvents: try FfiConverterBool.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: TimelineEventFocusThreadMode, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .forceThread:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .automatic(hideThreadedEvents):
+            writeInt(&buf, Int32(2))
+            FfiConverterBool.write(hideThreadedEvents, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTimelineEventFocusThreadMode_lift(_ buf: RustBuffer) throws -> TimelineEventFocusThreadMode {
+    return try FfiConverterTypeTimelineEventFocusThreadMode.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTimelineEventFocusThreadMode_lower(_ value: TimelineEventFocusThreadMode) -> RustBuffer {
+    return FfiConverterTypeTimelineEventFocusThreadMode.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * Extends [`ShieldStateCode`] to allow for a `SentInClear` code.
  */
 

@@ -7224,7 +7224,7 @@ public protocol QrCodeDataProtocol: AnyObject, Sendable {
     /**
      * The server name contained within the scanned QR code data.
      *
-     * Note: This value is only present when scanning a QR code the belongs to
+     * Note: This value is only present when scanning a QR code that belongs to
      * a logged in client. The mode where the new client shows the QR code
      * will return `None`.
      */
@@ -7312,7 +7312,7 @@ public static func fromBytes(bytes: Data)throws  -> QrCodeData  {
     /**
      * The server name contained within the scanned QR code data.
      *
-     * Note: This value is only present when scanning a QR code the belongs to
+     * Note: This value is only present when scanning a QR code that belongs to
      * a logged in client. The mode where the new client shows the QR code
      * will return `None`.
      */
@@ -15897,10 +15897,26 @@ public static func exclude(conditions: [FilterTimelineEventCondition]) -> Timeli
 })
 }
     
+public static func excludeEventTypes(eventTypes: [FilterTimelineEventType]) -> TimelineEventFilter  {
+    return try!  FfiConverterTypeTimelineEventFilter_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_constructor_timelineeventfilter_exclude_event_types(
+        FfiConverterSequenceTypeFilterTimelineEventType.lower(eventTypes),$0
+    )
+})
+}
+    
 public static func include(conditions: [FilterTimelineEventCondition]) -> TimelineEventFilter  {
     return try!  FfiConverterTypeTimelineEventFilter_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_constructor_timelineeventfilter_include(
         FfiConverterSequenceTypeFilterTimelineEventCondition.lower(conditions),$0
+    )
+})
+}
+    
+public static func includeEventTypes(eventTypes: [FilterTimelineEventType]) -> TimelineEventFilter  {
+    return try!  FfiConverterTypeTimelineEventFilter_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_constructor_timelineeventfilter_include_event_types(
+        FfiConverterSequenceTypeFilterTimelineEventType.lower(eventTypes),$0
     )
 })
 }
@@ -15950,128 +15966,6 @@ public func FfiConverterTypeTimelineEventFilter_lift(_ handle: UInt64) throws ->
 #endif
 public func FfiConverterTypeTimelineEventFilter_lower(_ value: TimelineEventFilter) -> UInt64 {
     return FfiConverterTypeTimelineEventFilter.lower(value)
-}
-
-
-
-
-
-
-public protocol TimelineEventTypeFilterProtocol: AnyObject, Sendable {
-    
-}
-open class TimelineEventTypeFilter: TimelineEventTypeFilterProtocol, @unchecked Sendable {
-    fileprivate let handle: UInt64
-
-    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public struct NoHandle {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    required public init(unsafeFromHandle handle: UInt64) {
-        self.handle = handle
-    }
-
-    // This constructor can be used to instantiate a fake object.
-    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    //
-    // - Warning:
-    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public init(noHandle: NoHandle) {
-        self.handle = 0
-    }
-
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public func uniffiCloneHandle() -> UInt64 {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_timelineeventtypefilter(self.handle, $0) }
-    }
-    // No primary constructor declared for this class.
-
-    deinit {
-        if handle == 0 {
-            // Mock objects have handle=0 don't try to free them
-            return
-        }
-
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_timelineeventtypefilter(handle, $0) }
-    }
-
-    
-public static func exclude(eventTypes: [FilterTimelineEventType]) -> TimelineEventTypeFilter  {
-    return try!  FfiConverterTypeTimelineEventTypeFilter_lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_constructor_timelineeventtypefilter_exclude(
-        FfiConverterSequenceTypeFilterTimelineEventType.lower(eventTypes),$0
-    )
-})
-}
-    
-public static func include(eventTypes: [FilterTimelineEventType]) -> TimelineEventTypeFilter  {
-    return try!  FfiConverterTypeTimelineEventTypeFilter_lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_constructor_timelineeventtypefilter_include(
-        FfiConverterSequenceTypeFilterTimelineEventType.lower(eventTypes),$0
-    )
-})
-}
-    
-
-    
-
-    
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeTimelineEventTypeFilter: FfiConverter {
-    typealias FfiType = UInt64
-    typealias SwiftType = TimelineEventTypeFilter
-
-    public static func lift(_ handle: UInt64) throws -> TimelineEventTypeFilter {
-        return TimelineEventTypeFilter(unsafeFromHandle: handle)
-    }
-
-    public static func lower(_ value: TimelineEventTypeFilter) -> UInt64 {
-        return value.uniffiCloneHandle()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TimelineEventTypeFilter {
-        let handle: UInt64 = try readInt(&buf)
-        return try lift(handle)
-    }
-
-    public static func write(_ value: TimelineEventTypeFilter, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(value))
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeTimelineEventTypeFilter_lift(_ handle: UInt64) throws -> TimelineEventTypeFilter {
-    return try FfiConverterTypeTimelineEventTypeFilter.lift(handle)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeTimelineEventTypeFilter_lower(_ value: TimelineEventTypeFilter) -> UInt64 {
-    return FfiConverterTypeTimelineEventTypeFilter.lower(value)
 }
 
 
@@ -29350,6 +29244,8 @@ public enum LatestEventValue {
     case none
     case remote(timestamp: Timestamp, sender: String, isOwn: Bool, profile: ProfileDetails, content: TimelineItemContent
     )
+    case remoteInvite(timestamp: Timestamp, inviter: String?, inviterProfile: ProfileDetails
+    )
     case local(timestamp: Timestamp, sender: String, profile: ProfileDetails, content: TimelineItemContent, state: LatestEventValueLocalState
     )
 
@@ -29378,7 +29274,10 @@ public struct FfiConverterTypeLatestEventValue: FfiConverterRustBuffer {
         case 2: return .remote(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), sender: try FfiConverterString.read(from: &buf), isOwn: try FfiConverterBool.read(from: &buf), profile: try FfiConverterTypeProfileDetails.read(from: &buf), content: try FfiConverterTypeTimelineItemContent.read(from: &buf)
         )
         
-        case 3: return .local(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), sender: try FfiConverterString.read(from: &buf), profile: try FfiConverterTypeProfileDetails.read(from: &buf), content: try FfiConverterTypeTimelineItemContent.read(from: &buf), state: try FfiConverterTypeLatestEventValueLocalState.read(from: &buf)
+        case 3: return .remoteInvite(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), inviter: try FfiConverterOptionString.read(from: &buf), inviterProfile: try FfiConverterTypeProfileDetails.read(from: &buf)
+        )
+        
+        case 4: return .local(timestamp: try FfiConverterTypeTimestamp.read(from: &buf), sender: try FfiConverterString.read(from: &buf), profile: try FfiConverterTypeProfileDetails.read(from: &buf), content: try FfiConverterTypeTimelineItemContent.read(from: &buf), state: try FfiConverterTypeLatestEventValueLocalState.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -29402,8 +29301,15 @@ public struct FfiConverterTypeLatestEventValue: FfiConverterRustBuffer {
             FfiConverterTypeTimelineItemContent.write(content, into: &buf)
             
         
-        case let .local(timestamp,sender,profile,content,state):
+        case let .remoteInvite(timestamp,inviter,inviterProfile):
             writeInt(&buf, Int32(3))
+            FfiConverterTypeTimestamp.write(timestamp, into: &buf)
+            FfiConverterOptionString.write(inviter, into: &buf)
+            FfiConverterTypeProfileDetails.write(inviterProfile, into: &buf)
+            
+        
+        case let .local(timestamp,sender,profile,content,state):
+            writeInt(&buf, Int32(4))
             FfiConverterTypeTimestamp.write(timestamp, into: &buf)
             FfiConverterString.write(sender, into: &buf)
             FfiConverterTypeProfileDetails.write(profile, into: &buf)
@@ -37476,11 +37382,6 @@ public enum TimelineFilter {
          */types: [RoomMessageEventMessageType]
     )
     /**
-     * Show only events which match this filter.
-     */
-    case eventTypeFilter(filter: TimelineEventTypeFilter
-    )
-    /**
      * Show only events which match this event filter.
      */
     case eventFilter(filter: TimelineEventFilter
@@ -37511,10 +37412,7 @@ public struct FfiConverterTypeTimelineFilter: FfiConverterRustBuffer {
         case 2: return .onlyMessage(types: try FfiConverterSequenceTypeRoomMessageEventMessageType.read(from: &buf)
         )
         
-        case 3: return .eventTypeFilter(filter: try FfiConverterTypeTimelineEventTypeFilter.read(from: &buf)
-        )
-        
-        case 4: return .eventFilter(filter: try FfiConverterTypeTimelineEventFilter.read(from: &buf)
+        case 3: return .eventFilter(filter: try FfiConverterTypeTimelineEventFilter.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -37534,13 +37432,8 @@ public struct FfiConverterTypeTimelineFilter: FfiConverterRustBuffer {
             FfiConverterSequenceTypeRoomMessageEventMessageType.write(types, into: &buf)
             
         
-        case let .eventTypeFilter(filter):
-            writeInt(&buf, Int32(3))
-            FfiConverterTypeTimelineEventTypeFilter.write(filter, into: &buf)
-            
-        
         case let .eventFilter(filter):
-            writeInt(&buf, Int32(4))
+            writeInt(&buf, Int32(3))
             FfiConverterTypeTimelineEventFilter.write(filter, into: &buf)
             
         }
@@ -37582,8 +37475,8 @@ public enum TimelineFocus: Equatable, Hashable {
          * The number of context events to load around the focused event.
          */numContextEvents: UInt16, 
         /**
-         * Whether to hide in-thread replies from the live timeline.
-         */hideThreadedEvents: Bool
+         * How to handle threaded events.
+         */threadMode: TimelineEventFocusThreadMode
     )
     case thread(
         /**
@@ -37616,7 +37509,7 @@ public struct FfiConverterTypeTimelineFocus: FfiConverterRustBuffer {
         case 1: return .live(hideThreadedEvents: try FfiConverterBool.read(from: &buf)
         )
         
-        case 2: return .event(eventId: try FfiConverterString.read(from: &buf), numContextEvents: try FfiConverterUInt16.read(from: &buf), hideThreadedEvents: try FfiConverterBool.read(from: &buf)
+        case 2: return .event(eventId: try FfiConverterString.read(from: &buf), numContextEvents: try FfiConverterUInt16.read(from: &buf), threadMode: try FfiConverterTypeTimelineEventFocusThreadMode.read(from: &buf)
         )
         
         case 3: return .thread(rootEventId: try FfiConverterString.read(from: &buf)
@@ -37638,11 +37531,11 @@ public struct FfiConverterTypeTimelineFocus: FfiConverterRustBuffer {
             FfiConverterBool.write(hideThreadedEvents, into: &buf)
             
         
-        case let .event(eventId,numContextEvents,hideThreadedEvents):
+        case let .event(eventId,numContextEvents,threadMode):
             writeInt(&buf, Int32(2))
             FfiConverterString.write(eventId, into: &buf)
             FfiConverterUInt16.write(numContextEvents, into: &buf)
-            FfiConverterBool.write(hideThreadedEvents, into: &buf)
+            FfiConverterTypeTimelineEventFocusThreadMode.write(threadMode, into: &buf)
             
         
         case let .thread(rootEventId):
@@ -48283,7 +48176,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_loginwithqrcodehandler_scan() != 55947) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_qrcodedata_server_name() != 52906) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_qrcodedata_server_name() != 30138) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_qrcodedata_to_bytes() != 22532) {
@@ -49078,13 +48971,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_constructor_timelineeventfilter_exclude() != 53140) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_timelineeventfilter_exclude_event_types() != 53727) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_timelineeventfilter_include() != 40738) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_constructor_timelineeventtypefilter_exclude() != 17142) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_constructor_timelineeventtypefilter_include() != 18137) {
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_timelineeventfilter_include_event_types() != 47927) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_span_current() != 2135) {

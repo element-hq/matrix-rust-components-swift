@@ -1201,15 +1201,15 @@ public enum LoginQrCodeDecodeError: Swift.Error, Equatable, Hashable, Foundation
     case UrlParse(message: String)
     
     /**
-     * The QR code data contains an invalid mode, we expect the login (0x03)
-     * mode or the reciprocate mode (0x04).
+     * The QR code data contains an invalid intent, we expect the login
+     * intent or the reciprocate intent.
      */
-    case InvalidMode(message: String)
+    case InvalidIntent(message: String)
     
     /**
-     * The QR code data contains an unsupported version.
+     * The QR code data contains an unsupported type.
      */
-    case InvalidVersion(message: String)
+    case InvalidType(message: String)
     
     /**
      * The base64 encoded variant of the QR code data is not a valid base64
@@ -1263,11 +1263,11 @@ public struct FfiConverterTypeLoginQrCodeDecodeError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 4: return .InvalidMode(
+        case 4: return .InvalidIntent(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 5: return .InvalidVersion(
+        case 5: return .InvalidType(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -1296,9 +1296,9 @@ public struct FfiConverterTypeLoginQrCodeDecodeError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         case .UrlParse(_ /* message is ignored*/):
             writeInt(&buf, Int32(3))
-        case .InvalidMode(_ /* message is ignored*/):
+        case .InvalidIntent(_ /* message is ignored*/):
             writeInt(&buf, Int32(4))
-        case .InvalidVersion(_ /* message is ignored*/):
+        case .InvalidType(_ /* message is ignored*/):
             writeInt(&buf, Int32(5))
         case .Base64(_ /* message is ignored*/):
             writeInt(&buf, Int32(6))
