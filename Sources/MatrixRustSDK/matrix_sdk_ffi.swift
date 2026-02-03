@@ -1294,7 +1294,7 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func setPusher(identifiers: PusherIdentifiers, kind: PusherKind, appDisplayName: String, deviceDisplayName: String, profileTag: String?, lang: String) async throws 
     
     /**
-     * Sets the [UnableToDecryptDelegate] which will inform about UTDs.
+     * Sets the [`UnableToDecryptDelegate`] which will inform about UTDs.
      * Returns an error if the delegate was already set.
      */
     func setUtdDelegate(utdDelegate: UnableToDecryptDelegate) async throws 
@@ -2973,7 +2973,7 @@ open func setPusher(identifiers: PusherIdentifiers, kind: PusherKind, appDisplay
 }
     
     /**
-     * Sets the [UnableToDecryptDelegate] which will inform about UTDs.
+     * Sets the [`UnableToDecryptDelegate`] which will inform about UTDs.
      * Returns an error if the delegate was already set.
      */
 open func setUtdDelegate(utdDelegate: UnableToDecryptDelegate)async throws   {
@@ -38821,7 +38821,19 @@ public func FfiConverterCallbackInterfaceCallDeclineListener_lower(_ v: CallDecl
 
 public protocol ClientDelegate: AnyObject, Sendable {
     
+    /**
+     * A callback invoked whenever the SDK runs into an unknown token error.
+     */
     func didReceiveAuthError(isSoftLogout: Bool) 
+    
+    /**
+     * A callback invoked when a background task registered with the client's
+     * task monitor encounters an error.
+     *
+     * Can default to an empty implementation, if the embedder doesn't care
+     * about handling background jobs errors.
+     */
+    func onBackgroundTaskErrorReport(taskName: String, error: BackgroundTaskFailureReason) 
     
 }
 
@@ -38862,6 +38874,32 @@ fileprivate struct UniffiCallbackInterfaceClientDelegate {
                 }
                 return uniffiObj.didReceiveAuthError(
                      isSoftLogout: try FfiConverterBool.lift(isSoftLogout)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        onBackgroundTaskErrorReport: { (
+            uniffiHandle: UInt64,
+            taskName: RustBuffer,
+            error: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceClientDelegate.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onBackgroundTaskErrorReport(
+                     taskName: try FfiConverterString.lift(taskName),
+                     error: try FfiConverterTypeBackgroundTaskFailureReason_lift(error)
                 )
             }
 
@@ -47837,7 +47875,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_pusher() != 51438) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_utd_delegate() != 38853) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_utd_delegate() != 53527) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_sliding_sync_version() != 55440) {
@@ -48992,7 +49030,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_accountdatalistener_on_change() != 13017) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientdelegate_did_receive_auth_error() != 38563) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientdelegate_did_receive_auth_error() != 55975) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientdelegate_on_background_task_error_report() != 53131) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientsessiondelegate_retrieve_session_from_keychain() != 43233) {
@@ -49184,6 +49225,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitVerificationStateListener()
     uniffiCallbackInitWidgetCapabilitiesProvider()
     uniffiEnsureMatrixSdkBaseInitialized()
+    uniffiEnsureMatrixSdkCommonInitialized()
     uniffiEnsureMatrixSdkCryptoInitialized()
     uniffiEnsureMatrixSdkInitialized()
     uniffiEnsureMatrixSdkUiInitialized()
