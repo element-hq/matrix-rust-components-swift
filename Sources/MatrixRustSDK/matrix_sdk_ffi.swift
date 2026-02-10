@@ -19390,6 +19390,10 @@ public func FfiConverterTypeNoticeMessageContent_lower(_ value: NoticeMessageCon
 
 public struct NotificationItem {
     public var event: NotificationEvent
+    /**
+     * The raw JSON of the underlying event.
+     */
+    public var rawEvent: String
     public var senderInfo: NotificationSenderInfo
     public var roomInfo: NotificationRoomInfo
     /**
@@ -19407,7 +19411,10 @@ public struct NotificationItem {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(event: NotificationEvent, senderInfo: NotificationSenderInfo, roomInfo: NotificationRoomInfo, 
+    public init(event: NotificationEvent, 
+        /**
+         * The raw JSON of the underlying event.
+         */rawEvent: String, senderInfo: NotificationSenderInfo, roomInfo: NotificationRoomInfo, 
         /**
          * Is the notification supposed to be at the "noisy" level?
          * Can be `None` if we couldn't determine this, because we lacked
@@ -19417,6 +19424,7 @@ public struct NotificationItem {
          * The push actions for this notification (notify, sound, highlight, etc.).
          */actions: [Action]?) {
         self.event = event
+        self.rawEvent = rawEvent
         self.senderInfo = senderInfo
         self.roomInfo = roomInfo
         self.isNoisy = isNoisy
@@ -19442,6 +19450,7 @@ public struct FfiConverterTypeNotificationItem: FfiConverterRustBuffer {
         return
             try NotificationItem(
                 event: FfiConverterTypeNotificationEvent.read(from: &buf), 
+                rawEvent: FfiConverterString.read(from: &buf), 
                 senderInfo: FfiConverterTypeNotificationSenderInfo.read(from: &buf), 
                 roomInfo: FfiConverterTypeNotificationRoomInfo.read(from: &buf), 
                 isNoisy: FfiConverterOptionBool.read(from: &buf), 
@@ -19453,6 +19462,7 @@ public struct FfiConverterTypeNotificationItem: FfiConverterRustBuffer {
 
     public static func write(_ value: NotificationItem, into buf: inout [UInt8]) {
         FfiConverterTypeNotificationEvent.write(value.event, into: &buf)
+        FfiConverterString.write(value.rawEvent, into: &buf)
         FfiConverterTypeNotificationSenderInfo.write(value.senderInfo, into: &buf)
         FfiConverterTypeNotificationRoomInfo.write(value.roomInfo, into: &buf)
         FfiConverterOptionBool.write(value.isNoisy, into: &buf)
@@ -37483,8 +37493,7 @@ public enum TimelineFocus: Equatable, Hashable {
          * The thread root event ID to focus on.
          */rootEventId: String
     )
-    case pinnedEvents(maxEventsToLoad: UInt16, maxConcurrentRequests: UInt16
-    )
+    case pinnedEvents
 
 
 
@@ -37515,8 +37524,7 @@ public struct FfiConverterTypeTimelineFocus: FfiConverterRustBuffer {
         case 3: return .thread(rootEventId: try FfiConverterString.read(from: &buf)
         )
         
-        case 4: return .pinnedEvents(maxEventsToLoad: try FfiConverterUInt16.read(from: &buf), maxConcurrentRequests: try FfiConverterUInt16.read(from: &buf)
-        )
+        case 4: return .pinnedEvents
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -37543,11 +37551,9 @@ public struct FfiConverterTypeTimelineFocus: FfiConverterRustBuffer {
             FfiConverterString.write(rootEventId, into: &buf)
             
         
-        case let .pinnedEvents(maxEventsToLoad,maxConcurrentRequests):
+        case .pinnedEvents:
             writeInt(&buf, Int32(4))
-            FfiConverterUInt16.write(maxEventsToLoad, into: &buf)
-            FfiConverterUInt16.write(maxConcurrentRequests, into: &buf)
-            
+        
         }
     }
 }
