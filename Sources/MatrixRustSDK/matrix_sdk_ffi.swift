@@ -1311,6 +1311,12 @@ public protocol ClientProtocol: AnyObject, Sendable {
      */
     func startSsoLogin(redirectUrl: String, idpId: String?) async throws  -> SsoHandler
     
+    /**
+     * Subscribe to duplicate key upload errors triggered by requests to
+     * /keys/upload.
+     */
+    func subscribeToDuplicateKeyUploadErrors(listener: DuplicateKeyUploadErrorListener)  -> TaskHandle
+    
     func subscribeToIgnoredUsers(listener: IgnoredUsersListener)  -> TaskHandle
     
     /**
@@ -3040,6 +3046,19 @@ open func startSsoLogin(redirectUrl: String, idpId: String?)async throws  -> Sso
             liftFunc: FfiConverterTypeSsoHandler_lift,
             errorHandler: FfiConverterTypeSsoError_lift
         )
+}
+    
+    /**
+     * Subscribe to duplicate key upload errors triggered by requests to
+     * /keys/upload.
+     */
+open func subscribeToDuplicateKeyUploadErrors(listener: DuplicateKeyUploadErrorListener) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_duplicate_key_upload_errors(
+            self.uniffiCloneHandle(),
+        FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener_lower(listener),$0
+    )
+})
 }
     
 open func subscribeToIgnoredUsers(listener: IgnoredUsersListener) -> TaskHandle  {
@@ -17508,6 +17527,76 @@ public func FfiConverterTypeCreateRoomParameters_lower(_ value: CreateRoomParame
 }
 
 
+/**
+ * Information about the old and new key that caused a duplicate key upload
+ * error in /keys/upload.
+ */
+public struct DuplicateOneTimeKeyErrorMessage: Equatable, Hashable {
+    /**
+     * The previously uploaded one-time key, encoded as unpadded base64.
+     */
+    public var oldKey: String
+    /**
+     * The one-time key we attempted to upload, encoded as unpadded base64
+     */
+    public var newKey: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The previously uploaded one-time key, encoded as unpadded base64.
+         */oldKey: String, 
+        /**
+         * The one-time key we attempted to upload, encoded as unpadded base64
+         */newKey: String) {
+        self.oldKey = oldKey
+        self.newKey = newKey
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension DuplicateOneTimeKeyErrorMessage: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDuplicateOneTimeKeyErrorMessage: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DuplicateOneTimeKeyErrorMessage {
+        return
+            try DuplicateOneTimeKeyErrorMessage(
+                oldKey: FfiConverterString.read(from: &buf), 
+                newKey: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DuplicateOneTimeKeyErrorMessage, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.oldKey, into: &buf)
+        FfiConverterString.write(value.newKey, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDuplicateOneTimeKeyErrorMessage_lift(_ buf: RustBuffer) throws -> DuplicateOneTimeKeyErrorMessage {
+    return try FfiConverterTypeDuplicateOneTimeKeyErrorMessage.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDuplicateOneTimeKeyErrorMessage_lower(_ value: DuplicateOneTimeKeyErrorMessage) -> RustBuffer {
+    return FfiConverterTypeDuplicateOneTimeKeyErrorMessage.lower(value)
+}
+
+
 public struct EmoteMessageContent: Equatable, Hashable {
     public var body: String
     public var formatted: FormattedBody?
@@ -21104,6 +21193,7 @@ public struct RoomInfo {
     public var activeMembersCount: UInt64
     public var invitedMembersCount: UInt64
     public var joinedMembersCount: UInt64
+    public var serviceMembers: [String]
     public var highlightCount: UInt64
     public var notificationCount: UInt64
     public var cachedUserDefinedNotificationMode: RoomNotificationMode?
@@ -21181,7 +21271,7 @@ public struct RoomInfo {
          *
          * Can be missing if the room membership invite event is missing from the
          * store.
-         */inviter: RoomMember?, heroes: [RoomHero], activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, highlightCount: UInt64, notificationCount: UInt64, cachedUserDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], 
+         */inviter: RoomMember?, heroes: [RoomHero], activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, serviceMembers: [String], highlightCount: UInt64, notificationCount: UInt64, cachedUserDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], 
         /**
          * Whether this room has been explicitly marked as unread
          */isMarkedUnread: Bool, 
@@ -21238,6 +21328,7 @@ public struct RoomInfo {
         self.activeMembersCount = activeMembersCount
         self.invitedMembersCount = invitedMembersCount
         self.joinedMembersCount = joinedMembersCount
+        self.serviceMembers = serviceMembers
         self.highlightCount = highlightCount
         self.notificationCount = notificationCount
         self.cachedUserDefinedNotificationMode = cachedUserDefinedNotificationMode
@@ -21291,6 +21382,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 activeMembersCount: FfiConverterUInt64.read(from: &buf), 
                 invitedMembersCount: FfiConverterUInt64.read(from: &buf), 
                 joinedMembersCount: FfiConverterUInt64.read(from: &buf), 
+                serviceMembers: FfiConverterSequenceString.read(from: &buf), 
                 highlightCount: FfiConverterUInt64.read(from: &buf), 
                 notificationCount: FfiConverterUInt64.read(from: &buf), 
                 cachedUserDefinedNotificationMode: FfiConverterOptionTypeRoomNotificationMode.read(from: &buf), 
@@ -21330,6 +21422,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.activeMembersCount, into: &buf)
         FfiConverterUInt64.write(value.invitedMembersCount, into: &buf)
         FfiConverterUInt64.write(value.joinedMembersCount, into: &buf)
+        FfiConverterSequenceString.write(value.serviceMembers, into: &buf)
         FfiConverterUInt64.write(value.highlightCount, into: &buf)
         FfiConverterUInt64.write(value.notificationCount, into: &buf)
         FfiConverterOptionTypeRoomNotificationMode.write(value.cachedUserDefinedNotificationMode, into: &buf)
@@ -23510,15 +23603,33 @@ public struct TracingFileConfiguration: Equatable, Hashable {
     public var filePrefix: String
     /**
      * Optional suffix for the log file's names.
+     *
+     * Default is ".log" if not specified.
      */
     public var fileSuffix: String?
     /**
-     * Maximum number of rotated files.
+     * Maximum total size of all log files combined in bytes.
      *
-     * If not set, there's no max limit, i.e. the number of log files is
-     * unlimited.
+     * When the total size of all log files with the configured prefix and
+     * suffix exceeds this limit, the oldest files will be removed until
+     * the total is below the limit.
+     *
+     * This is useful to prevent log files from consuming too much disk space
+     * over time, even with multiple rotated files.
+     *
+     * Default: 10MB (10 * 1024 * 1024 bytes) if not specified.
      */
-    public var maxFiles: UInt64?
+    public var maxTotalSizeBytes: UInt64?
+    /**
+     * Maximum age of log files in seconds.
+     *
+     * Log files older than this age will be automatically removed during
+     * cleanup. This is checked when the writer is created and during
+     * rotation operations.
+     *
+     * Default: 1 week (7 * 24 * 60 * 60 seconds) if not specified.
+     */
+    public var maxAgeSeconds: UInt64?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -23531,17 +23642,35 @@ public struct TracingFileConfiguration: Equatable, Hashable {
          */filePrefix: String, 
         /**
          * Optional suffix for the log file's names.
+         *
+         * Default is ".log" if not specified.
          */fileSuffix: String?, 
         /**
-         * Maximum number of rotated files.
+         * Maximum total size of all log files combined in bytes.
          *
-         * If not set, there's no max limit, i.e. the number of log files is
-         * unlimited.
-         */maxFiles: UInt64?) {
+         * When the total size of all log files with the configured prefix and
+         * suffix exceeds this limit, the oldest files will be removed until
+         * the total is below the limit.
+         *
+         * This is useful to prevent log files from consuming too much disk space
+         * over time, even with multiple rotated files.
+         *
+         * Default: 10MB (10 * 1024 * 1024 bytes) if not specified.
+         */maxTotalSizeBytes: UInt64?, 
+        /**
+         * Maximum age of log files in seconds.
+         *
+         * Log files older than this age will be automatically removed during
+         * cleanup. This is checked when the writer is created and during
+         * rotation operations.
+         *
+         * Default: 1 week (7 * 24 * 60 * 60 seconds) if not specified.
+         */maxAgeSeconds: UInt64?) {
         self.path = path
         self.filePrefix = filePrefix
         self.fileSuffix = fileSuffix
-        self.maxFiles = maxFiles
+        self.maxTotalSizeBytes = maxTotalSizeBytes
+        self.maxAgeSeconds = maxAgeSeconds
     }
 
     
@@ -23563,7 +23692,8 @@ public struct FfiConverterTypeTracingFileConfiguration: FfiConverterRustBuffer {
                 path: FfiConverterString.read(from: &buf), 
                 filePrefix: FfiConverterString.read(from: &buf), 
                 fileSuffix: FfiConverterOptionString.read(from: &buf), 
-                maxFiles: FfiConverterOptionUInt64.read(from: &buf)
+                maxTotalSizeBytes: FfiConverterOptionUInt64.read(from: &buf), 
+                maxAgeSeconds: FfiConverterOptionUInt64.read(from: &buf)
         )
     }
 
@@ -23571,7 +23701,8 @@ public struct FfiConverterTypeTracingFileConfiguration: FfiConverterRustBuffer {
         FfiConverterString.write(value.path, into: &buf)
         FfiConverterString.write(value.filePrefix, into: &buf)
         FfiConverterOptionString.write(value.fileSuffix, into: &buf)
-        FfiConverterOptionUInt64.write(value.maxFiles, into: &buf)
+        FfiConverterOptionUInt64.write(value.maxTotalSizeBytes, into: &buf)
+        FfiConverterOptionUInt64.write(value.maxAgeSeconds, into: &buf)
     }
 }
 
@@ -39138,6 +39269,137 @@ public func FfiConverterCallbackInterfaceClientSessionDelegate_lower(_ v: Client
 
 
 
+/**
+ * A listener for duplicate key upload errors triggered by requests to
+ * /keys/upload.
+ */
+public protocol DuplicateKeyUploadErrorListener: AnyObject, Sendable {
+    
+    /**
+     * Called once when uploading keys fails.
+     */
+    func onDuplicateKeyUploadError(message: DuplicateOneTimeKeyErrorMessage?) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceDuplicateKeyUploadErrorListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // This creates 1-element array, since this seems to be the only way to construct a const
+    // pointer that we can pass to the Rust code.
+    static let vtable: [UniffiVTableCallbackInterfaceDuplicateKeyUploadErrorListener] = [UniffiVTableCallbackInterfaceDuplicateKeyUploadErrorListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface DuplicateKeyUploadErrorListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface DuplicateKeyUploadErrorListener: handle missing in uniffiClone")
+            }
+        },
+        onDuplicateKeyUploadError: { (
+            uniffiHandle: UInt64,
+            message: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onDuplicateKeyUploadError(
+                     message: try FfiConverterOptionTypeDuplicateOneTimeKeyErrorMessage.lift(message)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )]
+}
+
+private func uniffiCallbackInitDuplicateKeyUploadErrorListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_duplicatekeyuploaderrorlistener(UniffiCallbackInterfaceDuplicateKeyUploadErrorListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener {
+    fileprivate static let handleMap = UniffiHandleMap<DuplicateKeyUploadErrorListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener : FfiConverter {
+    typealias SwiftType = DuplicateKeyUploadErrorListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener_lift(_ handle: UInt64) throws -> DuplicateKeyUploadErrorListener {
+    return try FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener_lower(_ v: DuplicateKeyUploadErrorListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener.lower(v)
+}
+
+
+
+
 public protocol EnableRecoveryProgressListener: AnyObject, Sendable {
     
     func onUpdate(status: EnableRecoveryProgress) 
@@ -44450,6 +44712,30 @@ fileprivate struct FfiConverterOptionTypeComposerDraft: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeDuplicateOneTimeKeyErrorMessage: FfiConverterRustBuffer {
+    typealias SwiftType = DuplicateOneTimeKeyErrorMessage?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeDuplicateOneTimeKeyErrorMessage.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeDuplicateOneTimeKeyErrorMessage.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeEventTimelineItem: FfiConverterRustBuffer {
     typealias SwiftType = EventTimelineItem?
 
@@ -47293,6 +47579,30 @@ public func reloadTracingFileWriter(configuration: TracingFileConfiguration)thro
 }
 }
 /**
+ * Log an event.
+ *
+ * The target should be something like a module path, and can be referenced in
+ * the filter string given to `init_platform`. `level` and `target` for a
+ * callsite are fixed at the first `log_event` call for that callsite and can
+ * not be changed afterwards, i.e. the level and target passed for second and
+ * following `log_event`s with the same callsite will be ignored.
+ *
+ * This function leaks a little bit of memory for each unique (file + line +
+ * level + target) it is called with. Please make sure that the number of
+ * different combinations of those parameters this can be called with is
+ * constant in the final executable.
+ */
+public func logEvent(file: String, line: UInt32?, level: LogLevel, target: String, message: String)  {try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_func_log_event(
+        FfiConverterString.lower(file),
+        FfiConverterOptionUInt32.lower(line),
+        FfiConverterTypeLogLevel_lower(level),
+        FfiConverterString.lower(target),
+        FfiConverterString.lower(message),$0
+    )
+}
+}
+/**
  * Generates a `matrix.to` permalink to the given room alias.
  */
 public func matrixToRoomAliasPermalink(roomAlias: String)throws  -> String  {
@@ -47436,30 +47746,6 @@ public func createCaptionEdit(caption: String?, formattedCaption: FormattedBody?
 })
 }
 /**
- * Log an event.
- *
- * The target should be something like a module path, and can be referenced in
- * the filter string given to `init_platform`. `level` and `target` for a
- * callsite are fixed at the first `log_event` call for that callsite and can
- * not be changed afterwards, i.e. the level and target passed for second and
- * following `log_event`s with the same callsite will be ignored.
- *
- * This function leaks a little bit of memory for each unique (file + line +
- * level + target) it is called with. Please make sure that the number of
- * different combinations of those parameters this can be called with is
- * constant in the final executable.
- */
-public func logEvent(file: String, line: UInt32?, level: LogLevel, target: String, message: String)  {try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_func_log_event(
-        FfiConverterString.lower(file),
-        FfiConverterOptionUInt32.lower(line),
-        FfiConverterTypeLogLevel_lower(level),
-        FfiConverterString.lower(target),
-        FfiConverterString.lower(message),$0
-    )
-}
-}
-/**
  * Create the actual url that can be used to setup the WebView or IFrame
  * that contains the widget.
  *
@@ -47566,6 +47852,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_func_reload_tracing_file_writer() != 7613) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_func_log_event() != 10301) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_func_matrix_to_room_alias_permalink() != 4370) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -47606,9 +47895,6 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_create_caption_edit() != 57776) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_func_log_event() != 28696) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_generate_webview_url() != 42271) {
@@ -47891,6 +48177,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_start_sso_login() != 11891) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_duplicate_key_upload_errors() != 63604) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_ignored_users() != 10184) {
@@ -48203,6 +48492,15 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettings_unmute_room() != 54475) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_span_enter() != 10876) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_span_exit() != 53701) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_span_is_none() != 30786) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_checkcodesender_send() != 2180) {
@@ -48979,15 +49277,6 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_inreplytodetails_event_id() != 55998) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_span_enter() != 15935) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_span_exit() != 2919) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_span_is_none() != 59307) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_widgetdriver_run() != 61502) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -48998,6 +49287,15 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_clientbuilder_new() != 40475) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_span_current() != 3197) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_span_new() != 17271) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_span_new_bridge_span() != 19695) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_qrcodedata_from_bytes() != 55735) {
@@ -49024,15 +49322,6 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_constructor_timelineeventfilter_include_event_types() != 47927) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_constructor_span_current() != 2135) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_constructor_span_new() != 47713) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_constructor_span_new_bridge_span() != 51316) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_accountdatalistener_on_change() != 13017) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -49046,6 +49335,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientsessiondelegate_save_session_in_keychain() != 4452) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_duplicatekeyuploaderrorlistener_on_duplicate_key_upload_error() != 17775) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_ignoreduserslistener_call() != 6068) {
@@ -49193,6 +49485,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitCallDeclineListener()
     uniffiCallbackInitClientDelegate()
     uniffiCallbackInitClientSessionDelegate()
+    uniffiCallbackInitDuplicateKeyUploadErrorListener()
     uniffiCallbackInitEnableRecoveryProgressListener()
     uniffiCallbackInitGeneratedQrLoginProgressListener()
     uniffiCallbackInitGrantGeneratedQrLoginProgressListener()
