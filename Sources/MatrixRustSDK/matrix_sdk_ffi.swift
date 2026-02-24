@@ -3419,7 +3419,7 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
     
     func build() async throws  -> Client
     
-    func crossProcessStoreLocksHolderName(holderName: String)  -> ClientBuilder
+    func crossProcessLockConfig(crossProcessLockConfig: CrossProcessLockConfig)  -> ClientBuilder
     
     /**
      * Set the trust requirement to be used when decrypting events.
@@ -3634,11 +3634,11 @@ open func build()async throws  -> Client  {
         )
 }
     
-open func crossProcessStoreLocksHolderName(holderName: String) -> ClientBuilder  {
+open func crossProcessLockConfig(crossProcessLockConfig: CrossProcessLockConfig) -> ClientBuilder  {
     return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_cross_process_store_locks_holder_name(
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_cross_process_lock_config(
             self.uniffiCloneHandle(),
-        FfiConverterString.lower(holderName),$0
+        FfiConverterTypeCrossProcessLockConfig_lower(crossProcessLockConfig),$0
     )
 })
 }
@@ -14294,8 +14294,6 @@ public protocol SyncServiceBuilderProtocol: AnyObject, Sendable {
     
     func finish() async throws  -> SyncService
     
-    func withCrossProcessLock()  -> SyncServiceBuilder
-    
     /**
      * Enable the "offline" mode for the [`SyncService`].
      */
@@ -14372,14 +14370,6 @@ open func finish()async throws  -> SyncService  {
             liftFunc: FfiConverterTypeSyncService_lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
-}
-    
-open func withCrossProcessLock() -> SyncServiceBuilder  {
-    return try!  FfiConverterTypeSyncServiceBuilder_lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_cross_process_lock(
-            self.uniffiCloneHandle(),$0
-    )
-})
 }
     
     /**
@@ -21178,6 +21168,7 @@ public struct RoomInfo {
      */
     public var successorRoom: SuccessorRoom?
     public var isFavourite: Bool
+    public var isLowPriority: Bool
     public var canonicalAlias: String?
     public var alternativeAliases: [String]
     public var membership: Membership
@@ -21264,7 +21255,7 @@ public struct RoomInfo {
          */isPublic: Bool?, isSpace: Bool, 
         /**
          * If present, it means the room has been archived/upgraded.
-         */successorRoom: SuccessorRoom?, isFavourite: Bool, canonicalAlias: String?, alternativeAliases: [String], membership: Membership, 
+         */successorRoom: SuccessorRoom?, isFavourite: Bool, isLowPriority: Bool, canonicalAlias: String?, alternativeAliases: [String], membership: Membership, 
         /**
          * Member who invited the current user to a room that's in the invited
          * state.
@@ -21320,6 +21311,7 @@ public struct RoomInfo {
         self.isSpace = isSpace
         self.successorRoom = successorRoom
         self.isFavourite = isFavourite
+        self.isLowPriority = isLowPriority
         self.canonicalAlias = canonicalAlias
         self.alternativeAliases = alternativeAliases
         self.membership = membership
@@ -21374,6 +21366,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 isSpace: FfiConverterBool.read(from: &buf), 
                 successorRoom: FfiConverterOptionTypeSuccessorRoom.read(from: &buf), 
                 isFavourite: FfiConverterBool.read(from: &buf), 
+                isLowPriority: FfiConverterBool.read(from: &buf), 
                 canonicalAlias: FfiConverterOptionString.read(from: &buf), 
                 alternativeAliases: FfiConverterSequenceString.read(from: &buf), 
                 membership: FfiConverterTypeMembership.read(from: &buf), 
@@ -21414,6 +21407,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isSpace, into: &buf)
         FfiConverterOptionTypeSuccessorRoom.write(value.successorRoom, into: &buf)
         FfiConverterBool.write(value.isFavourite, into: &buf)
+        FfiConverterBool.write(value.isLowPriority, into: &buf)
         FfiConverterOptionString.write(value.canonicalAlias, into: &buf)
         FfiConverterSequenceString.write(value.alternativeAliases, into: &buf)
         FfiConverterTypeMembership.write(value.membership, into: &buf)
@@ -26077,6 +26071,89 @@ public func FfiConverterTypeComposerDraftType_lift(_ buf: RustBuffer) throws -> 
 #endif
 public func FfiConverterTypeComposerDraftType_lower(_ value: ComposerDraftType) -> RustBuffer {
     return FfiConverterTypeComposerDraftType.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The cross-process lock config to use.
+ */
+
+public enum CrossProcessLockConfig: Equatable, Hashable {
+    
+    /**
+     * The client will run using multiple processes.
+     */
+    case multiProcess(
+        /**
+         * The holder name to use for the lock.
+         */holderName: String
+    )
+    /**
+     * The client will run in a single process, there is no need for a
+     * cross-process lock.
+     */
+    case singleProcess
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension CrossProcessLockConfig: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCrossProcessLockConfig: FfiConverterRustBuffer {
+    typealias SwiftType = CrossProcessLockConfig
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CrossProcessLockConfig {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .multiProcess(holderName: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .singleProcess
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: CrossProcessLockConfig, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .multiProcess(holderName):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(holderName, into: &buf)
+            
+        
+        case .singleProcess:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCrossProcessLockConfig_lift(_ buf: RustBuffer) throws -> CrossProcessLockConfig {
+    return try FfiConverterTypeCrossProcessLockConfig.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCrossProcessLockConfig_lower(_ value: CrossProcessLockConfig) -> RustBuffer {
+    return FfiConverterTypeCrossProcessLockConfig.lower(value)
 }
 
 
@@ -48248,7 +48325,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_build() != 21717) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_cross_process_store_locks_holder_name() != 56336) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_cross_process_lock_config() != 48946) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_decryption_settings() != 36533) {
@@ -49116,9 +49193,6 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_finish() != 29725) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_cross_process_lock() != 17911) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_offline_mode() != 48885) {
