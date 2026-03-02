@@ -3437,8 +3437,6 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
     
     func disableSslVerification()  -> ClientBuilder
     
-    func enableOidcRefreshLock()  -> ClientBuilder
-    
     /**
      * Set whether to enable the experimental support for sending and receiving
      * encrypted room history on invite, per [MSC4268].
@@ -3679,14 +3677,6 @@ open func disableBuiltInRootCertificates() -> ClientBuilder  {
 open func disableSslVerification() -> ClientBuilder  {
     return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_disable_ssl_verification(
-            self.uniffiCloneHandle(),$0
-    )
-})
-}
-    
-open func enableOidcRefreshLock() -> ClientBuilder  {
-    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_enable_oidc_refresh_lock(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -24983,10 +24973,10 @@ public func FfiConverterTypeAccountDataEventType_lower(_ value: AccountDataEvent
 public enum AccountManagementAction: Equatable, Hashable {
     
     case profile
-    case sessionsList
-    case sessionView(deviceId: String
+    case devicesList
+    case deviceView(deviceId: String
     )
-    case sessionEnd(deviceId: String
+    case deviceDelete(deviceId: String
     )
     case accountDeactivate
     case crossSigningReset
@@ -25013,12 +25003,12 @@ public struct FfiConverterTypeAccountManagementAction: FfiConverterRustBuffer {
         
         case 1: return .profile
         
-        case 2: return .sessionsList
+        case 2: return .devicesList
         
-        case 3: return .sessionView(deviceId: try FfiConverterString.read(from: &buf)
+        case 3: return .deviceView(deviceId: try FfiConverterString.read(from: &buf)
         )
         
-        case 4: return .sessionEnd(deviceId: try FfiConverterString.read(from: &buf)
+        case 4: return .deviceDelete(deviceId: try FfiConverterString.read(from: &buf)
         )
         
         case 5: return .accountDeactivate
@@ -25037,16 +25027,16 @@ public struct FfiConverterTypeAccountManagementAction: FfiConverterRustBuffer {
             writeInt(&buf, Int32(1))
         
         
-        case .sessionsList:
+        case .devicesList:
             writeInt(&buf, Int32(2))
         
         
-        case let .sessionView(deviceId):
+        case let .deviceView(deviceId):
             writeInt(&buf, Int32(3))
             FfiConverterString.write(deviceId, into: &buf)
             
         
-        case let .sessionEnd(deviceId):
+        case let .deviceDelete(deviceId):
             writeInt(&buf, Int32(4))
             FfiConverterString.write(deviceId, into: &buf)
             
@@ -28729,14 +28719,35 @@ public enum HumanQrGrantLoginError: Swift.Error, Equatable, Hashable, Foundation
     case NotFound(message: String)
     
     /**
-     * The device could not be created.
-     */
-    case UnableToCreateDevice(message: String)
-    
-    /**
      * An unknown error has happened.
      */
     case Unknown(message: String)
+    
+    /**
+     * The requested device was not returned by the homeserver.
+     */
+    case DeviceNotFound(message: String)
+    
+    /**
+     * The other device is already signed in and so does not need to sign in.
+     */
+    case OtherDeviceAlreadySignedIn(message: String)
+    
+    /**
+     * The sign in was cancelled.
+     */
+    case Cancelled(message: String)
+    
+    /**
+     * The sign in was not completed in the required time.
+     */
+    case Expired(message: String)
+    
+    /**
+     * A secure connection could not have been established between the two
+     * devices.
+     */
+    case ConnectionInsecure(message: String)
     
 
     
@@ -28787,11 +28798,27 @@ public struct FfiConverterTypeHumanQrGrantLoginError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 6: return .UnableToCreateDevice(
+        case 6: return .Unknown(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 7: return .Unknown(
+        case 7: return .DeviceNotFound(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 8: return .OtherDeviceAlreadySignedIn(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 9: return .Cancelled(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 10: return .Expired(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 11: return .ConnectionInsecure(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -28816,10 +28843,18 @@ public struct FfiConverterTypeHumanQrGrantLoginError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(4))
         case .NotFound(_ /* message is ignored*/):
             writeInt(&buf, Int32(5))
-        case .UnableToCreateDevice(_ /* message is ignored*/):
-            writeInt(&buf, Int32(6))
         case .Unknown(_ /* message is ignored*/):
+            writeInt(&buf, Int32(6))
+        case .DeviceNotFound(_ /* message is ignored*/):
             writeInt(&buf, Int32(7))
+        case .OtherDeviceAlreadySignedIn(_ /* message is ignored*/):
+            writeInt(&buf, Int32(8))
+        case .Cancelled(_ /* message is ignored*/):
+            writeInt(&buf, Int32(9))
+        case .Expired(_ /* message is ignored*/):
+            writeInt(&buf, Int32(10))
+        case .ConnectionInsecure(_ /* message is ignored*/):
+            writeInt(&buf, Int32(11))
 
         
         }
@@ -31502,6 +31537,10 @@ public enum NotificationStatus {
      * current user.
      */
     case eventFilteredOut
+    /**
+     * The event has been redacted.
+     */
+    case eventRedacted
 
 
 
@@ -31530,6 +31569,8 @@ public struct FfiConverterTypeNotificationStatus: FfiConverterRustBuffer {
         
         case 3: return .eventFilteredOut
         
+        case 4: return .eventRedacted
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -31549,6 +31590,10 @@ public struct FfiConverterTypeNotificationStatus: FfiConverterRustBuffer {
         
         case .eventFilteredOut:
             writeInt(&buf, Int32(3))
+        
+        
+        case .eventRedacted:
+            writeInt(&buf, Int32(4))
         
         }
     }
@@ -40726,7 +40771,7 @@ public func FfiConverterCallbackInterfaceNotificationSettingsDelegate_lower(_ v:
 
 public protocol PaginationStatusListener: AnyObject, Sendable {
     
-    func onUpdate(status: RoomPaginationStatus) 
+    func onUpdate(status: PaginationStatus) 
     
 }
 
@@ -40766,7 +40811,7 @@ fileprivate struct UniffiCallbackInterfacePaginationStatusListener {
                     throw UniffiInternalError.unexpectedStaleHandle
                 }
                 return uniffiObj.onUpdate(
-                     status: try FfiConverterTypeRoomPaginationStatus_lift(status)
+                     status: try FfiConverterTypePaginationStatus_lift(status)
                 )
             }
 
@@ -48340,9 +48385,6 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_ssl_verification() != 17095) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_enable_oidc_refresh_lock() != 54805) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_enable_share_history_on_invite() != 47743) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -49540,7 +49582,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicestateobserver_on_update() != 7272) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_paginationstatuslistener_on_update() != 53207) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_paginationstatuslistener_on_update() != 17449) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timelinelistener_on_update() != 35518) {
