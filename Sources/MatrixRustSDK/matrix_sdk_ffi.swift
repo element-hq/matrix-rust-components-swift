@@ -30409,7 +30409,10 @@ public enum MessageLikeEventContent {
     case rtcNotification(notificationType: RtcNotificationType, 
         /**
          * The timestamp at which this notification is considered invalid.
-         */expirationTs: Timestamp
+         */expirationTs: Timestamp, 
+        /**
+         * Soft indication of whether it is an audio or video call.
+         */callIntent: RtcCallIntent?
     )
     case callHangup
     case callCandidates
@@ -30455,7 +30458,7 @@ public struct FfiConverterTypeMessageLikeEventContent: FfiConverterRustBuffer {
         
         case 2: return .callInvite
         
-        case 3: return .rtcNotification(notificationType: try FfiConverterTypeRtcNotificationType.read(from: &buf), expirationTs: try FfiConverterTypeTimestamp.read(from: &buf)
+        case 3: return .rtcNotification(notificationType: try FfiConverterTypeRtcNotificationType.read(from: &buf), expirationTs: try FfiConverterTypeTimestamp.read(from: &buf), callIntent: try FfiConverterOptionTypeRtcCallIntent.read(from: &buf)
         )
         
         case 4: return .callHangup
@@ -30508,10 +30511,11 @@ public struct FfiConverterTypeMessageLikeEventContent: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         
         
-        case let .rtcNotification(notificationType,expirationTs):
+        case let .rtcNotification(notificationType,expirationTs,callIntent):
             writeInt(&buf, Int32(3))
             FfiConverterTypeRtcNotificationType.write(notificationType, into: &buf)
             FfiConverterTypeTimestamp.write(expirationTs, into: &buf)
+            FfiConverterOptionTypeRtcCallIntent.write(callIntent, into: &buf)
             
         
         case .callHangup:
@@ -35617,6 +35621,73 @@ public func FfiConverterTypeRoomVisibility_lift(_ buf: RustBuffer) throws -> Roo
 #endif
 public func FfiConverterTypeRoomVisibility_lower(_ value: RoomVisibility) -> RustBuffer {
     return FfiConverterTypeRoomVisibility.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum RtcCallIntent: Equatable, Hashable {
+    
+    case video
+    case audio
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension RtcCallIntent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRtcCallIntent: FfiConverterRustBuffer {
+    typealias SwiftType = RtcCallIntent
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RtcCallIntent {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .video
+        
+        case 2: return .audio
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RtcCallIntent, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .video:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .audio:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRtcCallIntent_lift(_ buf: RustBuffer) throws -> RtcCallIntent {
+    return try FfiConverterTypeRtcCallIntent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRtcCallIntent_lower(_ value: RtcCallIntent) -> RustBuffer {
+    return FfiConverterTypeRtcCallIntent.lower(value)
 }
 
 
@@ -45810,6 +45881,30 @@ fileprivate struct FfiConverterOptionTypeRoomNotificationMode: FfiConverterRustB
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeRoomNotificationMode.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeRtcCallIntent: FfiConverterRustBuffer {
+    typealias SwiftType = RtcCallIntent?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRtcCallIntent.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRtcCallIntent.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
