@@ -817,22 +817,26 @@ public func FfiConverterTypeSpaceRoomListPaginationState_lower(_ value: SpaceRoo
 public enum TimelineEventFocusThreadMode: Equatable, Hashable {
     
     /**
-     * Force the timeline into threaded mode. When the focused event is part of
-     * a thread, the timeline will be focused on that thread's root. Otherwise,
-     * the timeline will treat the target event itself as the thread root.
-     * Threaded events will never be hidden.
+     * Force the timeline into threaded mode.
+     *
+     * When the focused event is part of a thread, the timeline will be focused
+     * on that thread's root. Otherwise, the timeline will treat the target
+     * event itself as the thread root. Threaded events will never be
+     * hidden.
      */
     case forceThread
     /**
-     * Automatically determine if the target event is
-     * part of a thread or not. If the event is part of a thread, the timeline
+     * Automatically determine if the target event is part of a thread or not.
+     *
+     * If the event is part of a thread, the timeline
      * will be filtered to on-thread events.
      */
     case automatic(
         /**
          * When the target event is not part of a thread, whether to
-         * hide in-thread replies from the live timeline. Has no effect
-         * when the target event is part of a thread.
+         * hide in-thread replies from the live timeline.
+         *
+         * Has no effect when the target event is part of a thread.
          *
          * This should be set to true when the client can create
          * [`TimelineFocus::Thread`]-focused timelines from the thread roots

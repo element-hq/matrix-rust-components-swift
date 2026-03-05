@@ -27160,7 +27160,7 @@ public enum ErrorKind: Equatable, Hashable {
     case wrongRoomKeysVersion(
         /**
          * The currently active backup version.
-         */currentVersion: String?
+         */currentVersion: String
     )
     /**
      * A custom API error.
@@ -27285,7 +27285,7 @@ public struct FfiConverterTypeErrorKind: FfiConverterRustBuffer {
         
         case 46: return .weakPassword
         
-        case 47: return .wrongRoomKeysVersion(currentVersion: try FfiConverterOptionString.read(from: &buf)
+        case 47: return .wrongRoomKeysVersion(currentVersion: try FfiConverterString.read(from: &buf)
         )
         
         case 48: return .custom(errcode: try FfiConverterString.read(from: &buf)
@@ -27491,7 +27491,7 @@ public struct FfiConverterTypeErrorKind: FfiConverterRustBuffer {
         
         case let .wrongRoomKeysVersion(currentVersion):
             writeInt(&buf, Int32(47))
-            FfiConverterOptionString.write(currentVersion, into: &buf)
+            FfiConverterString.write(currentVersion, into: &buf)
             
         
         case let .custom(errcode):
