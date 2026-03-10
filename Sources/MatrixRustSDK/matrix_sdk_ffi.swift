@@ -3964,7 +3964,23 @@ public protocol EncryptionProtocol: AnyObject, Sendable {
     
     func isLastDevice() async throws  -> Bool
     
+    /**
+     * Download identity and key backup information from Recovery
+     */
     func recover(recoveryKey: String) async throws 
+    
+    /**
+     * Download identity and key backup information from Recovery, and, if the
+     * key backup information is inconsistent, create a new key backup.
+     *
+     * This will create a new key backup if:
+     *
+     * * Key backup is enabled and the backup decryption key is missing from
+     * Recovery, or
+     * * Key backup is enabled and the backup decryption key does not match the
+     * public key
+     */
+    func recoverAndFixBackup(recoveryKey: String) async throws 
     
     func recoverAndReset(oldRecoveryKey: String) async throws  -> String
     
@@ -4249,11 +4265,42 @@ open func isLastDevice()async throws  -> Bool  {
         )
 }
     
+    /**
+     * Download identity and key backup information from Recovery
+     */
 open func recover(recoveryKey: String)async throws   {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_encryption_recover(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(recoveryKey)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeRecoveryError_lift
+        )
+}
+    
+    /**
+     * Download identity and key backup information from Recovery, and, if the
+     * key backup information is inconsistent, create a new key backup.
+     *
+     * This will create a new key backup if:
+     *
+     * * Key backup is enabled and the backup decryption key is missing from
+     * Recovery, or
+     * * Key backup is enabled and the backup decryption key does not match the
+     * public key
+     */
+open func recoverAndFixBackup(recoveryKey: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_recover_and_fix_backup(
                     self.uniffiCloneHandle(),
                     FfiConverterString.lower(recoveryKey)
                 )
@@ -7755,7 +7802,7 @@ public protocol RoomProtocol: AnyObject, Sendable {
      * * `score` - The score to rate this content as where -100 is most
      * offensive and 0 is inoffensive (optional).
      */
-    func reportContent(eventId: String, score: Int32?, reason: String?) async throws 
+    func reportContent(eventId: String, reason: String?) async throws 
     
     /**
      * Reports a room as inappropriate to the server.
@@ -9128,13 +9175,13 @@ open func removeRoomAliasFromRoomDirectory(alias: String)async throws  -> Bool  
      * * `score` - The score to rate this content as where -100 is most
      * offensive and 0 is inoffensive (optional).
      */
-open func reportContent(eventId: String, score: Int32?, reason: String?)async throws   {
+open func reportContent(eventId: String, reason: String?)async throws   {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_report_content(
                     self.uniffiCloneHandle(),
-                    FfiConverterString.lower(eventId),FfiConverterOptionInt32.lower(score),FfiConverterOptionString.lower(reason)
+                    FfiConverterString.lower(eventId),FfiConverterOptionString.lower(reason)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -17129,6 +17176,87 @@ public func FfiConverterTypeAuthDataPasswordDetails_lower(_ value: AuthDataPassw
 }
 
 
+/**
+ * FFI representation of a single location update from a beacon event.
+ */
+public struct BeaconInfo: Equatable, Hashable {
+    /**
+     * The geo URI carrying the user's coordinates
+     * (e.g. `"geo:51.5008,0.1247;u=35"`).
+     */
+    public var geoUri: String
+    /**
+     * Timestamp (ms since Unix Epoch) of this location update.
+     */
+    public var ts: Timestamp
+    /**
+     * An optional human-readable description of the location.
+     */
+    public var description: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The geo URI carrying the user's coordinates
+         * (e.g. `"geo:51.5008,0.1247;u=35"`).
+         */geoUri: String, 
+        /**
+         * Timestamp (ms since Unix Epoch) of this location update.
+         */ts: Timestamp, 
+        /**
+         * An optional human-readable description of the location.
+         */description: String?) {
+        self.geoUri = geoUri
+        self.ts = ts
+        self.description = description
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension BeaconInfo: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeBeaconInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BeaconInfo {
+        return
+            try BeaconInfo(
+                geoUri: FfiConverterString.read(from: &buf), 
+                ts: FfiConverterTypeTimestamp.read(from: &buf), 
+                description: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: BeaconInfo, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.geoUri, into: &buf)
+        FfiConverterTypeTimestamp.write(value.ts, into: &buf)
+        FfiConverterOptionString.write(value.description, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBeaconInfo_lift(_ buf: RustBuffer) throws -> BeaconInfo {
+    return try FfiConverterTypeBeaconInfo.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBeaconInfo_lower(_ value: BeaconInfo) -> RustBuffer {
+    return FfiConverterTypeBeaconInfo.lower(value)
+}
+
+
 public struct ClientProperties: Equatable, Hashable {
     /**
      * The client_id provides the widget with the option to behave differently
@@ -18844,6 +18972,110 @@ public func FfiConverterTypeListThreadsOptions_lift(_ buf: RustBuffer) throws ->
 #endif
 public func FfiConverterTypeListThreadsOptions_lower(_ value: ListThreadsOptions) -> RustBuffer {
     return FfiConverterTypeListThreadsOptions.lower(value)
+}
+
+
+/**
+ * FFI representation of a live location sharing session (MSC3489).
+ *
+ * Corresponds to a `org.matrix.msc3672.beacon_info` state event in the
+ * timeline. Location updates are aggregated here as they arrive.
+ */
+public struct LiveLocationContent: Equatable, Hashable {
+    /**
+     * Whether this sharing session is currently active.
+     */
+    public var isLive: Bool
+    /**
+     * An optional human-readable label for this sharing session.
+     */
+    public var description: String?
+    /**
+     * Duration of the session in milliseconds.
+     */
+    public var timeoutMs: UInt64
+    /**
+     * The asset type of the beacon (e.g. `Sender` for the user's own
+     * location, `Pin` for a fixed point of interest).
+     */
+    public var assetType: AssetType
+    /**
+     * All location updates received so far, sorted oldest-first.
+     */
+    public var locations: [BeaconInfo]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Whether this sharing session is currently active.
+         */isLive: Bool, 
+        /**
+         * An optional human-readable label for this sharing session.
+         */description: String?, 
+        /**
+         * Duration of the session in milliseconds.
+         */timeoutMs: UInt64, 
+        /**
+         * The asset type of the beacon (e.g. `Sender` for the user's own
+         * location, `Pin` for a fixed point of interest).
+         */assetType: AssetType, 
+        /**
+         * All location updates received so far, sorted oldest-first.
+         */locations: [BeaconInfo]) {
+        self.isLive = isLive
+        self.description = description
+        self.timeoutMs = timeoutMs
+        self.assetType = assetType
+        self.locations = locations
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension LiveLocationContent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLiveLocationContent: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LiveLocationContent {
+        return
+            try LiveLocationContent(
+                isLive: FfiConverterBool.read(from: &buf), 
+                description: FfiConverterOptionString.read(from: &buf), 
+                timeoutMs: FfiConverterUInt64.read(from: &buf), 
+                assetType: FfiConverterTypeAssetType.read(from: &buf), 
+                locations: FfiConverterSequenceTypeBeaconInfo.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LiveLocationContent, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.isLive, into: &buf)
+        FfiConverterOptionString.write(value.description, into: &buf)
+        FfiConverterUInt64.write(value.timeoutMs, into: &buf)
+        FfiConverterTypeAssetType.write(value.assetType, into: &buf)
+        FfiConverterSequenceTypeBeaconInfo.write(value.locations, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLiveLocationContent_lift(_ buf: RustBuffer) throws -> LiveLocationContent {
+    return try FfiConverterTypeLiveLocationContent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLiveLocationContent_lower(_ value: LiveLocationContent) -> RustBuffer {
+    return FfiConverterTypeLiveLocationContent.lower(value)
 }
 
 
@@ -25238,6 +25470,7 @@ public enum AssetType: Equatable, Hashable {
     
     case sender
     case pin
+    case unknown
 
 
 
@@ -25263,6 +25496,8 @@ public struct FfiConverterTypeAssetType: FfiConverterRustBuffer {
         
         case 2: return .pin
         
+        case 3: return .unknown
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -25277,6 +25512,10 @@ public struct FfiConverterTypeAssetType: FfiConverterRustBuffer {
         
         case .pin:
             writeInt(&buf, Int32(2))
+        
+        
+        case .unknown:
+            writeInt(&buf, Int32(3))
         
         }
     }
@@ -37917,6 +38156,14 @@ public enum TimelineItemContent {
     )
     case failedToParseState(eventType: String, stateKey: String, error: String
     )
+    /**
+     * A live location sharing session (MSC3489).
+     *
+     * Represents a `org.matrix.msc3672.beacon_info` state event with all
+     * aggregated location updates from `org.matrix.msc3672.beacon` events.
+     */
+    case liveLocation(content: LiveLocationContent
+    )
 
 
 
@@ -37958,6 +38205,9 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
         )
         
         case 8: return .failedToParseState(eventType: try FfiConverterString.read(from: &buf), stateKey: try FfiConverterString.read(from: &buf), error: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 9: return .liveLocation(content: try FfiConverterTypeLiveLocationContent.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -38014,6 +38264,11 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
             FfiConverterString.write(eventType, into: &buf)
             FfiConverterString.write(stateKey, into: &buf)
             FfiConverterString.write(error, into: &buf)
+            
+        
+        case let .liveLocation(content):
+            writeInt(&buf, Int32(9))
+            FfiConverterTypeLiveLocationContent.write(content, into: &buf)
             
         }
     }
@@ -46448,6 +46703,31 @@ fileprivate struct FfiConverterSequenceTypeTimelineItem: FfiConverterRustBuffer 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeBeaconInfo: FfiConverterRustBuffer {
+    typealias SwiftType = [BeaconInfo]
+
+    public static func write(_ value: [BeaconInfo], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeBeaconInfo.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [BeaconInfo] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [BeaconInfo]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeBeaconInfo.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeConditionalPushRule: FfiConverterRustBuffer {
     typealias SwiftType = [ConditionalPushRule]
 
@@ -48558,7 +48838,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_is_last_device() != 54322) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_recover() != 14635) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_recover() != 39016) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_recover_and_fix_backup() != 59505) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_recover_and_reset() != 48062) {
@@ -48933,7 +49216,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_remove_room_alias_from_room_directory() != 26389) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_report_content() != 27264) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_report_content() != 37734) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_report_room() != 372) {
