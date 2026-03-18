@@ -1328,6 +1328,90 @@ public func FfiConverterTypeLoginQrCodeDecodeError_lower(_ value: LoginQrCodeDec
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * The intent of the device that generated/displayed the QR code.
+ *
+ * The QR code login mechanism supports both, the new device, as well as the
+ * existing device to display the QR code.
+ *
+ * The different intents have an explicit one-byte identifier which gets added
+ * to the QR code data.
+ */
+
+public enum QrCodeIntent: Equatable, Hashable {
+    
+    /**
+     * Enum variant for the case where the new device is displaying the QR
+     * code.
+     */
+    case login
+    /**
+     * Enum variant for the case where the existing device is displaying the QR
+     * code.
+     */
+    case reciprocate
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension QrCodeIntent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeQrCodeIntent: FfiConverterRustBuffer {
+    typealias SwiftType = QrCodeIntent
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> QrCodeIntent {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .login
+        
+        case 2: return .reciprocate
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: QrCodeIntent, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .login:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .reciprocate:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeQrCodeIntent_lift(_ buf: RustBuffer) throws -> QrCodeIntent {
+    return try FfiConverterTypeQrCodeIntent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeQrCodeIntent_lower(_ value: QrCodeIntent) -> RustBuffer {
+    return FfiConverterTypeQrCodeIntent.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * The result of a signature check.
  */
 
