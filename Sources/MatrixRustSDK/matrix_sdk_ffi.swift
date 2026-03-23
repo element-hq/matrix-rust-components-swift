@@ -18902,6 +18902,15 @@ public struct LiveLocationContent: Equatable, Hashable {
      */
     public var isLive: Bool
     /**
+     * The timestamp when this live location sharing session started
+     * (from the `org.matrix.msc3488.ts` field of the originating
+     * `beacon_info` state event).
+     *
+     * This marks the *beginning* of the session. The session expires at
+     * `ts + timeout_ms`.
+     */
+    public var ts: Timestamp
+    /**
      * An optional human-readable label for this sharing session.
      */
     public var description: String?
@@ -18926,6 +18935,14 @@ public struct LiveLocationContent: Equatable, Hashable {
          * Whether this sharing session is currently active.
          */isLive: Bool, 
         /**
+         * The timestamp when this live location sharing session started
+         * (from the `org.matrix.msc3488.ts` field of the originating
+         * `beacon_info` state event).
+         *
+         * This marks the *beginning* of the session. The session expires at
+         * `ts + timeout_ms`.
+         */ts: Timestamp, 
+        /**
          * An optional human-readable label for this sharing session.
          */description: String?, 
         /**
@@ -18939,6 +18956,7 @@ public struct LiveLocationContent: Equatable, Hashable {
          * All location updates received so far, sorted oldest-first.
          */locations: [BeaconInfo]) {
         self.isLive = isLive
+        self.ts = ts
         self.description = description
         self.timeoutMs = timeoutMs
         self.assetType = assetType
@@ -18962,6 +18980,7 @@ public struct FfiConverterTypeLiveLocationContent: FfiConverterRustBuffer {
         return
             try LiveLocationContent(
                 isLive: FfiConverterBool.read(from: &buf), 
+                ts: FfiConverterTypeTimestamp.read(from: &buf), 
                 description: FfiConverterOptionString.read(from: &buf), 
                 timeoutMs: FfiConverterUInt64.read(from: &buf), 
                 assetType: FfiConverterTypeAssetType.read(from: &buf), 
@@ -18971,6 +18990,7 @@ public struct FfiConverterTypeLiveLocationContent: FfiConverterRustBuffer {
 
     public static func write(_ value: LiveLocationContent, into buf: inout [UInt8]) {
         FfiConverterBool.write(value.isLive, into: &buf)
+        FfiConverterTypeTimestamp.write(value.ts, into: &buf)
         FfiConverterOptionString.write(value.description, into: &buf)
         FfiConverterUInt64.write(value.timeoutMs, into: &buf)
         FfiConverterTypeAssetType.write(value.assetType, into: &buf)
@@ -21327,6 +21347,7 @@ public struct RoomInfo {
     public var cachedUserDefinedNotificationMode: RoomNotificationMode?
     public var hasRoomCall: Bool
     public var activeRoomCallParticipants: [String]
+    public var activeRoomCallConsensusIntent: RtcCallIntentConsensus
     /**
      * Whether this room has been explicitly marked as unread
      */
@@ -21399,7 +21420,7 @@ public struct RoomInfo {
          *
          * Can be missing if the room membership invite event is missing from the
          * store.
-         */inviter: RoomMember?, heroes: [RoomHero], activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, serviceMembers: [String], highlightCount: UInt64, notificationCount: UInt64, cachedUserDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], 
+         */inviter: RoomMember?, heroes: [RoomHero], activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, serviceMembers: [String], highlightCount: UInt64, notificationCount: UInt64, cachedUserDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], activeRoomCallConsensusIntent: RtcCallIntentConsensus, 
         /**
          * Whether this room has been explicitly marked as unread
          */isMarkedUnread: Bool, 
@@ -21463,6 +21484,7 @@ public struct RoomInfo {
         self.cachedUserDefinedNotificationMode = cachedUserDefinedNotificationMode
         self.hasRoomCall = hasRoomCall
         self.activeRoomCallParticipants = activeRoomCallParticipants
+        self.activeRoomCallConsensusIntent = activeRoomCallConsensusIntent
         self.isMarkedUnread = isMarkedUnread
         self.numUnreadMessages = numUnreadMessages
         self.numUnreadNotifications = numUnreadNotifications
@@ -21518,6 +21540,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 cachedUserDefinedNotificationMode: FfiConverterOptionTypeRoomNotificationMode.read(from: &buf), 
                 hasRoomCall: FfiConverterBool.read(from: &buf), 
                 activeRoomCallParticipants: FfiConverterSequenceString.read(from: &buf), 
+                activeRoomCallConsensusIntent: FfiConverterTypeRtcCallIntentConsensus.read(from: &buf), 
                 isMarkedUnread: FfiConverterBool.read(from: &buf), 
                 numUnreadMessages: FfiConverterUInt64.read(from: &buf), 
                 numUnreadNotifications: FfiConverterUInt64.read(from: &buf), 
@@ -21559,6 +21582,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterOptionTypeRoomNotificationMode.write(value.cachedUserDefinedNotificationMode, into: &buf)
         FfiConverterBool.write(value.hasRoomCall, into: &buf)
         FfiConverterSequenceString.write(value.activeRoomCallParticipants, into: &buf)
+        FfiConverterTypeRtcCallIntentConsensus.write(value.activeRoomCallConsensusIntent, into: &buf)
         FfiConverterBool.write(value.isMarkedUnread, into: &buf)
         FfiConverterUInt64.write(value.numUnreadMessages, into: &buf)
         FfiConverterUInt64.write(value.numUnreadNotifications, into: &buf)
@@ -36078,6 +36102,88 @@ public func FfiConverterTypeRtcCallIntent_lift(_ buf: RustBuffer) throws -> RtcC
 #endif
 public func FfiConverterTypeRtcCallIntent_lower(_ value: RtcCallIntent) -> RustBuffer {
     return FfiConverterTypeRtcCallIntent.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum RtcCallIntentConsensus: Equatable, Hashable {
+    
+    case full(RtcCallIntent
+    )
+    case partial(intent: RtcCallIntent, agreeingCount: UInt64, totalCount: UInt64
+    )
+    case none
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension RtcCallIntentConsensus: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRtcCallIntentConsensus: FfiConverterRustBuffer {
+    typealias SwiftType = RtcCallIntentConsensus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RtcCallIntentConsensus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .full(try FfiConverterTypeRtcCallIntent.read(from: &buf)
+        )
+        
+        case 2: return .partial(intent: try FfiConverterTypeRtcCallIntent.read(from: &buf), agreeingCount: try FfiConverterUInt64.read(from: &buf), totalCount: try FfiConverterUInt64.read(from: &buf)
+        )
+        
+        case 3: return .none
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RtcCallIntentConsensus, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .full(v1):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeRtcCallIntent.write(v1, into: &buf)
+            
+        
+        case let .partial(intent,agreeingCount,totalCount):
+            writeInt(&buf, Int32(2))
+            FfiConverterTypeRtcCallIntent.write(intent, into: &buf)
+            FfiConverterUInt64.write(agreeingCount, into: &buf)
+            FfiConverterUInt64.write(totalCount, into: &buf)
+            
+        
+        case .none:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRtcCallIntentConsensus_lift(_ buf: RustBuffer) throws -> RtcCallIntentConsensus {
+    return try FfiConverterTypeRtcCallIntentConsensus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRtcCallIntentConsensus_lower(_ value: RtcCallIntentConsensus) -> RustBuffer {
+    return FfiConverterTypeRtcCallIntentConsensus.lower(value)
 }
 
 
