@@ -810,6 +810,89 @@ public func FfiConverterTypeSpaceRoomListPaginationState_lower(_ value: SpaceRoo
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * The pagination state of a [`ThreadListService`].
+ */
+
+public enum ThreadListPaginationState: Equatable, Hashable {
+    
+    /**
+     * The list is idle (not currently loading).
+     */
+    case idle(
+        /**
+         * Whether the end of the thread list has been reached (no more pages
+         * to load).
+         */endReached: Bool
+    )
+    /**
+     * The list is currently loading the next page.
+     */
+    case loading
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ThreadListPaginationState: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeThreadListPaginationState: FfiConverterRustBuffer {
+    typealias SwiftType = ThreadListPaginationState
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThreadListPaginationState {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .idle(endReached: try FfiConverterBool.read(from: &buf)
+        )
+        
+        case 2: return .loading
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ThreadListPaginationState, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .idle(endReached):
+            writeInt(&buf, Int32(1))
+            FfiConverterBool.write(endReached, into: &buf)
+            
+        
+        case .loading:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThreadListPaginationState_lift(_ buf: RustBuffer) throws -> ThreadListPaginationState {
+    return try FfiConverterTypeThreadListPaginationState.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThreadListPaginationState_lower(_ value: ThreadListPaginationState) -> RustBuffer {
+    return FfiConverterTypeThreadListPaginationState.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * Options for controlling the behaviour of [`TimelineFocus::Event`]
  * for threaded events.
  */

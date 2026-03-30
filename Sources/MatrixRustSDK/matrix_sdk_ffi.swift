@@ -7708,17 +7708,6 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func loadOrFetchEvent(eventId: String) async throws  -> TimelineEvent
     
     /**
-     * Retrieve a list of all the threads for the current room.
-     *
-     * Since this client-server API is paginated, the return type may include a
-     * token used to resuming back-pagination into the list of results, in
-     * [`ThreadList::prev_batch_token`]. This token can be passed to the next
-     * call to this function, through the `from` field of
-     * [`ListThreadsOptions`].
-     */
-    func loadThreadList(opts: ListThreadsOptions) async throws  -> ThreadList
-    
-    /**
      * Mark a room as fully read, by attaching a read receipt to the provided
      * `event_id`.
      *
@@ -7998,6 +7987,17 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func successorRoom()  -> SuccessorRoom?
     
     func suggestedRoleForUser(userId: String) async throws  -> RoomMemberRole
+    
+    /**
+     * Creates a new [`ThreadListService`] for this room.
+     *
+     * The returned service provides a reactive, paginated list of thread roots
+     * for the room. Use [`ThreadListService::paginate`] to load pages and
+     * [`ThreadListService::subscribe_to_items_updates`] /
+     * [`ThreadListService::subscribe_to_pagination_state_updates`] to observe
+     * changes.
+     */
+    func threadListService()  -> ThreadListService
     
     /**
      * Create a timeline with a default configuration, i.e. a live timeline
@@ -8812,32 +8812,6 @@ open func loadOrFetchEvent(eventId: String)async throws  -> TimelineEvent  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
             liftFunc: FfiConverterTypeTimelineEvent_lift,
-            errorHandler: FfiConverterTypeClientError_lift
-        )
-}
-    
-    /**
-     * Retrieve a list of all the threads for the current room.
-     *
-     * Since this client-server API is paginated, the return type may include a
-     * token used to resuming back-pagination into the list of results, in
-     * [`ThreadList::prev_batch_token`]. This token can be passed to the next
-     * call to this function, through the `from` field of
-     * [`ListThreadsOptions`].
-     */
-open func loadThreadList(opts: ListThreadsOptions)async throws  -> ThreadList  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_load_thread_list(
-                    self.uniffiCloneHandle(),
-                    FfiConverterTypeListThreadsOptions_lower(opts)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterTypeThreadList_lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -9720,6 +9694,23 @@ open func suggestedRoleForUser(userId: String)async throws  -> RoomMemberRole  {
             liftFunc: FfiConverterTypeRoomMemberRole_lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
+}
+    
+    /**
+     * Creates a new [`ThreadListService`] for this room.
+     *
+     * The returned service provides a reactive, paginated list of thread roots
+     * for the room. Use [`ThreadListService::paginate`] to load pages and
+     * [`ThreadListService::subscribe_to_items_updates`] /
+     * [`ThreadListService::subscribe_to_pagination_state_updates`] to observe
+     * changes.
+     */
+open func threadListService() -> ThreadListService  {
+    return try!  FfiConverterTypeThreadListService_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_room_thread_list_service(
+            self.uniffiCloneHandle(),$0
+    )
+})
 }
     
     /**
@@ -14648,6 +14639,277 @@ public func FfiConverterTypeTaskHandle_lift(_ handle: UInt64) throws -> TaskHand
 #endif
 public func FfiConverterTypeTaskHandle_lower(_ value: TaskHandle) -> UInt64 {
     return FfiConverterTypeTaskHandle.lower(value)
+}
+
+
+
+
+
+
+/**
+ * A high-level, reactive, paginated list of threads for a room.
+ *
+ * `ThreadListService` is the FFI-facing wrapper around
+ * [`matrix_sdk_ui::timeline::thread_list_service::ThreadListService`]. It
+ * maintains an observable list of [`ThreadListItem`]s and exposes a
+ * pagination state publisher, making it straightforward to build reactive UIs
+ * on top of the thread list.
+ *
+ * Obtain an instance via [`Room::thread_list_service`].
+ */
+public protocol ThreadListServiceProtocol: AnyObject, Sendable {
+    
+    /**
+     * Returns a snapshot of the current thread list items.
+     */
+    func items()  -> [ThreadListItem]
+    
+    /**
+     * Fetches the next page of threads and appends the results to the list.
+     *
+     * This is a no-op when the list is already loading or the end has been
+     * reached.
+     */
+    func paginate() async throws 
+    
+    /**
+     * Returns a snapshot of the current pagination state.
+     */
+    func paginationState()  -> ThreadListPaginationState
+    
+    /**
+     * Resets the service back to its initial, empty state.
+     *
+     * Clears all loaded items, discards the pagination token, and sets the
+     * state to `Idle { end_reached: false }`. The next call to
+     * [`Self::paginate`] will restart from the beginning of the thread list.
+     */
+    func reset() async 
+    
+    /**
+     * Subscribes to changes in the thread list.
+     *
+     * The `listener` receives an initial `Reset` diff containing all currently
+     * loaded items, followed by subsequent diffs as the list changes.
+     */
+    func subscribeToItemsUpdates(listener: ThreadListEntriesListener)  -> TaskHandle
+    
+    /**
+     * Subscribes to changes in the pagination state.
+     *
+     * The `listener` is called once for every state transition. The returned
+     * [`TaskHandle`] keeps the subscription alive
+     */
+    func subscribeToPaginationStateUpdates(listener: ThreadListPaginationStateListener)  -> TaskHandle
+    
+}
+/**
+ * A high-level, reactive, paginated list of threads for a room.
+ *
+ * `ThreadListService` is the FFI-facing wrapper around
+ * [`matrix_sdk_ui::timeline::thread_list_service::ThreadListService`]. It
+ * maintains an observable list of [`ThreadListItem`]s and exposes a
+ * pagination state publisher, making it straightforward to build reactive UIs
+ * on top of the thread list.
+ *
+ * Obtain an instance via [`Room::thread_list_service`].
+ */
+open class ThreadListService: ThreadListServiceProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_threadlistservice(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_threadlistservice(handle, $0) }
+    }
+
+    
+
+    
+    /**
+     * Returns a snapshot of the current thread list items.
+     */
+open func items() -> [ThreadListItem]  {
+    return try!  FfiConverterSequenceTypeThreadListItem.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_threadlistservice_items(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * Fetches the next page of threads and appends the results to the list.
+     *
+     * This is a no-op when the list is already loading or the end has been
+     * reached.
+     */
+open func paginate()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_threadlistservice_paginate(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Returns a snapshot of the current pagination state.
+     */
+open func paginationState() -> ThreadListPaginationState  {
+    return try!  FfiConverterTypeThreadListPaginationState_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_threadlistservice_pagination_state(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * Resets the service back to its initial, empty state.
+     *
+     * Clears all loaded items, discards the pagination token, and sets the
+     * state to `Idle { end_reached: false }`. The next call to
+     * [`Self::paginate`] will restart from the beginning of the thread list.
+     */
+open func reset()async   {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_threadlistservice_reset(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: nil
+            
+        )
+}
+    
+    /**
+     * Subscribes to changes in the thread list.
+     *
+     * The `listener` receives an initial `Reset` diff containing all currently
+     * loaded items, followed by subsequent diffs as the list changes.
+     */
+open func subscribeToItemsUpdates(listener: ThreadListEntriesListener) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_threadlistservice_subscribe_to_items_updates(
+            self.uniffiCloneHandle(),
+        FfiConverterCallbackInterfaceThreadListEntriesListener_lower(listener),$0
+    )
+})
+}
+    
+    /**
+     * Subscribes to changes in the pagination state.
+     *
+     * The `listener` is called once for every state transition. The returned
+     * [`TaskHandle`] keeps the subscription alive
+     */
+open func subscribeToPaginationStateUpdates(listener: ThreadListPaginationStateListener) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_threadlistservice_subscribe_to_pagination_state_updates(
+            self.uniffiCloneHandle(),
+        FfiConverterCallbackInterfaceThreadListPaginationStateListener_lower(listener),$0
+    )
+})
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeThreadListService: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = ThreadListService
+
+    public static func lift(_ handle: UInt64) throws -> ThreadListService {
+        return ThreadListService(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: ThreadListService) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThreadListService {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: ThreadListService, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThreadListService_lift(_ handle: UInt64) throws -> ThreadListService {
+    return try FfiConverterTypeThreadListService.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThreadListService_lower(_ value: ThreadListService) -> UInt64 {
+    return FfiConverterTypeThreadListService.lower(value)
 }
 
 
@@ -23393,97 +23655,67 @@ public func FfiConverterTypeTextMessageContent_lower(_ value: TextMessageContent
 
 
 /**
- * A structure wrapping a Thread List endpoint response i.e.
- * [`ThreadListItem`]s and the current pagination token.
+ * Each `ThreadListItem` represents one thread root event in the room. The
+ * fields are pre-resolved from the raw homeserver response: the sender's
+ * profile is fetched eagerly and the event content is parsed into a
+ * `TimelineItemContent` so that consumers can render the item without any
+ * additional work.
+ *
+ * `ThreadListItem`s are produced page by page via `Room::load_thread_list()`
+ * and are accumulated inside the `ThreadListService` as pages are fetched
+ * through `ThreadListService::paginate()`.
  */
-public struct ThreadList {
+public struct ThreadListItem {
     /**
-     * The events that are thread roots in the current batch.
+     * The thread root event.
+     *
+     * Contains the event ID, timestamp, sender, sender profile, and parsed
+     * content of the thread's root message. Use `root_event.event_id` to open
+     * a per-thread `Timeline` or to navigate the user to the thread view.
      */
-    public var items: [ThreadListItem]
+    public var rootEvent: ThreadListItemEvent
     /**
-     * Token to paginate backwards in a subsequent query to
-     * [`Room::list_threads`].
+     * The latest event in the thread (i.e. the most recent reply), if
+     * available.
+     *
+     * Initially populated from the server's bundled thread summary and
+     * updated in real time as new events arrive via sync or back-pagination.
      */
-    public var prevBatchToken: String?
+    public var latestEvent: ThreadListItemEvent?
+    /**
+     * The number of replies in this thread (excluding the root event).
+     *
+     * Initially populated from the server's bundled thread summary and
+     * updated in real time as new events arrive via sync.
+     */
+    public var numReplies: UInt32
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         /**
-         * The events that are thread roots in the current batch.
-         */items: [ThreadListItem], 
+         * The thread root event.
+         *
+         * Contains the event ID, timestamp, sender, sender profile, and parsed
+         * content of the thread's root message. Use `root_event.event_id` to open
+         * a per-thread `Timeline` or to navigate the user to the thread view.
+         */rootEvent: ThreadListItemEvent, 
         /**
-         * Token to paginate backwards in a subsequent query to
-         * [`Room::list_threads`].
-         */prevBatchToken: String?) {
-        self.items = items
-        self.prevBatchToken = prevBatchToken
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension ThreadList: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeThreadList: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThreadList {
-        return
-            try ThreadList(
-                items: FfiConverterSequenceTypeThreadListItem.read(from: &buf), 
-                prevBatchToken: FfiConverterOptionString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ThreadList, into buf: inout [UInt8]) {
-        FfiConverterSequenceTypeThreadListItem.write(value.items, into: &buf)
-        FfiConverterOptionString.write(value.prevBatchToken, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeThreadList_lift(_ buf: RustBuffer) throws -> ThreadList {
-    return try FfiConverterTypeThreadList.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeThreadList_lower(_ value: ThreadList) -> RustBuffer {
-    return FfiConverterTypeThreadList.lower(value)
-}
-
-
-/**
- * An individual Thread as retrieved from through Thread List API.
- */
-public struct ThreadListItem {
-    public var rootEventId: String
-    public var timestamp: Timestamp
-    public var sender: String
-    public var senderProfile: ProfileDetails
-    public var isOwn: Bool
-    public var content: TimelineItemContent?
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(rootEventId: String, timestamp: Timestamp, sender: String, senderProfile: ProfileDetails, isOwn: Bool, content: TimelineItemContent?) {
-        self.rootEventId = rootEventId
-        self.timestamp = timestamp
-        self.sender = sender
-        self.senderProfile = senderProfile
-        self.isOwn = isOwn
-        self.content = content
+         * The latest event in the thread (i.e. the most recent reply), if
+         * available.
+         *
+         * Initially populated from the server's bundled thread summary and
+         * updated in real time as new events arrive via sync or back-pagination.
+         */latestEvent: ThreadListItemEvent?, 
+        /**
+         * The number of replies in this thread (excluding the root event).
+         *
+         * Initially populated from the server's bundled thread summary and
+         * updated in real time as new events arrive via sync.
+         */numReplies: UInt32) {
+        self.rootEvent = rootEvent
+        self.latestEvent = latestEvent
+        self.numReplies = numReplies
     }
 
     
@@ -23502,22 +23734,16 @@ public struct FfiConverterTypeThreadListItem: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThreadListItem {
         return
             try ThreadListItem(
-                rootEventId: FfiConverterString.read(from: &buf), 
-                timestamp: FfiConverterTypeTimestamp.read(from: &buf), 
-                sender: FfiConverterString.read(from: &buf), 
-                senderProfile: FfiConverterTypeProfileDetails.read(from: &buf), 
-                isOwn: FfiConverterBool.read(from: &buf), 
-                content: FfiConverterOptionTypeTimelineItemContent.read(from: &buf)
+                rootEvent: FfiConverterTypeThreadListItemEvent.read(from: &buf), 
+                latestEvent: FfiConverterOptionTypeThreadListItemEvent.read(from: &buf), 
+                numReplies: FfiConverterUInt32.read(from: &buf)
         )
     }
 
     public static func write(_ value: ThreadListItem, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.rootEventId, into: &buf)
-        FfiConverterTypeTimestamp.write(value.timestamp, into: &buf)
-        FfiConverterString.write(value.sender, into: &buf)
-        FfiConverterTypeProfileDetails.write(value.senderProfile, into: &buf)
-        FfiConverterBool.write(value.isOwn, into: &buf)
-        FfiConverterOptionTypeTimelineItemContent.write(value.content, into: &buf)
+        FfiConverterTypeThreadListItemEvent.write(value.rootEvent, into: &buf)
+        FfiConverterOptionTypeThreadListItemEvent.write(value.latestEvent, into: &buf)
+        FfiConverterUInt32.write(value.numReplies, into: &buf)
     }
 }
 
@@ -23534,6 +23760,116 @@ public func FfiConverterTypeThreadListItem_lift(_ buf: RustBuffer) throws -> Thr
 #endif
 public func FfiConverterTypeThreadListItem_lower(_ value: ThreadListItem) -> RustBuffer {
     return FfiConverterTypeThreadListItem.lower(value)
+}
+
+
+/**
+ * Information about an event in a thread (either the root or the latest
+ * reply).
+ */
+public struct ThreadListItemEvent {
+    /**
+     * The event ID.
+     */
+    public var eventId: String
+    /**
+     * The timestamp of the event.
+     */
+    public var timestamp: Timestamp
+    /**
+     * The sender of the event.
+     */
+    public var sender: String
+    /**
+     * The sender's profile details.
+     */
+    public var senderProfile: ProfileDetails
+    /**
+     * Whether the event was sent by the current user.
+     */
+    public var isOwn: Bool
+    /**
+     * The content of the event, if available.
+     */
+    public var content: TimelineItemContent?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The event ID.
+         */eventId: String, 
+        /**
+         * The timestamp of the event.
+         */timestamp: Timestamp, 
+        /**
+         * The sender of the event.
+         */sender: String, 
+        /**
+         * The sender's profile details.
+         */senderProfile: ProfileDetails, 
+        /**
+         * Whether the event was sent by the current user.
+         */isOwn: Bool, 
+        /**
+         * The content of the event, if available.
+         */content: TimelineItemContent?) {
+        self.eventId = eventId
+        self.timestamp = timestamp
+        self.sender = sender
+        self.senderProfile = senderProfile
+        self.isOwn = isOwn
+        self.content = content
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ThreadListItemEvent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeThreadListItemEvent: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThreadListItemEvent {
+        return
+            try ThreadListItemEvent(
+                eventId: FfiConverterString.read(from: &buf), 
+                timestamp: FfiConverterTypeTimestamp.read(from: &buf), 
+                sender: FfiConverterString.read(from: &buf), 
+                senderProfile: FfiConverterTypeProfileDetails.read(from: &buf), 
+                isOwn: FfiConverterBool.read(from: &buf), 
+                content: FfiConverterOptionTypeTimelineItemContent.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ThreadListItemEvent, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.eventId, into: &buf)
+        FfiConverterTypeTimestamp.write(value.timestamp, into: &buf)
+        FfiConverterString.write(value.sender, into: &buf)
+        FfiConverterTypeProfileDetails.write(value.senderProfile, into: &buf)
+        FfiConverterBool.write(value.isOwn, into: &buf)
+        FfiConverterOptionTypeTimelineItemContent.write(value.content, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThreadListItemEvent_lift(_ buf: RustBuffer) throws -> ThreadListItemEvent {
+    return try FfiConverterTypeThreadListItemEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThreadListItemEvent_lower(_ value: ThreadListItemEvent) -> RustBuffer {
+    return FfiConverterTypeThreadListItemEvent.lower(value)
 }
 
 
@@ -37883,6 +38219,200 @@ public func FfiConverterTypeTagName_lower(_ value: TagName) -> RustBuffer {
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * A diff applied to the observable thread list.
+ *
+ * Mirrors [`eyeball_im::VectorDiff`] for [`ThreadListItem`].
+ */
+
+public enum ThreadListUpdate {
+    
+    /**
+     * New items were appended at the back.
+     */
+    case append(values: [ThreadListItem]
+    )
+    /**
+     * The list was cleared.
+     */
+    case clear
+    /**
+     * A new item was prepended at the front.
+     */
+    case pushFront(value: ThreadListItem
+    )
+    /**
+     * A new item was appended at the back.
+     */
+    case pushBack(value: ThreadListItem
+    )
+    /**
+     * The first item was removed.
+     */
+    case popFront
+    /**
+     * The last item was removed.
+     */
+    case popBack
+    /**
+     * An item was inserted at the given position.
+     */
+    case insert(index: UInt32, value: ThreadListItem
+    )
+    /**
+     * The item at the given position was replaced.
+     */
+    case set(index: UInt32, value: ThreadListItem
+    )
+    /**
+     * The item at the given position was removed.
+     */
+    case remove(index: UInt32
+    )
+    /**
+     * The list was truncated to the given length.
+     */
+    case truncate(length: UInt32
+    )
+    /**
+     * The whole list was replaced with new items.
+     */
+    case reset(values: [ThreadListItem]
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ThreadListUpdate: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeThreadListUpdate: FfiConverterRustBuffer {
+    typealias SwiftType = ThreadListUpdate
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ThreadListUpdate {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .append(values: try FfiConverterSequenceTypeThreadListItem.read(from: &buf)
+        )
+        
+        case 2: return .clear
+        
+        case 3: return .pushFront(value: try FfiConverterTypeThreadListItem.read(from: &buf)
+        )
+        
+        case 4: return .pushBack(value: try FfiConverterTypeThreadListItem.read(from: &buf)
+        )
+        
+        case 5: return .popFront
+        
+        case 6: return .popBack
+        
+        case 7: return .insert(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeThreadListItem.read(from: &buf)
+        )
+        
+        case 8: return .set(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeThreadListItem.read(from: &buf)
+        )
+        
+        case 9: return .remove(index: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 10: return .truncate(length: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 11: return .reset(values: try FfiConverterSequenceTypeThreadListItem.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ThreadListUpdate, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .append(values):
+            writeInt(&buf, Int32(1))
+            FfiConverterSequenceTypeThreadListItem.write(values, into: &buf)
+            
+        
+        case .clear:
+            writeInt(&buf, Int32(2))
+        
+        
+        case let .pushFront(value):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeThreadListItem.write(value, into: &buf)
+            
+        
+        case let .pushBack(value):
+            writeInt(&buf, Int32(4))
+            FfiConverterTypeThreadListItem.write(value, into: &buf)
+            
+        
+        case .popFront:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .popBack:
+            writeInt(&buf, Int32(6))
+        
+        
+        case let .insert(index,value):
+            writeInt(&buf, Int32(7))
+            FfiConverterUInt32.write(index, into: &buf)
+            FfiConverterTypeThreadListItem.write(value, into: &buf)
+            
+        
+        case let .set(index,value):
+            writeInt(&buf, Int32(8))
+            FfiConverterUInt32.write(index, into: &buf)
+            FfiConverterTypeThreadListItem.write(value, into: &buf)
+            
+        
+        case let .remove(index):
+            writeInt(&buf, Int32(9))
+            FfiConverterUInt32.write(index, into: &buf)
+            
+        
+        case let .truncate(length):
+            writeInt(&buf, Int32(10))
+            FfiConverterUInt32.write(length, into: &buf)
+            
+        
+        case let .reset(values):
+            writeInt(&buf, Int32(11))
+            FfiConverterSequenceTypeThreadListItem.write(values, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThreadListUpdate_lift(_ buf: RustBuffer) throws -> ThreadListUpdate {
+    return try FfiConverterTypeThreadListUpdate.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThreadListUpdate_lower(_ value: ThreadListUpdate) -> RustBuffer {
+    return FfiConverterTypeThreadListUpdate.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum TimelineDiff {
     
@@ -44253,6 +44783,260 @@ public func FfiConverterCallbackInterfaceSyncServiceStateObserver_lower(_ v: Syn
 
 
 
+/**
+ * Listener for changes to the [`ThreadListService`] item list.
+ */
+public protocol ThreadListEntriesListener: AnyObject, Sendable {
+    
+    func onUpdate(diff: [ThreadListUpdate]) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceThreadListEntriesListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // This creates 1-element array, since this seems to be the only way to construct a const
+    // pointer that we can pass to the Rust code.
+    static let vtable: [UniffiVTableCallbackInterfaceThreadListEntriesListener] = [UniffiVTableCallbackInterfaceThreadListEntriesListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceThreadListEntriesListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface ThreadListEntriesListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceThreadListEntriesListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface ThreadListEntriesListener: handle missing in uniffiClone")
+            }
+        },
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            diff: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceThreadListEntriesListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     diff: try FfiConverterSequenceTypeThreadListUpdate.lift(diff)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )]
+}
+
+private func uniffiCallbackInitThreadListEntriesListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_threadlistentrieslistener(UniffiCallbackInterfaceThreadListEntriesListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceThreadListEntriesListener {
+    fileprivate static let handleMap = UniffiHandleMap<ThreadListEntriesListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceThreadListEntriesListener : FfiConverter {
+    typealias SwiftType = ThreadListEntriesListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceThreadListEntriesListener_lift(_ handle: UInt64) throws -> ThreadListEntriesListener {
+    return try FfiConverterCallbackInterfaceThreadListEntriesListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceThreadListEntriesListener_lower(_ v: ThreadListEntriesListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceThreadListEntriesListener.lower(v)
+}
+
+
+
+
+/**
+ * Listener for changes to the [`ThreadListService`] pagination state.
+ */
+public protocol ThreadListPaginationStateListener: AnyObject, Sendable {
+    
+    func onUpdate(state: ThreadListPaginationState) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceThreadListPaginationStateListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // This creates 1-element array, since this seems to be the only way to construct a const
+    // pointer that we can pass to the Rust code.
+    static let vtable: [UniffiVTableCallbackInterfaceThreadListPaginationStateListener] = [UniffiVTableCallbackInterfaceThreadListPaginationStateListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceThreadListPaginationStateListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface ThreadListPaginationStateListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceThreadListPaginationStateListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface ThreadListPaginationStateListener: handle missing in uniffiClone")
+            }
+        },
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            state: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceThreadListPaginationStateListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     state: try FfiConverterTypeThreadListPaginationState_lift(state)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )]
+}
+
+private func uniffiCallbackInitThreadListPaginationStateListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_threadlistpaginationstatelistener(UniffiCallbackInterfaceThreadListPaginationStateListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceThreadListPaginationStateListener {
+    fileprivate static let handleMap = UniffiHandleMap<ThreadListPaginationStateListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceThreadListPaginationStateListener : FfiConverter {
+    typealias SwiftType = ThreadListPaginationStateListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceThreadListPaginationStateListener_lift(_ handle: UInt64) throws -> ThreadListPaginationStateListener {
+    return try FfiConverterCallbackInterfaceThreadListPaginationStateListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceThreadListPaginationStateListener_lower(_ v: ThreadListPaginationStateListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceThreadListPaginationStateListener.lower(v)
+}
+
+
+
+
 public protocol TimelineListener: AnyObject, Sendable {
     
     func onUpdate(diff: [TimelineDiff]) 
@@ -45873,6 +46657,30 @@ fileprivate struct FfiConverterOptionTypeSuccessorRoom: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeSuccessorRoom.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeThreadListItemEvent: FfiConverterRustBuffer {
+    typealias SwiftType = ThreadListItemEvent?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeThreadListItemEvent.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeThreadListItemEvent.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -47918,6 +48726,31 @@ fileprivate struct FfiConverterSequenceTypeSpaceListUpdate: FfiConverterRustBuff
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeThreadListUpdate: FfiConverterRustBuffer {
+    typealias SwiftType = [ThreadListUpdate]
+
+    public static func write(_ value: [ThreadListUpdate], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeThreadListUpdate.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ThreadListUpdate] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ThreadListUpdate]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeThreadListUpdate.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeTimelineDiff: FfiConverterRustBuffer {
     typealias SwiftType = [TimelineDiff]
 
@@ -49452,9 +50285,6 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_load_or_fetch_event() != 47103) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_load_thread_list() != 55252) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_mark_as_fully_read_unchecked() != 1608) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -49588,6 +50418,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_suggested_role_for_user() != 58040) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_thread_list_service() != 13714) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_timeline() != 51168) {
@@ -50064,6 +50897,24 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_inreplytodetails_event_id() != 55998) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_threadlistservice_items() != 55694) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_threadlistservice_paginate() != 53406) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_threadlistservice_pagination_state() != 17012) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_threadlistservice_reset() != 49568) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_threadlistservice_subscribe_to_items_updates() != 62027) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_threadlistservice_subscribe_to_pagination_state_updates() != 52158) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_widgetdriver_run() != 61502) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -50259,6 +51110,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timelinelistener_on_update() != 35518) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_threadlistentrieslistener_on_update() != 20080) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_threadlistpaginationstatelistener_on_update() != 57673) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_unabletodecryptdelegate_on_utd() != 3448) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -50305,6 +51162,8 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitSpaceServiceSpaceFiltersListener()
     uniffiCallbackInitSyncNotificationListener()
     uniffiCallbackInitSyncServiceStateObserver()
+    uniffiCallbackInitThreadListEntriesListener()
+    uniffiCallbackInitThreadListPaginationStateListener()
     uniffiCallbackInitTimelineListener()
     uniffiCallbackInitTypingNotificationsListener()
     uniffiCallbackInitUnableToDecryptDelegate()
