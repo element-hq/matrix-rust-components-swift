@@ -1357,7 +1357,27 @@ public protocol ClientProtocol: AnyObject, Sendable {
      */
     func subscribeToSendQueueUpdates(listener: SendQueueRoomUpdateListener) async throws  -> TaskHandle
     
+    /**
+     * Perform a single sync v2 call.
+     *
+     * This is useful for performing an initial sync or a one-shot sync
+     * without entering a continuous loop.
+     */
+    func syncOnceV2(settings: SyncSettingsV2) async throws  -> SyncResponseV2
+    
     func syncService()  -> SyncServiceBuilder
+    
+    /**
+     * Start a sync v2 loop.
+     *
+     * This is an alternative to [`Client::sync_service`] (which uses Sliding
+     * Sync / MSC4186). It works with any homeserver, including older
+     * Synapse versions that do not support Sliding Sync.
+     *
+     * Returns a `TaskHandle` that can be used to cancel the sync loop.
+     * The listener is called after each successful sync response.
+     */
+    func syncV2(settings: SyncSettingsV2, listener: SyncListenerV2)  -> TaskHandle
     
     func trackRecentlyVisitedRoom(room: String) async throws 
     
@@ -3160,10 +3180,53 @@ open func subscribeToSendQueueUpdates(listener: SendQueueRoomUpdateListener)asyn
         )
 }
     
+    /**
+     * Perform a single sync v2 call.
+     *
+     * This is useful for performing an initial sync or a one-shot sync
+     * without entering a continuous loop.
+     */
+open func syncOnceV2(settings: SyncSettingsV2)async throws  -> SyncResponseV2  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_sync_once_v2(
+                    self.uniffiCloneHandle(),
+                    FfiConverterTypeSyncSettingsV2_lower(settings)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeSyncResponseV2_lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
 open func syncService() -> SyncServiceBuilder  {
     return try!  FfiConverterTypeSyncServiceBuilder_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_client_sync_service(
             self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * Start a sync v2 loop.
+     *
+     * This is an alternative to [`Client::sync_service`] (which uses Sliding
+     * Sync / MSC4186). It works with any homeserver, including older
+     * Synapse versions that do not support Sliding Sync.
+     *
+     * Returns a `TaskHandle` that can be used to cancel the sync loop.
+     * The listener is called after each successful sync response.
+     */
+open func syncV2(settings: SyncSettingsV2, listener: SyncListenerV2) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_sync_v2(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeSyncSettingsV2_lower(settings),
+        FfiConverterCallbackInterfaceSyncListenerV2_lower(listener),$0
     )
 })
 }
@@ -7885,6 +7948,23 @@ public protocol RoomProtocol: AnyObject, Sendable {
      */
     func sendRaw(eventType: String, content: String) async throws 
     
+    /**
+     * Send a raw state event to the room.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the state event to send (e.g.
+     * `"m.room.name"` or a custom type).
+     *
+     * * `state_key` - A unique key which defines the overwriting semantics for
+     * this piece of room state. This is often an empty string.
+     *
+     * * `content` - The content of the state event encoded as a JSON string.
+     *
+     * Returns the event ID of the newly created state event.
+     */
+    func sendStateEventRaw(eventType: String, stateKey: String, content: String) async throws  -> String
+    
     func setIsFavourite(isFavourite: Bool, tagOrder: Double?) async throws 
     
     func setIsLowPriority(isLowPriority: Bool, tagOrder: Double?) async throws 
@@ -9359,6 +9439,38 @@ open func sendRaw(eventType: String, content: String)async throws   {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Send a raw state event to the room.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the state event to send (e.g.
+     * `"m.room.name"` or a custom type).
+     *
+     * * `state_key` - A unique key which defines the overwriting semantics for
+     * this piece of room state. This is often an empty string.
+     *
+     * * `content` - The content of the state event encoded as a JSON string.
+     *
+     * Returns the event ID of the newly created state event.
+     */
+open func sendStateEventRaw(eventType: String, stateKey: String, content: String)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_state_event_raw(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(eventType),FfiConverterString.lower(stateKey),FfiConverterString.lower(content)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -23538,6 +23650,237 @@ public func FfiConverterTypeSuccessorRoom_lift(_ buf: RustBuffer) throws -> Succ
 #endif
 public func FfiConverterTypeSuccessorRoom_lower(_ value: SuccessorRoom) -> RustBuffer {
     return FfiConverterTypeSuccessorRoom.lower(value)
+}
+
+
+/**
+ * Room updates from a sync v2 response.
+ */
+public struct SyncResponseRoomsV2: Equatable, Hashable {
+    /**
+     * Room IDs of rooms the user has been invited to.
+     */
+    public var invited: [String]
+    /**
+     * Room IDs of joined rooms that had updates.
+     */
+    public var joined: [String]
+    /**
+     * Room IDs of rooms the user has left.
+     */
+    public var left: [String]
+    /**
+     * Room IDs of rooms the user has knocked on.
+     */
+    public var knocked: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Room IDs of rooms the user has been invited to.
+         */invited: [String], 
+        /**
+         * Room IDs of joined rooms that had updates.
+         */joined: [String], 
+        /**
+         * Room IDs of rooms the user has left.
+         */left: [String], 
+        /**
+         * Room IDs of rooms the user has knocked on.
+         */knocked: [String]) {
+        self.invited = invited
+        self.joined = joined
+        self.left = left
+        self.knocked = knocked
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SyncResponseRoomsV2: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSyncResponseRoomsV2: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SyncResponseRoomsV2 {
+        return
+            try SyncResponseRoomsV2(
+                invited: FfiConverterSequenceString.read(from: &buf), 
+                joined: FfiConverterSequenceString.read(from: &buf), 
+                left: FfiConverterSequenceString.read(from: &buf), 
+                knocked: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SyncResponseRoomsV2, into buf: inout [UInt8]) {
+        FfiConverterSequenceString.write(value.invited, into: &buf)
+        FfiConverterSequenceString.write(value.joined, into: &buf)
+        FfiConverterSequenceString.write(value.left, into: &buf)
+        FfiConverterSequenceString.write(value.knocked, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSyncResponseRoomsV2_lift(_ buf: RustBuffer) throws -> SyncResponseRoomsV2 {
+    return try FfiConverterTypeSyncResponseRoomsV2.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSyncResponseRoomsV2_lower(_ value: SyncResponseRoomsV2) -> RustBuffer {
+    return FfiConverterTypeSyncResponseRoomsV2.lower(value)
+}
+
+
+/**
+ * The response from a sync v2 call.
+ */
+public struct SyncResponseV2: Equatable, Hashable {
+    /**
+     * The batch token to supply in the `since` param of the next `/sync`
+     * request.
+     */
+    public var nextBatch: String
+    /**
+     * Updates to rooms.
+     */
+    public var rooms: SyncResponseRoomsV2
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The batch token to supply in the `since` param of the next `/sync`
+         * request.
+         */nextBatch: String, 
+        /**
+         * Updates to rooms.
+         */rooms: SyncResponseRoomsV2) {
+        self.nextBatch = nextBatch
+        self.rooms = rooms
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SyncResponseV2: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSyncResponseV2: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SyncResponseV2 {
+        return
+            try SyncResponseV2(
+                nextBatch: FfiConverterString.read(from: &buf), 
+                rooms: FfiConverterTypeSyncResponseRoomsV2.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SyncResponseV2, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.nextBatch, into: &buf)
+        FfiConverterTypeSyncResponseRoomsV2.write(value.rooms, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSyncResponseV2_lift(_ buf: RustBuffer) throws -> SyncResponseV2 {
+    return try FfiConverterTypeSyncResponseV2.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSyncResponseV2_lower(_ value: SyncResponseV2) -> RustBuffer {
+    return FfiConverterTypeSyncResponseV2.lower(value)
+}
+
+
+/**
+ * Settings for a sync v2 call.
+ */
+public struct SyncSettingsV2: Equatable, Hashable {
+    /**
+     * Timeout in milliseconds for the server long-poll.
+     * If not set, defaults to 30 seconds.
+     */
+    public var timeoutMs: UInt64?
+    /**
+     * Whether to request full state on the first sync.
+     */
+    public var fullState: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Timeout in milliseconds for the server long-poll.
+         * If not set, defaults to 30 seconds.
+         */timeoutMs: UInt64? = nil, 
+        /**
+         * Whether to request full state on the first sync.
+         */fullState: Bool = false) {
+        self.timeoutMs = timeoutMs
+        self.fullState = fullState
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SyncSettingsV2: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSyncSettingsV2: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SyncSettingsV2 {
+        return
+            try SyncSettingsV2(
+                timeoutMs: FfiConverterOptionUInt64.read(from: &buf), 
+                fullState: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SyncSettingsV2, into buf: inout [UInt8]) {
+        FfiConverterOptionUInt64.write(value.timeoutMs, into: &buf)
+        FfiConverterBool.write(value.fullState, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSyncSettingsV2_lift(_ buf: RustBuffer) throws -> SyncSettingsV2 {
+    return try FfiConverterTypeSyncSettingsV2.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSyncSettingsV2_lower(_ value: SyncSettingsV2) -> RustBuffer {
+    return FfiConverterTypeSyncSettingsV2.lower(value)
 }
 
 
@@ -44525,6 +44868,139 @@ public func FfiConverterCallbackInterfaceSpaceServiceSpaceFiltersListener_lower(
 
 
 /**
+ * A listener for the sync loop.
+ *
+ * Called after each successful sync response when using
+ * [`Client::sync_v2`](crate::client::Client::sync_v2).
+ */
+public protocol SyncListenerV2: AnyObject, Sendable {
+    
+    /**
+     * Called after each successful sync response.
+     */
+    func onUpdate(response: SyncResponseV2) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceSyncListenerV2 {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // This creates 1-element array, since this seems to be the only way to construct a const
+    // pointer that we can pass to the Rust code.
+    static let vtable: [UniffiVTableCallbackInterfaceSyncListenerV2] = [UniffiVTableCallbackInterfaceSyncListenerV2(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceSyncListenerV2.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface SyncListenerV2: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceSyncListenerV2.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface SyncListenerV2: handle missing in uniffiClone")
+            }
+        },
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            response: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSyncListenerV2.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     response: try FfiConverterTypeSyncResponseV2_lift(response)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )]
+}
+
+private func uniffiCallbackInitSyncListenerV2() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_synclistenerv2(UniffiCallbackInterfaceSyncListenerV2.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceSyncListenerV2 {
+    fileprivate static let handleMap = UniffiHandleMap<SyncListenerV2>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceSyncListenerV2 : FfiConverter {
+    typealias SwiftType = SyncListenerV2
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceSyncListenerV2_lift(_ handle: UInt64) throws -> SyncListenerV2 {
+    return try FfiConverterCallbackInterfaceSyncListenerV2.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceSyncListenerV2_lower(_ v: SyncListenerV2) -> UInt64 {
+    return FfiConverterCallbackInterfaceSyncListenerV2.lower(v)
+}
+
+
+
+
+/**
  * A listener for notifications generated from sync responses.
  *
  * This is called during sync for each event that triggers a notification
@@ -49817,7 +50293,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_send_queue_updates() != 53470) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_sync_once_v2() != 18740) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_sync_service() != 47464) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_sync_v2() != 9900) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_track_recently_visited_room() != 40498) {
@@ -50364,6 +50846,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_raw() != 63831) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_state_event_raw() != 55730) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_is_favourite() != 1289) {
@@ -51104,6 +51589,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicestateobserver_on_update() != 7272) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_synclistenerv2_on_update() != 15542) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_paginationstatuslistener_on_update() != 17449) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -51160,6 +51648,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitSpaceRoomListSpaceListener()
     uniffiCallbackInitSpaceServiceJoinedSpacesListener()
     uniffiCallbackInitSpaceServiceSpaceFiltersListener()
+    uniffiCallbackInitSyncListenerV2()
     uniffiCallbackInitSyncNotificationListener()
     uniffiCallbackInitSyncServiceStateObserver()
     uniffiCallbackInitThreadListEntriesListener()
