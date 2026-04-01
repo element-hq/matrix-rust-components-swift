@@ -7,8 +7,8 @@ import Foundation
 // Depending on the consumer's build setup, the low-level FFI code
 // might be in a separate module, or it might be compiled inline into
 // this module. This is a bit of light hackery to work with both.
-#if canImport(matrix_sdk_ffiFFI)
-import matrix_sdk_ffiFFI
+#if canImport(MatrixSDKFFI)
+import MatrixSDKFFI
 #endif
 
 fileprivate extension RustBuffer {
@@ -940,6 +940,15 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func enableAllSendQueues(enable: Bool) async 
     
     /**
+     * Whether to enable automatic backpagination under certain conditions
+     * (e.g. when processing read receipts).
+     *
+     * This is an experimental feature, and might cause performance issues on
+     * large accounts. Use with caution.
+     */
+    func enableAutomaticBackpagination() 
+    
+    /**
      * Enables or disables progress reporting for media uploads in the send
      * queue.
      */
@@ -1041,6 +1050,8 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * The homeserver this client is configured to use.
      */
     func homeserver()  -> String
+    
+    func homeserverCapabilities()  -> HomeserverCapabilities
     
     /**
      * Information about login options for the client's homeserver.
@@ -1844,6 +1855,20 @@ open func enableAllSendQueues(enable: Bool)async   {
 }
     
     /**
+     * Whether to enable automatic backpagination under certain conditions
+     * (e.g. when processing read receipts).
+     *
+     * This is an experimental feature, and might cause performance issues on
+     * large accounts. Use with caution.
+     */
+open func enableAutomaticBackpagination()  {try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_enable_automatic_backpagination(
+            self.uniffiCloneHandle(),$0
+    )
+}
+}
+    
+    /**
      * Enables or disables progress reporting for media uploads in the send
      * queue.
      */
@@ -2199,6 +2224,14 @@ open func getUrl(url: String)async throws  -> Data  {
 open func homeserver() -> String  {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_client_homeserver(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+open func homeserverCapabilities() -> HomeserverCapabilities  {
+    return try!  FfiConverterTypeHomeserverCapabilities_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_homeserver_capabilities(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -4814,6 +4847,264 @@ public func FfiConverterTypeGrantLoginWithQrCodeHandler_lift(_ handle: UInt64) t
 #endif
 public func FfiConverterTypeGrantLoginWithQrCodeHandler_lower(_ value: GrantLoginWithQrCodeHandler) -> UInt64 {
     return FfiConverterTypeGrantLoginWithQrCodeHandler.lower(value)
+}
+
+
+
+
+
+
+public protocol HomeserverCapabilitiesProtocol: AnyObject, Sendable {
+    
+    func canChangeAvatar() async throws  -> Bool
+    
+    func canChangeDisplayname() async throws  -> Bool
+    
+    func canChangePassword() async throws  -> Bool
+    
+    func canChangeThirdpartyIds() async throws  -> Bool
+    
+    func canGetLoginToken() async throws  -> Bool
+    
+    func extendedProfileFields() async throws  -> ExtendedProfileFields
+    
+    func forgetsRoomWhenLeaving() async throws  -> Bool
+    
+    func refresh() async throws 
+    
+}
+open class HomeserverCapabilities: HomeserverCapabilitiesProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_homeservercapabilities(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_homeservercapabilities(handle, $0) }
+    }
+
+    
+
+    
+open func canChangeAvatar()async throws  -> Bool  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_homeservercapabilities_can_change_avatar(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+open func canChangeDisplayname()async throws  -> Bool  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_homeservercapabilities_can_change_displayname(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+open func canChangePassword()async throws  -> Bool  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_homeservercapabilities_can_change_password(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+open func canChangeThirdpartyIds()async throws  -> Bool  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_homeservercapabilities_can_change_thirdparty_ids(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+open func canGetLoginToken()async throws  -> Bool  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_homeservercapabilities_can_get_login_token(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+open func extendedProfileFields()async throws  -> ExtendedProfileFields  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_homeservercapabilities_extended_profile_fields(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeExtendedProfileFields_lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+open func forgetsRoomWhenLeaving()async throws  -> Bool  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_homeservercapabilities_forgets_room_when_leaving(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+open func refresh()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_homeservercapabilities_refresh(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeHomeserverCapabilities: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = HomeserverCapabilities
+
+    public static func lift(_ handle: UInt64) throws -> HomeserverCapabilities {
+        return HomeserverCapabilities(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: HomeserverCapabilities) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HomeserverCapabilities {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: HomeserverCapabilities, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHomeserverCapabilities_lift(_ handle: UInt64) throws -> HomeserverCapabilities {
+    return try FfiConverterTypeHomeserverCapabilities.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHomeserverCapabilities_lower(_ value: HomeserverCapabilities) -> UInt64 {
+    return FfiConverterTypeHomeserverCapabilities.lower(value)
 }
 
 
@@ -18219,6 +18510,64 @@ public func FfiConverterTypeEventTimelineItemDebugInfo_lift(_ buf: RustBuffer) t
 #endif
 public func FfiConverterTypeEventTimelineItemDebugInfo_lower(_ value: EventTimelineItemDebugInfo) -> RustBuffer {
     return FfiConverterTypeEventTimelineItemDebugInfo.lower(value)
+}
+
+
+public struct ExtendedProfileFields: Equatable, Hashable {
+    public var enabled: Bool
+    public var allowed: [String]
+    public var disallowed: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(enabled: Bool, allowed: [String], disallowed: [String]) {
+        self.enabled = enabled
+        self.allowed = allowed
+        self.disallowed = disallowed
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ExtendedProfileFields: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExtendedProfileFields: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExtendedProfileFields {
+        return
+            try ExtendedProfileFields(
+                enabled: FfiConverterBool.read(from: &buf), 
+                allowed: FfiConverterSequenceString.read(from: &buf), 
+                disallowed: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ExtendedProfileFields, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.enabled, into: &buf)
+        FfiConverterSequenceString.write(value.allowed, into: &buf)
+        FfiConverterSequenceString.write(value.disallowed, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExtendedProfileFields_lift(_ buf: RustBuffer) throws -> ExtendedProfileFields {
+    return try FfiConverterTypeExtendedProfileFields.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExtendedProfileFields_lower(_ value: ExtendedProfileFields) -> RustBuffer {
+    return FfiConverterTypeExtendedProfileFields.lower(value)
 }
 
 
@@ -50080,6 +50429,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_all_send_queues() != 53800) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_automatic_backpagination() != 6524) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_send_queue_upload_progress() != 30956) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -50138,6 +50490,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_homeserver() != 26707) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_homeserver_capabilities() != 31959) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_homeserver_login_details() != 63281) {
@@ -50327,6 +50682,30 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recent_emojis() != 49975) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeservercapabilities_can_change_avatar() != 42689) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeservercapabilities_can_change_displayname() != 39251) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeservercapabilities_can_change_password() != 37772) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeservercapabilities_can_change_thirdparty_ids() != 28706) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeservercapabilities_can_get_login_token() != 8709) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeservercapabilities_extended_profile_fields() != 56484) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeservercapabilities_forgets_room_when_leaving() != 21393) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeservercapabilities_refresh() != 6414) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediafilehandle_path() != 42046) {
