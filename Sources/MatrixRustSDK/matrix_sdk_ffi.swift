@@ -4058,6 +4058,22 @@ public protocol EncryptionProtocol: AnyObject, Sendable {
      */
     func hasDevicesToVerifyAgainst() async throws  -> Bool
     
+    /**
+     * This method will import all the private cross-signing keys and
+     * the private part of a backup key and its accompanying version into the
+     * store.
+     *
+     * Importing all the secrets will mark the device as verified and enable
+     * backups.
+     *
+     * **Warning**: Only import this from a trusted source, i.e. if an existing
+     * device is sharing this with a new device.
+     *
+     * **Warning*: Only call this method right after logging in and before the
+     * initial sync has been started.
+     */
+    func importSecretsBundle(secretsBundle: SecretsBundleWithUserId) async throws 
+    
     func isLastDevice() async throws  -> Bool
     
     /**
@@ -4340,6 +4356,37 @@ open func hasDevicesToVerifyAgainst()async throws  -> Bool  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
             liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * This method will import all the private cross-signing keys and
+     * the private part of a backup key and its accompanying version into the
+     * store.
+     *
+     * Importing all the secrets will mark the device as verified and enable
+     * backups.
+     *
+     * **Warning**: Only import this from a trusted source, i.e. if an existing
+     * device is sharing this with a new device.
+     *
+     * **Warning*: Only call this method right after logging in and before the
+     * initial sync has been started.
+     */
+open func importSecretsBundle(secretsBundle: SecretsBundleWithUserId)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_import_secrets_bundle(
+                    self.uniffiCloneHandle(),
+                    FfiConverterTypeSecretsBundleWithUserId_lower(secretsBundle)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -5868,6 +5915,13 @@ public protocol LazyTimelineItemProviderProtocol: AnyObject, Sendable {
      */
     func getShields(strict: Bool)  -> ShieldState
     
+    /**
+     * Returns the JSON string of the event's `content` field from the latest
+     * version (including edits). Returns `None` for local echoes that haven't
+     * been echoed back by the server yet.
+     */
+    func latestContentRaw()  -> String?
+    
 }
 /**
  * Wrapper to retrieve some timeline item info lazily.
@@ -5964,6 +6018,19 @@ open func getShields(strict: Bool) -> ShieldState  {
     uniffi_matrix_sdk_ffi_fn_method_lazytimelineitemprovider_get_shields(
             self.uniffiCloneHandle(),
         FfiConverterBool.lower(strict),$0
+    )
+})
+}
+    
+    /**
+     * Returns the JSON string of the event's `content` field from the latest
+     * version (including edits). Returns `None` for local echoes that haven't
+     * been echoed back by the server yet.
+     */
+open func latestContentRaw() -> String?  {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_lazytimelineitemprovider_latest_content_raw(
+            self.uniffiCloneHandle(),$0
     )
 })
 }
@@ -12256,6 +12323,183 @@ public func FfiConverterTypeRoomPreview_lower(_ value: RoomPreview) -> UInt64 {
 
 
 
+/**
+ * Struct containing the bundle of secrets to fully activate a new device for
+ * end-to-end encryption.
+ */
+public protocol SecretsBundleWithUserIdProtocol: AnyObject, Sendable {
+    
+    /**
+     * Does the bundle contain a backup key.
+     *
+     * Since enabling a backup is optional, the backup key might be missing
+     * from the bundle. Returns `false` if the backup key is missing,
+     * otherwise `true`.
+     */
+    func containsBackupKey()  -> Bool
+    
+}
+/**
+ * Struct containing the bundle of secrets to fully activate a new device for
+ * end-to-end encryption.
+ */
+open class SecretsBundleWithUserId: SecretsBundleWithUserIdProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_secretsbundlewithuserid(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_secretsbundlewithuserid(handle, $0) }
+    }
+
+    
+    /**
+     * Attempt to export a [`SecretsBundle`] from a crypto store.
+     *
+     * This method can be used to retrieve a [`SecretsBundle`] from an existing
+     * `matrix-sdk`-based client in order to import the [`SecretsBundle`] in
+     * another [`Client`] instance.
+     *
+     * This can be useful for migration purposes or to allow existing client
+     * instances create new ones that will be fully verified.
+     */
+public static func fromDatabase(databasePath: String, passphrase: String?, backupInfo: String)async throws  -> SecretsBundleWithUserId  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_constructor_secretsbundlewithuserid_from_database(FfiConverterString.lower(databasePath),FfiConverterOptionString.lower(passphrase),FfiConverterString.lower(backupInfo)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
+            liftFunc: FfiConverterTypeSecretsBundleWithUserId_lift,
+            errorHandler: FfiConverterTypeBundleExportError_lift
+        )
+}
+    
+    /**
+     * Attempt to create a [`SecretsBundle`] from a previously JSON serialized
+     * bundle.
+     */
+public static func fromStr(userId: String, bundle: String, backupInfo: String)throws  -> SecretsBundleWithUserId  {
+    return try  FfiConverterTypeSecretsBundleWithUserId_lift(try rustCallWithError(FfiConverterTypeBundleExportError_lift) {
+    uniffi_matrix_sdk_ffi_fn_constructor_secretsbundlewithuserid_from_str(
+        FfiConverterString.lower(userId),
+        FfiConverterString.lower(bundle),
+        FfiConverterString.lower(backupInfo),$0
+    )
+})
+}
+    
+
+    
+    /**
+     * Does the bundle contain a backup key.
+     *
+     * Since enabling a backup is optional, the backup key might be missing
+     * from the bundle. Returns `false` if the backup key is missing,
+     * otherwise `true`.
+     */
+open func containsBackupKey() -> Bool  {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_secretsbundlewithuserid_contains_backup_key(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSecretsBundleWithUserId: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = SecretsBundleWithUserId
+
+    public static func lift(_ handle: UInt64) throws -> SecretsBundleWithUserId {
+        return SecretsBundleWithUserId(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: SecretsBundleWithUserId) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SecretsBundleWithUserId {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: SecretsBundleWithUserId, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecretsBundleWithUserId_lift(_ handle: UInt64) throws -> SecretsBundleWithUserId {
+    return try FfiConverterTypeSecretsBundleWithUserId.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecretsBundleWithUserId_lower(_ value: SecretsBundleWithUserId) -> UInt64 {
+    return FfiConverterTypeSecretsBundleWithUserId.lower(value)
+}
+
+
+
+
+
+
 public protocol SendAttachmentJoinHandleProtocol: AnyObject, Sendable {
     
     /**
@@ -18352,6 +18596,11 @@ public struct EventTimelineItem {
     public var isOwn: Bool
     public var isEditable: Bool
     public var content: TimelineItemContent
+    /**
+     * The raw Matrix event type string (e.g. `"m.room.message"`), or `None`
+     * when the original type is not available (e.g. redacted events).
+     */
+    public var eventTypeRaw: String?
     public var timestamp: Timestamp
     public var localSendState: EventSendState?
     public var localCreatedAt: UInt64?
@@ -18365,7 +18614,11 @@ public struct EventTimelineItem {
     public init(
         /**
          * Indicates that an event is remote.
-         */isRemote: Bool, eventOrTransactionId: EventOrTransactionId, sender: String, senderProfile: ProfileDetails, forwarder: String?, forwarderProfile: ProfileDetails?, isOwn: Bool, isEditable: Bool, content: TimelineItemContent, timestamp: Timestamp, localSendState: EventSendState?, localCreatedAt: UInt64?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, lazyProvider: LazyTimelineItemProvider) {
+         */isRemote: Bool, eventOrTransactionId: EventOrTransactionId, sender: String, senderProfile: ProfileDetails, forwarder: String?, forwarderProfile: ProfileDetails?, isOwn: Bool, isEditable: Bool, content: TimelineItemContent, 
+        /**
+         * The raw Matrix event type string (e.g. `"m.room.message"`), or `None`
+         * when the original type is not available (e.g. redacted events).
+         */eventTypeRaw: String?, timestamp: Timestamp, localSendState: EventSendState?, localCreatedAt: UInt64?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, lazyProvider: LazyTimelineItemProvider) {
         self.isRemote = isRemote
         self.eventOrTransactionId = eventOrTransactionId
         self.sender = sender
@@ -18375,6 +18628,7 @@ public struct EventTimelineItem {
         self.isOwn = isOwn
         self.isEditable = isEditable
         self.content = content
+        self.eventTypeRaw = eventTypeRaw
         self.timestamp = timestamp
         self.localSendState = localSendState
         self.localCreatedAt = localCreatedAt
@@ -18409,6 +18663,7 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
                 isOwn: FfiConverterBool.read(from: &buf), 
                 isEditable: FfiConverterBool.read(from: &buf), 
                 content: FfiConverterTypeTimelineItemContent.read(from: &buf), 
+                eventTypeRaw: FfiConverterOptionString.read(from: &buf), 
                 timestamp: FfiConverterTypeTimestamp.read(from: &buf), 
                 localSendState: FfiConverterOptionTypeEventSendState.read(from: &buf), 
                 localCreatedAt: FfiConverterOptionUInt64.read(from: &buf), 
@@ -18429,6 +18684,7 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isOwn, into: &buf)
         FfiConverterBool.write(value.isEditable, into: &buf)
         FfiConverterTypeTimelineItemContent.write(value.content, into: &buf)
+        FfiConverterOptionString.write(value.eventTypeRaw, into: &buf)
         FfiConverterTypeTimestamp.write(value.timestamp, into: &buf)
         FfiConverterOptionTypeEventSendState.write(value.localSendState, into: &buf)
         FfiConverterOptionUInt64.write(value.localCreatedAt, into: &buf)
@@ -25851,6 +26107,10 @@ public struct WidgetCapabilities: Equatable, Hashable {
      * This allows the widget to send events with a delay.
      */
     public var sendDelayedEvent: Bool
+    /**
+     * This allows the widget to download files (avatars)
+     */
+    public var downloadFiles: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -25873,12 +26133,16 @@ public struct WidgetCapabilities: Equatable, Hashable {
          */updateDelayedEvent: Bool, 
         /**
          * This allows the widget to send events with a delay.
-         */sendDelayedEvent: Bool) {
+         */sendDelayedEvent: Bool, 
+        /**
+         * This allows the widget to download files (avatars)
+         */downloadFiles: Bool) {
         self.read = read
         self.send = send
         self.requiresClient = requiresClient
         self.updateDelayedEvent = updateDelayedEvent
         self.sendDelayedEvent = sendDelayedEvent
+        self.downloadFiles = downloadFiles
     }
 
     
@@ -25901,7 +26165,8 @@ public struct FfiConverterTypeWidgetCapabilities: FfiConverterRustBuffer {
                 send: FfiConverterSequenceTypeWidgetEventFilter.read(from: &buf), 
                 requiresClient: FfiConverterBool.read(from: &buf), 
                 updateDelayedEvent: FfiConverterBool.read(from: &buf), 
-                sendDelayedEvent: FfiConverterBool.read(from: &buf)
+                sendDelayedEvent: FfiConverterBool.read(from: &buf), 
+                downloadFiles: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -25911,6 +26176,7 @@ public struct FfiConverterTypeWidgetCapabilities: FfiConverterRustBuffer {
         FfiConverterBool.write(value.requiresClient, into: &buf)
         FfiConverterBool.write(value.updateDelayedEvent, into: &buf)
         FfiConverterBool.write(value.sendDelayedEvent, into: &buf)
+        FfiConverterBool.write(value.downloadFiles, into: &buf)
     }
 }
 
@@ -27043,6 +27309,148 @@ public func FfiConverterTypeBatchNotificationResult_lower(_ value: BatchNotifica
 
 
 
+/**
+ * Error type describing failures that can happen while exporting a
+ * [`SecretsBundle`] from a SQLite store.
+ */
+public enum BundleExportError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+    
+    
+    /**
+     * The SQLite store couldn't be opened.
+     */
+    case OpenStoreError(msg: String
+    )
+    /**
+     * Data from the SQLite store couldn't be exported.
+     */
+    case StoreError(msg: String
+    )
+    /**
+     * The store doesn't contain a secrets bundle or it couldn't be read from
+     * the store.
+     */
+    case SecretError(msg: String
+    )
+    /**
+     * The store is empty and doesn't contain a secrets bundle.
+     */
+    case StoreEmpty
+    /**
+     * A JSON object couldn't be deserialized while the secrets bundle was
+     * exported.
+     */
+    case Json(msg: String
+    )
+    /**
+     * Error returned when the secrets bundle is missing a backup key or
+     * includes one that doesn’t match the key configured for the active backup
+     * version.
+     */
+    case InvalidBackup
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
+}
+
+#if compiler(>=6)
+extension BundleExportError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeBundleExportError: FfiConverterRustBuffer {
+    typealias SwiftType = BundleExportError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BundleExportError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .OpenStoreError(
+            msg: try FfiConverterString.read(from: &buf)
+            )
+        case 2: return .StoreError(
+            msg: try FfiConverterString.read(from: &buf)
+            )
+        case 3: return .SecretError(
+            msg: try FfiConverterString.read(from: &buf)
+            )
+        case 4: return .StoreEmpty
+        case 5: return .Json(
+            msg: try FfiConverterString.read(from: &buf)
+            )
+        case 6: return .InvalidBackup
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: BundleExportError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        
+        case let .OpenStoreError(msg):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(msg, into: &buf)
+            
+        
+        case let .StoreError(msg):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(msg, into: &buf)
+            
+        
+        case let .SecretError(msg):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(msg, into: &buf)
+            
+        
+        case .StoreEmpty:
+            writeInt(&buf, Int32(4))
+        
+        
+        case let .Json(msg):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(msg, into: &buf)
+            
+        
+        case .InvalidBackup:
+            writeInt(&buf, Int32(6))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBundleExportError_lift(_ buf: RustBuffer) throws -> BundleExportError {
+    return try FfiConverterTypeBundleExportError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBundleExportError_lower(_ value: BundleExportError) -> RustBuffer {
+    return FfiConverterTypeBundleExportError.lower(value)
+}
+
+
 public enum ClientBuildError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
     
@@ -27697,6 +28105,103 @@ public func FfiConverterTypeDateDividerMode_lift(_ buf: RustBuffer) throws -> Da
 #endif
 public func FfiConverterTypeDateDividerMode_lower(_ value: DateDividerMode) -> RustBuffer {
     return FfiConverterTypeDateDividerMode.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Result for the check if a store has a valid secrets bundle.
+ */
+
+public enum DetectedSecretsBundle: Equatable, Hashable {
+    
+    /**
+     * The store doesn't contain a secrets bundle at all.
+     */
+    case none
+    /**
+     * The store contains a bundle without a backup.
+     */
+    case withoutBackup
+    /**
+     * The store contains a bundle with an unused backup, the backup key in the
+     * bundle isn't used on the homeserver.
+     */
+    case unusedBackup
+    /**
+     * The store contains a complete secrets bundle.
+     */
+    case complete
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension DetectedSecretsBundle: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDetectedSecretsBundle: FfiConverterRustBuffer {
+    typealias SwiftType = DetectedSecretsBundle
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DetectedSecretsBundle {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .none
+        
+        case 2: return .withoutBackup
+        
+        case 3: return .unusedBackup
+        
+        case 4: return .complete
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: DetectedSecretsBundle, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .none:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .withoutBackup:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .unusedBackup:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .complete:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDetectedSecretsBundle_lift(_ buf: RustBuffer) throws -> DetectedSecretsBundle {
+    return try FfiConverterTypeDetectedSecretsBundle.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDetectedSecretsBundle_lower(_ value: DetectedSecretsBundle) -> RustBuffer {
+    return FfiConverterTypeDetectedSecretsBundle.lower(value)
 }
 
 
@@ -33276,7 +33781,6 @@ public enum OtherState: Equatable, Hashable {
     case policyRuleRoom
     case policyRuleServer
     case policyRuleUser
-    case roomAliases
     case roomAvatar(url: String?
     )
     case roomCanonicalAlias
@@ -33331,50 +33835,48 @@ public struct FfiConverterTypeOtherState: FfiConverterRustBuffer {
         
         case 3: return .policyRuleUser
         
-        case 4: return .roomAliases
-        
-        case 5: return .roomAvatar(url: try FfiConverterOptionString.read(from: &buf)
+        case 4: return .roomAvatar(url: try FfiConverterOptionString.read(from: &buf)
         )
         
-        case 6: return .roomCanonicalAlias
+        case 5: return .roomCanonicalAlias
         
-        case 7: return .roomCreate(federate: try FfiConverterBool.read(from: &buf)
+        case 6: return .roomCreate(federate: try FfiConverterBool.read(from: &buf)
         )
         
-        case 8: return .roomEncryption
+        case 7: return .roomEncryption
         
-        case 9: return .roomGuestAccess
+        case 8: return .roomGuestAccess
         
-        case 10: return .roomHistoryVisibility(historyVisibility: try FfiConverterTypeHistoryVisibility.read(from: &buf)
+        case 9: return .roomHistoryVisibility(historyVisibility: try FfiConverterTypeHistoryVisibility.read(from: &buf)
         )
         
-        case 11: return .roomJoinRules(joinRule: try FfiConverterOptionTypeJoinRule.read(from: &buf)
+        case 10: return .roomJoinRules(joinRule: try FfiConverterOptionTypeJoinRule.read(from: &buf)
         )
         
-        case 12: return .roomName(name: try FfiConverterOptionString.read(from: &buf)
+        case 11: return .roomName(name: try FfiConverterOptionString.read(from: &buf)
         )
         
-        case 13: return .roomPinnedEvents(change: try FfiConverterTypeRoomPinnedEventsChange.read(from: &buf)
+        case 12: return .roomPinnedEvents(change: try FfiConverterTypeRoomPinnedEventsChange.read(from: &buf)
         )
         
-        case 14: return .roomPowerLevels(events: try FfiConverterDictionaryTypeTimelineEventTypeInt64.read(from: &buf), previousEvents: try FfiConverterOptionDictionaryTypeTimelineEventTypeInt64.read(from: &buf), users: try FfiConverterDictionaryStringInt64.read(from: &buf), previousUsers: try FfiConverterOptionDictionaryStringInt64.read(from: &buf), thresholds: try FfiConverterTypePowerLevelChanges.read(from: &buf), previousThresholds: try FfiConverterOptionTypePowerLevelChanges.read(from: &buf)
+        case 13: return .roomPowerLevels(events: try FfiConverterDictionaryTypeTimelineEventTypeInt64.read(from: &buf), previousEvents: try FfiConverterOptionDictionaryTypeTimelineEventTypeInt64.read(from: &buf), users: try FfiConverterDictionaryStringInt64.read(from: &buf), previousUsers: try FfiConverterOptionDictionaryStringInt64.read(from: &buf), thresholds: try FfiConverterTypePowerLevelChanges.read(from: &buf), previousThresholds: try FfiConverterOptionTypePowerLevelChanges.read(from: &buf)
         )
         
-        case 15: return .roomServerAcl
+        case 14: return .roomServerAcl
         
-        case 16: return .roomThirdPartyInvite(displayName: try FfiConverterOptionString.read(from: &buf)
+        case 15: return .roomThirdPartyInvite(displayName: try FfiConverterOptionString.read(from: &buf)
         )
         
-        case 17: return .roomTombstone
+        case 16: return .roomTombstone
         
-        case 18: return .roomTopic(topic: try FfiConverterOptionString.read(from: &buf)
+        case 17: return .roomTopic(topic: try FfiConverterOptionString.read(from: &buf)
         )
         
-        case 19: return .spaceChild
+        case 18: return .spaceChild
         
-        case 20: return .spaceParent
+        case 19: return .spaceParent
         
-        case 21: return .custom(eventType: try FfiConverterString.read(from: &buf)
+        case 20: return .custom(eventType: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -33397,54 +33899,50 @@ public struct FfiConverterTypeOtherState: FfiConverterRustBuffer {
             writeInt(&buf, Int32(3))
         
         
-        case .roomAliases:
-            writeInt(&buf, Int32(4))
-        
-        
         case let .roomAvatar(url):
-            writeInt(&buf, Int32(5))
+            writeInt(&buf, Int32(4))
             FfiConverterOptionString.write(url, into: &buf)
             
         
         case .roomCanonicalAlias:
-            writeInt(&buf, Int32(6))
+            writeInt(&buf, Int32(5))
         
         
         case let .roomCreate(federate):
-            writeInt(&buf, Int32(7))
+            writeInt(&buf, Int32(6))
             FfiConverterBool.write(federate, into: &buf)
             
         
         case .roomEncryption:
-            writeInt(&buf, Int32(8))
+            writeInt(&buf, Int32(7))
         
         
         case .roomGuestAccess:
-            writeInt(&buf, Int32(9))
+            writeInt(&buf, Int32(8))
         
         
         case let .roomHistoryVisibility(historyVisibility):
-            writeInt(&buf, Int32(10))
+            writeInt(&buf, Int32(9))
             FfiConverterTypeHistoryVisibility.write(historyVisibility, into: &buf)
             
         
         case let .roomJoinRules(joinRule):
-            writeInt(&buf, Int32(11))
+            writeInt(&buf, Int32(10))
             FfiConverterOptionTypeJoinRule.write(joinRule, into: &buf)
             
         
         case let .roomName(name):
-            writeInt(&buf, Int32(12))
+            writeInt(&buf, Int32(11))
             FfiConverterOptionString.write(name, into: &buf)
             
         
         case let .roomPinnedEvents(change):
-            writeInt(&buf, Int32(13))
+            writeInt(&buf, Int32(12))
             FfiConverterTypeRoomPinnedEventsChange.write(change, into: &buf)
             
         
         case let .roomPowerLevels(events,previousEvents,users,previousUsers,thresholds,previousThresholds):
-            writeInt(&buf, Int32(14))
+            writeInt(&buf, Int32(13))
             FfiConverterDictionaryTypeTimelineEventTypeInt64.write(events, into: &buf)
             FfiConverterOptionDictionaryTypeTimelineEventTypeInt64.write(previousEvents, into: &buf)
             FfiConverterDictionaryStringInt64.write(users, into: &buf)
@@ -33454,33 +33952,33 @@ public struct FfiConverterTypeOtherState: FfiConverterRustBuffer {
             
         
         case .roomServerAcl:
-            writeInt(&buf, Int32(15))
+            writeInt(&buf, Int32(14))
         
         
         case let .roomThirdPartyInvite(displayName):
-            writeInt(&buf, Int32(16))
+            writeInt(&buf, Int32(15))
             FfiConverterOptionString.write(displayName, into: &buf)
             
         
         case .roomTombstone:
-            writeInt(&buf, Int32(17))
+            writeInt(&buf, Int32(16))
         
         
         case let .roomTopic(topic):
-            writeInt(&buf, Int32(18))
+            writeInt(&buf, Int32(17))
             FfiConverterOptionString.write(topic, into: &buf)
             
         
         case .spaceChild:
-            writeInt(&buf, Int32(19))
+            writeInt(&buf, Int32(18))
         
         
         case .spaceParent:
-            writeInt(&buf, Int32(20))
+            writeInt(&buf, Int32(19))
         
         
         case let .custom(eventType):
-            writeInt(&buf, Int32(21))
+            writeInt(&buf, Int32(20))
             FfiConverterString.write(eventType, into: &buf)
             
         }
@@ -38187,7 +38685,6 @@ public enum StateEventContent: Equatable, Hashable {
     case policyRuleRoom
     case policyRuleServer
     case policyRuleUser
-    case roomAliases
     case roomAvatar
     case roomCanonicalAlias
     case roomCreate
@@ -38234,43 +38731,41 @@ public struct FfiConverterTypeStateEventContent: FfiConverterRustBuffer {
         
         case 3: return .policyRuleUser
         
-        case 4: return .roomAliases
+        case 4: return .roomAvatar
         
-        case 5: return .roomAvatar
+        case 5: return .roomCanonicalAlias
         
-        case 6: return .roomCanonicalAlias
+        case 6: return .roomCreate
         
-        case 7: return .roomCreate
+        case 7: return .roomEncryption
         
-        case 8: return .roomEncryption
+        case 8: return .roomGuestAccess
         
-        case 9: return .roomGuestAccess
+        case 9: return .roomHistoryVisibility
         
-        case 10: return .roomHistoryVisibility
+        case 10: return .roomJoinRules
         
-        case 11: return .roomJoinRules
-        
-        case 12: return .roomMemberContent(userId: try FfiConverterString.read(from: &buf), membershipState: try FfiConverterTypeMembershipState.read(from: &buf)
+        case 11: return .roomMemberContent(userId: try FfiConverterString.read(from: &buf), membershipState: try FfiConverterTypeMembershipState.read(from: &buf)
         )
         
-        case 13: return .roomName
+        case 12: return .roomName
         
-        case 14: return .roomPinnedEvents
+        case 13: return .roomPinnedEvents
         
-        case 15: return .roomPowerLevels
+        case 14: return .roomPowerLevels
         
-        case 16: return .roomServerAcl
+        case 15: return .roomServerAcl
         
-        case 17: return .roomThirdPartyInvite
+        case 16: return .roomThirdPartyInvite
         
-        case 18: return .roomTombstone
+        case 17: return .roomTombstone
         
-        case 19: return .roomTopic(topic: try FfiConverterString.read(from: &buf)
+        case 18: return .roomTopic(topic: try FfiConverterString.read(from: &buf)
         )
         
-        case 20: return .spaceChild
+        case 19: return .spaceChild
         
-        case 21: return .spaceParent
+        case 20: return .spaceParent
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -38292,79 +38787,75 @@ public struct FfiConverterTypeStateEventContent: FfiConverterRustBuffer {
             writeInt(&buf, Int32(3))
         
         
-        case .roomAliases:
+        case .roomAvatar:
             writeInt(&buf, Int32(4))
         
         
-        case .roomAvatar:
+        case .roomCanonicalAlias:
             writeInt(&buf, Int32(5))
         
         
-        case .roomCanonicalAlias:
+        case .roomCreate:
             writeInt(&buf, Int32(6))
         
         
-        case .roomCreate:
+        case .roomEncryption:
             writeInt(&buf, Int32(7))
         
         
-        case .roomEncryption:
+        case .roomGuestAccess:
             writeInt(&buf, Int32(8))
         
         
-        case .roomGuestAccess:
+        case .roomHistoryVisibility:
             writeInt(&buf, Int32(9))
         
         
-        case .roomHistoryVisibility:
+        case .roomJoinRules:
             writeInt(&buf, Int32(10))
         
         
-        case .roomJoinRules:
-            writeInt(&buf, Int32(11))
-        
-        
         case let .roomMemberContent(userId,membershipState):
-            writeInt(&buf, Int32(12))
+            writeInt(&buf, Int32(11))
             FfiConverterString.write(userId, into: &buf)
             FfiConverterTypeMembershipState.write(membershipState, into: &buf)
             
         
         case .roomName:
-            writeInt(&buf, Int32(13))
+            writeInt(&buf, Int32(12))
         
         
         case .roomPinnedEvents:
-            writeInt(&buf, Int32(14))
+            writeInt(&buf, Int32(13))
         
         
         case .roomPowerLevels:
-            writeInt(&buf, Int32(15))
+            writeInt(&buf, Int32(14))
         
         
         case .roomServerAcl:
-            writeInt(&buf, Int32(16))
+            writeInt(&buf, Int32(15))
         
         
         case .roomThirdPartyInvite:
-            writeInt(&buf, Int32(17))
+            writeInt(&buf, Int32(16))
         
         
         case .roomTombstone:
-            writeInt(&buf, Int32(18))
+            writeInt(&buf, Int32(17))
         
         
         case let .roomTopic(topic):
-            writeInt(&buf, Int32(19))
+            writeInt(&buf, Int32(18))
             FfiConverterString.write(topic, into: &buf)
             
         
         case .spaceChild:
-            writeInt(&buf, Int32(20))
+            writeInt(&buf, Int32(19))
         
         
         case .spaceParent:
-            writeInt(&buf, Int32(21))
+            writeInt(&buf, Int32(20))
         
         }
     }
@@ -38397,7 +38888,6 @@ public enum StateEventType: Equatable, Hashable {
     case policyRuleRoom
     case policyRuleServer
     case policyRuleUser
-    case roomAliases
     case roomAvatar
     case roomCanonicalAlias
     case roomCreate
@@ -38452,47 +38942,45 @@ public struct FfiConverterTypeStateEventType: FfiConverterRustBuffer {
         
         case 6: return .policyRuleUser
         
-        case 7: return .roomAliases
+        case 7: return .roomAvatar
         
-        case 8: return .roomAvatar
+        case 8: return .roomCanonicalAlias
         
-        case 9: return .roomCanonicalAlias
+        case 9: return .roomCreate
         
-        case 10: return .roomCreate
+        case 10: return .roomEncryption
         
-        case 11: return .roomEncryption
+        case 11: return .roomGuestAccess
         
-        case 12: return .roomGuestAccess
+        case 12: return .roomHistoryVisibility
         
-        case 13: return .roomHistoryVisibility
+        case 13: return .roomImagePack
         
-        case 14: return .roomImagePack
+        case 14: return .roomJoinRules
         
-        case 15: return .roomJoinRules
+        case 15: return .roomMemberEvent
         
-        case 16: return .roomMemberEvent
+        case 16: return .roomLanguage
         
-        case 17: return .roomLanguage
+        case 17: return .roomName
         
-        case 18: return .roomName
+        case 18: return .roomPinnedEvents
         
-        case 19: return .roomPinnedEvents
+        case 19: return .roomPowerLevels
         
-        case 20: return .roomPowerLevels
+        case 20: return .roomServerAcl
         
-        case 21: return .roomServerAcl
+        case 21: return .roomThirdPartyInvite
         
-        case 22: return .roomThirdPartyInvite
+        case 22: return .roomTombstone
         
-        case 23: return .roomTombstone
+        case 23: return .roomTopic
         
-        case 24: return .roomTopic
+        case 24: return .spaceChild
         
-        case 25: return .spaceChild
+        case 25: return .spaceParent
         
-        case 26: return .spaceParent
-        
-        case 27: return .custom(value: try FfiConverterString.read(from: &buf)
+        case 26: return .custom(value: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -38527,88 +39015,84 @@ public struct FfiConverterTypeStateEventType: FfiConverterRustBuffer {
             writeInt(&buf, Int32(6))
         
         
-        case .roomAliases:
+        case .roomAvatar:
             writeInt(&buf, Int32(7))
         
         
-        case .roomAvatar:
+        case .roomCanonicalAlias:
             writeInt(&buf, Int32(8))
         
         
-        case .roomCanonicalAlias:
+        case .roomCreate:
             writeInt(&buf, Int32(9))
         
         
-        case .roomCreate:
+        case .roomEncryption:
             writeInt(&buf, Int32(10))
         
         
-        case .roomEncryption:
+        case .roomGuestAccess:
             writeInt(&buf, Int32(11))
         
         
-        case .roomGuestAccess:
+        case .roomHistoryVisibility:
             writeInt(&buf, Int32(12))
         
         
-        case .roomHistoryVisibility:
+        case .roomImagePack:
             writeInt(&buf, Int32(13))
         
         
-        case .roomImagePack:
+        case .roomJoinRules:
             writeInt(&buf, Int32(14))
         
         
-        case .roomJoinRules:
+        case .roomMemberEvent:
             writeInt(&buf, Int32(15))
         
         
-        case .roomMemberEvent:
+        case .roomLanguage:
             writeInt(&buf, Int32(16))
         
         
-        case .roomLanguage:
+        case .roomName:
             writeInt(&buf, Int32(17))
         
         
-        case .roomName:
+        case .roomPinnedEvents:
             writeInt(&buf, Int32(18))
         
         
-        case .roomPinnedEvents:
+        case .roomPowerLevels:
             writeInt(&buf, Int32(19))
         
         
-        case .roomPowerLevels:
+        case .roomServerAcl:
             writeInt(&buf, Int32(20))
         
         
-        case .roomServerAcl:
+        case .roomThirdPartyInvite:
             writeInt(&buf, Int32(21))
         
         
-        case .roomThirdPartyInvite:
+        case .roomTombstone:
             writeInt(&buf, Int32(22))
         
         
-        case .roomTombstone:
+        case .roomTopic:
             writeInt(&buf, Int32(23))
         
         
-        case .roomTopic:
+        case .spaceChild:
             writeInt(&buf, Int32(24))
         
         
-        case .spaceChild:
+        case .spaceParent:
             writeInt(&buf, Int32(25))
         
         
-        case .spaceParent:
-            writeInt(&buf, Int32(26))
-        
-        
         case let .custom(value):
-            writeInt(&buf, Int32(27))
+            writeInt(&buf, Int32(26))
             FfiConverterString.write(value, into: &buf)
             
         }
@@ -39624,7 +40108,8 @@ public enum TimelineItemContent {
     case msgLike(content: MsgLikeContent
     )
     case callInvite
-    case rtcNotification
+    case rtcNotification(callIntent: String?
+    )
     case roomMembership(userId: String, userDisplayName: String?, change: MembershipChange?, reason: String?
     )
     case profileChange(displayName: String?, prevDisplayName: String?, avatarUrl: String?, prevAvatarUrl: String?
@@ -39661,7 +40146,8 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
         
         case 2: return .callInvite
         
-        case 3: return .rtcNotification
+        case 3: return .rtcNotification(callIntent: try FfiConverterOptionString.read(from: &buf)
+        )
         
         case 4: return .roomMembership(userId: try FfiConverterString.read(from: &buf), userDisplayName: try FfiConverterOptionString.read(from: &buf), change: try FfiConverterOptionTypeMembershipChange.read(from: &buf), reason: try FfiConverterOptionString.read(from: &buf)
         )
@@ -39695,9 +40181,10 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         
         
-        case .rtcNotification:
+        case let .rtcNotification(callIntent):
             writeInt(&buf, Int32(3))
-        
+            FfiConverterOptionString.write(callIntent, into: &buf)
+            
         
         case let .roomMembership(userId,userDisplayName,change,reason):
             writeInt(&buf, Int32(4))
@@ -49986,6 +50473,34 @@ public func genTransactionId() -> String  {
 })
 }
 /**
+ * Check if a crypto store contains a valid [`SecretsBundle`].
+ */
+public func databaseContainsSecretsBundle(databasePath: String, passphrase: String?, backupInfo: String?)async throws  -> DetectedSecretsBundle  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_func_database_contains_secrets_bundle(FfiConverterString.lower(databasePath),FfiConverterOptionString.lower(passphrase),FfiConverterOptionString.lower(backupInfo)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeDetectedSecretsBundle_lift,
+            errorHandler: FfiConverterTypeBundleExportError_lift
+        )
+}
+/**
+ * Check if a JSON encoded string contains a valid [`SecretsBundle`].
+ */
+public func jsonStringContainsSecretsBundle(bundle: String, backupInfo: String?)throws  -> DetectedSecretsBundle  {
+    return try  FfiConverterTypeDetectedSecretsBundle_lift(try rustCallWithError(FfiConverterTypeClientError_lift) {
+    uniffi_matrix_sdk_ffi_fn_func_json_string_contains_secrets_bundle(
+        FfiConverterString.lower(bundle),
+        FfiConverterOptionString.lower(backupInfo),$0
+    )
+})
+}
+/**
  * Set the global enablement level for the Sentry layer (after the logs have
  * been set up).
  */
@@ -50286,6 +50801,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_gen_transaction_id() != 50486) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_func_database_contains_secrets_bundle() != 57434) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_func_json_string_contains_secrets_bundle() != 52137) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_enable_sentry_logging() != 7613) {
@@ -50819,6 +51340,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_has_devices_to_verify_against() != 50754) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_import_secrets_bundle() != 9110) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_is_last_device() != 54322) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -50865,6 +51389,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_identityresethandle_reset() != 29457) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_secretsbundlewithuserid_contains_backup_key() != 61271) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_useridentity_has_verification_violation() != 36877) {
@@ -51629,6 +52156,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_get_shields() != 41889) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_latest_content_raw() != 12105) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_sendattachmentjoinhandle_cancel() != 5666) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -51789,6 +52319,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_clientbuilder_new() != 40475) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_secretsbundlewithuserid_from_database() != 15629) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_secretsbundlewithuserid_from_str() != 28891) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_span_current() != 3197) {
