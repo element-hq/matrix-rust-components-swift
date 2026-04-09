@@ -5916,11 +5916,11 @@ public protocol LazyTimelineItemProviderProtocol: AnyObject, Sendable {
     func getShields(strict: Bool)  -> ShieldState
     
     /**
-     * Returns the JSON string of the event's `content` field from the latest
-     * version (including edits). Returns `None` for local echoes that haven't
-     * been echoed back by the server yet.
+     * Returns the full raw JSON string of the latest version of the event
+     * (including edits). Returns `None` for local echoes that haven't been
+     * echoed back by the server yet.
      */
-    func latestContentRaw()  -> String?
+    func latestJson()  -> String?
     
 }
 /**
@@ -6023,13 +6023,13 @@ open func getShields(strict: Bool) -> ShieldState  {
 }
     
     /**
-     * Returns the JSON string of the event's `content` field from the latest
-     * version (including edits). Returns `None` for local echoes that haven't
-     * been echoed back by the server yet.
+     * Returns the full raw JSON string of the latest version of the event
+     * (including edits). Returns `None` for local echoes that haven't been
+     * echoed back by the server yet.
      */
-open func latestContentRaw() -> String?  {
+open func latestJson() -> String?  {
     return try!  FfiConverterOptionString.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_lazytimelineitemprovider_latest_content_raw(
+    uniffi_matrix_sdk_ffi_fn_method_lazytimelineitemprovider_latest_json(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -39324,6 +39324,28 @@ public enum TagName: Equatable, Hashable {
 
 
 
+// The local Rust `Eq` implementation - only `eq` is used.
+public static func == (self: TagName, other: TagName) -> Bool {
+    return try!  FfiConverterBool.lift(
+        try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_tagname_uniffi_trait_eq_eq(
+            FfiConverterTypeTagName_lower(self),
+        FfiConverterTypeTagName_lower(other),$0
+    )
+}
+    )
+}
+// The local Rust `Hash` implementation
+public func hash(into hasher: inout Hasher) {
+    let val = try!  FfiConverterUInt64.lift(
+        try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_tagname_uniffi_trait_hash(
+            FfiConverterTypeTagName_lower(self),$0
+    )
+}
+    )
+    hasher.combine(val)
+}
 }
 
 #if compiler(>=6)
@@ -39840,6 +39862,28 @@ public enum TimelineEventType: Equatable, Hashable {
 
 
 
+// The local Rust `Eq` implementation - only `eq` is used.
+public static func == (self: TimelineEventType, other: TimelineEventType) -> Bool {
+    return try!  FfiConverterBool.lift(
+        try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_timelineeventtype_uniffi_trait_eq_eq(
+            FfiConverterTypeTimelineEventType_lower(self),
+        FfiConverterTypeTimelineEventType_lower(other),$0
+    )
+}
+    )
+}
+// The local Rust `Hash` implementation
+public func hash(into hasher: inout Hasher) {
+    let val = try!  FfiConverterUInt64.lift(
+        try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_timelineeventtype_uniffi_trait_hash(
+            FfiConverterTypeTimelineEventType_lower(self),$0
+    )
+}
+    )
+    hasher.combine(val)
+}
 }
 
 #if compiler(>=6)
@@ -52156,7 +52200,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_get_shields() != 41889) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_latest_content_raw() != 12105) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_lazytimelineitemprovider_latest_json() != 23678) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sendattachmentjoinhandle_cancel() != 5666) {
