@@ -1277,6 +1277,11 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func setAccountData(eventType: String, content: String) async throws 
     
     /**
+     * Updates the user's avatar using the provided MXC url.
+     */
+    func setAvatarUrl(url: String) async throws 
+    
+    /**
      * Sets the [ClientDelegate] which will inform about authentication errors.
      * Returns an error if the delegate was already set.
      */
@@ -2911,6 +2916,26 @@ open func setAccountData(eventType: String, content: String)async throws   {
                 uniffi_matrix_sdk_ffi_fn_method_client_set_account_data(
                     self.uniffiCloneHandle(),
                     FfiConverterString.lower(eventType),FfiConverterString.lower(content)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Updates the user's avatar using the provided MXC url.
+     */
+open func setAvatarUrl(url: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_set_avatar_url(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(url)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -15173,6 +15198,24 @@ public protocol SyncServiceBuilderProtocol: AnyObject, Sendable {
      */
     func withOfflineMode()  -> SyncServiceBuilder
     
+    /**
+     * Set a custom Sliding Sync connection ID for the room list service.
+     *
+     * By default [`matrix_sdk_ui::room_list_service::DEFAULT_CONNECTION_ID`]
+     * is used. Set a different value for secondary processes such as iOS
+     * Share Extensions that are not meant to reuse the main app's
+     * connection.
+     */
+    func withRoomListConnectionId(connectionId: String)  -> SyncServiceBuilder
+    
+    /**
+     * Set a custom timeline limit for the room list service.
+     *
+     * When set, overrides the default timeline limit of
+     * [`matrix_sdk_ui::room_list_service::DEFAULT_LIST_TIMELINE_LIMIT`].
+     */
+    func withRoomListTimelineLimit(limit: UInt32)  -> SyncServiceBuilder
+    
     func withSharePos(enable: Bool)  -> SyncServiceBuilder
     
 }
@@ -15253,6 +15296,38 @@ open func withOfflineMode() -> SyncServiceBuilder  {
     return try!  FfiConverterTypeSyncServiceBuilder_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_offline_mode(
             self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * Set a custom Sliding Sync connection ID for the room list service.
+     *
+     * By default [`matrix_sdk_ui::room_list_service::DEFAULT_CONNECTION_ID`]
+     * is used. Set a different value for secondary processes such as iOS
+     * Share Extensions that are not meant to reuse the main app's
+     * connection.
+     */
+open func withRoomListConnectionId(connectionId: String) -> SyncServiceBuilder  {
+    return try!  FfiConverterTypeSyncServiceBuilder_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_room_list_connection_id(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(connectionId),$0
+    )
+})
+}
+    
+    /**
+     * Set a custom timeline limit for the room list service.
+     *
+     * When set, overrides the default timeline limit of
+     * [`matrix_sdk_ui::room_list_service::DEFAULT_LIST_TIMELINE_LIMIT`].
+     */
+open func withRoomListTimelineLimit(limit: UInt32) -> SyncServiceBuilder  {
+    return try!  FfiConverterTypeSyncServiceBuilder_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_room_list_timeline_limit(
+            self.uniffiCloneHandle(),
+        FfiConverterUInt32.lower(limit),$0
     )
 })
 }
@@ -51560,6 +51635,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_account_data() != 56242) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_avatar_url() != 58051) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_delegate() != 377) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -52575,6 +52653,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_offline_mode() != 48885) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_room_list_connection_id() != 13768) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_room_list_timeline_limit() != 39644) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_share_pos() != 21315) {
