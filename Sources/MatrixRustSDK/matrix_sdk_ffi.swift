@@ -945,6 +945,9 @@ public protocol ClientProtocol: AnyObject, Sendable {
      *
      * This is an experimental feature, and might cause performance issues on
      * large accounts. Use with caution.
+     *
+     * This must be called after creating a client, but before subscribing to
+     * the event cache (so, before spawning a sync service or a timeline).
      */
     func enableAutomaticBackpagination() 
     
@@ -1191,6 +1194,8 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func registerNotificationHandler(listener: SyncNotificationListener) async 
     
     func removeAvatar() async throws 
+    
+    func requestOpenidToken() async throws  -> OpenIdToken
     
     /**
      * Empty the server version and unstable features cache.
@@ -1457,6 +1462,12 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * `io.element.recent_emoji` global account data.
      */
     func getRecentEmojis() async throws  -> [RecentEmoji]
+    
+    /**
+     * Search across all all rooms for the given query, returning an iterator
+     * over the results.
+     */
+    func searchMessages(query: String, filter: SearchRoomFilter, numResultsPerBatch: UInt32) async throws  -> GlobalSearchIterator
     
 }
 open class Client: ClientProtocol, @unchecked Sendable {
@@ -1865,6 +1876,9 @@ open func enableAllSendQueues(enable: Bool)async   {
      *
      * This is an experimental feature, and might cause performance issues on
      * large accounts. Use with caution.
+     *
+     * This must be called after creating a client, but before subscribing to
+     * the event cache (so, before spawning a sync service or a timeline).
      */
 open func enableAutomaticBackpagination()  {try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_client_enable_automatic_backpagination(
@@ -2683,6 +2697,23 @@ open func removeAvatar()async throws   {
         )
 }
     
+open func requestOpenidToken()async throws  -> OpenIdToken  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_request_openid_token(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeOpenIdToken_lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
     /**
      * Empty the server version and unstable features cache.
      *
@@ -3469,6 +3500,27 @@ open func getRecentEmojis()async throws  -> [RecentEmoji]  {
         )
 }
     
+    /**
+     * Search across all all rooms for the given query, returning an iterator
+     * over the results.
+     */
+open func searchMessages(query: String, filter: SearchRoomFilter, numResultsPerBatch: UInt32)async throws  -> GlobalSearchIterator  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_search_messages(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(query),FfiConverterTypeSearchRoomFilter_lower(filter),FfiConverterUInt32.lower(numResultsPerBatch)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
+            liftFunc: FfiConverterTypeGlobalSearchIterator_lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
 
     
 }
@@ -3629,6 +3681,21 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
     func userAgent(userAgent: String)  -> ClientBuilder
     
     func username(username: String)  -> ClientBuilder
+    
+    /**
+     * Set up the search index store for this client, which is used to store
+     * the message search index locally.
+     *
+     * As soon as this is enabled, messages will start to be indexed, and can
+     * be later queried for search.
+     *
+     * `path` is the directory where the search index will be stored. It must
+     * be unique per session.
+     *
+     * `password` is an optional password to encrypt the search index at rest.
+     * If `None`, the search index will be stored unencrypted.
+     */
+    func withSearchIndexStore(path: String, password: String?)  -> ClientBuilder
     
 }
 open class ClientBuilder: ClientBuilderProtocol, @unchecked Sendable {
@@ -3983,6 +4050,29 @@ open func username(username: String) -> ClientBuilder  {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_username(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(username),$0
+    )
+})
+}
+    
+    /**
+     * Set up the search index store for this client, which is used to store
+     * the message search index locally.
+     *
+     * As soon as this is enabled, messages will start to be indexed, and can
+     * be later queried for search.
+     *
+     * `path` is the directory where the search index will be stored. It must
+     * be unique per session.
+     *
+     * `password` is an optional password to encrypt the search index at rest.
+     * If `None`, the search index will be stored unencrypted.
+     */
+open func withSearchIndexStore(path: String, password: String?) -> ClientBuilder  {
+    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_with_search_index_store(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(path),
+        FfiConverterOptionString.lower(password),$0
     )
 })
 }
@@ -4689,6 +4779,139 @@ public func FfiConverterTypeEncryption_lift(_ handle: UInt64) throws -> Encrypti
 #endif
 public func FfiConverterTypeEncryption_lower(_ value: Encryption) -> UInt64 {
     return FfiConverterTypeEncryption.lower(value)
+}
+
+
+
+
+
+
+public protocol GlobalSearchIteratorProtocol: AnyObject, Sendable {
+    
+    /**
+     * Return a list of events for the next batch of search results, or `None`
+     * if there are no more results.
+     */
+    func nextEvents() async throws  -> [GlobalSearchResult]?
+    
+}
+open class GlobalSearchIterator: GlobalSearchIteratorProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_globalsearchiterator(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_globalsearchiterator(handle, $0) }
+    }
+
+    
+
+    
+    /**
+     * Return a list of events for the next batch of search results, or `None`
+     * if there are no more results.
+     */
+open func nextEvents()async throws  -> [GlobalSearchResult]?  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_globalsearchiterator_next_events(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionSequenceTypeGlobalSearchResult.lift,
+            errorHandler: FfiConverterTypeSearchError_lift
+        )
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeGlobalSearchIterator: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = GlobalSearchIterator
+
+    public static func lift(_ handle: UInt64) throws -> GlobalSearchIterator {
+        return GlobalSearchIterator(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: GlobalSearchIterator) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> GlobalSearchIterator {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: GlobalSearchIterator, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGlobalSearchIterator_lift(_ handle: UInt64) throws -> GlobalSearchIterator {
+    return try FfiConverterTypeGlobalSearchIterator.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGlobalSearchIterator_lower(_ value: GlobalSearchIterator) -> UInt64 {
+    return FfiConverterTypeGlobalSearchIterator.lower(value)
 }
 
 
@@ -8689,6 +8912,13 @@ public protocol RoomProtocol: AnyObject, Sendable {
      */
     func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandle) async throws 
     
+    /**
+     * Search for messages in this room matching the given query, returning an
+     * iterator over the results that yields `num_results_per_batch` results at
+     * a time.
+     */
+    func searchMessages(query: String, numResultsPerBatch: UInt32)  -> RoomSearchIterator
+    
 }
 open class Room: RoomProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
@@ -10617,6 +10847,21 @@ open func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandl
         )
 }
     
+    /**
+     * Search for messages in this room matching the given query, returning an
+     * iterator over the results that yields `num_results_per_batch` results at
+     * a time.
+     */
+open func searchMessages(query: String, numResultsPerBatch: UInt32) -> RoomSearchIterator  {
+    return try!  FfiConverterTypeRoomSearchIterator_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_room_search_messages(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(query),
+        FfiConverterUInt32.lower(numResultsPerBatch),$0
+    )
+})
+}
+    
 
     
 }
@@ -12507,6 +12752,139 @@ public func FfiConverterTypeRoomPreview_lift(_ handle: UInt64) throws -> RoomPre
 #endif
 public func FfiConverterTypeRoomPreview_lower(_ value: RoomPreview) -> UInt64 {
     return FfiConverterTypeRoomPreview.lower(value)
+}
+
+
+
+
+
+
+public protocol RoomSearchIteratorProtocol: AnyObject, Sendable {
+    
+    /**
+     * Return a list of events for the next batch of search results, or `None`
+     * if there are no more results.
+     */
+    func nextEvents() async throws  -> [RoomSearchResult]?
+    
+}
+open class RoomSearchIterator: RoomSearchIteratorProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_roomsearchiterator(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roomsearchiterator(handle, $0) }
+    }
+
+    
+
+    
+    /**
+     * Return a list of events for the next batch of search results, or `None`
+     * if there are no more results.
+     */
+open func nextEvents()async throws  -> [RoomSearchResult]?  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_roomsearchiterator_next_events(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionSequenceTypeRoomSearchResult.lift,
+            errorHandler: FfiConverterTypeSearchError_lift
+        )
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRoomSearchIterator: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = RoomSearchIterator
+
+    public static func lift(_ handle: UInt64) throws -> RoomSearchIterator {
+        return RoomSearchIterator(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: RoomSearchIterator) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomSearchIterator {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: RoomSearchIterator, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomSearchIterator_lift(_ handle: UInt64) throws -> RoomSearchIterator {
+    return try FfiConverterTypeRoomSearchIterator.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomSearchIterator_lower(_ value: RoomSearchIterator) -> UInt64 {
+    return FfiConverterTypeRoomSearchIterator.lower(value)
 }
 
 
@@ -19400,6 +19778,60 @@ public func FfiConverterTypeGalleryUploadParameters_lower(_ value: GalleryUpload
 }
 
 
+public struct GlobalSearchResult {
+    public var roomId: String
+    public var result: RoomSearchResult
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(roomId: String, result: RoomSearchResult) {
+        self.roomId = roomId
+        self.result = result
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension GlobalSearchResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeGlobalSearchResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> GlobalSearchResult {
+        return
+            try GlobalSearchResult(
+                roomId: FfiConverterString.read(from: &buf), 
+                result: FfiConverterTypeRoomSearchResult.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: GlobalSearchResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.roomId, into: &buf)
+        FfiConverterTypeRoomSearchResult.write(value.result, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGlobalSearchResult_lift(_ buf: RustBuffer) throws -> GlobalSearchResult {
+    return try FfiConverterTypeGlobalSearchResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGlobalSearchResult_lower(_ value: GlobalSearchResult) -> RustBuffer {
+    return FfiConverterTypeGlobalSearchResult.lower(value)
+}
+
+
 public struct HttpPusherData: Equatable, Hashable {
     public var url: String
     public var format: PushFormat?
@@ -21386,6 +21818,68 @@ public func FfiConverterTypeOidcCrossSigningResetInfo_lift(_ buf: RustBuffer) th
 #endif
 public func FfiConverterTypeOidcCrossSigningResetInfo_lower(_ value: OidcCrossSigningResetInfo) -> RustBuffer {
     return FfiConverterTypeOidcCrossSigningResetInfo.lower(value)
+}
+
+
+public struct OpenIdToken: Equatable, Hashable {
+    public var accessToken: String
+    public var tokenType: String
+    public var matrixServerName: String
+    public var expiresInSeconds: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(accessToken: String, tokenType: String, matrixServerName: String, expiresInSeconds: UInt64) {
+        self.accessToken = accessToken
+        self.tokenType = tokenType
+        self.matrixServerName = matrixServerName
+        self.expiresInSeconds = expiresInSeconds
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension OpenIdToken: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeOpenIdToken: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OpenIdToken {
+        return
+            try OpenIdToken(
+                accessToken: FfiConverterString.read(from: &buf), 
+                tokenType: FfiConverterString.read(from: &buf), 
+                matrixServerName: FfiConverterString.read(from: &buf), 
+                expiresInSeconds: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: OpenIdToken, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.accessToken, into: &buf)
+        FfiConverterString.write(value.tokenType, into: &buf)
+        FfiConverterString.write(value.matrixServerName, into: &buf)
+        FfiConverterUInt64.write(value.expiresInSeconds, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOpenIdToken_lift(_ buf: RustBuffer) throws -> OpenIdToken {
+    return try FfiConverterTypeOpenIdToken.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOpenIdToken_lower(_ value: OpenIdToken) -> RustBuffer {
+    return FfiConverterTypeOpenIdToken.lower(value)
 }
 
 
@@ -23458,6 +23952,72 @@ public func FfiConverterTypeRoomPreviewInfo_lift(_ buf: RustBuffer) throws -> Ro
 #endif
 public func FfiConverterTypeRoomPreviewInfo_lower(_ value: RoomPreviewInfo) -> RustBuffer {
     return FfiConverterTypeRoomPreviewInfo.lower(value)
+}
+
+
+public struct RoomSearchResult {
+    public var eventId: String
+    public var sender: String
+    public var senderProfile: ProfileDetails
+    public var content: TimelineItemContent
+    public var timestamp: Timestamp
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(eventId: String, sender: String, senderProfile: ProfileDetails, content: TimelineItemContent, timestamp: Timestamp) {
+        self.eventId = eventId
+        self.sender = sender
+        self.senderProfile = senderProfile
+        self.content = content
+        self.timestamp = timestamp
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RoomSearchResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRoomSearchResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomSearchResult {
+        return
+            try RoomSearchResult(
+                eventId: FfiConverterString.read(from: &buf), 
+                sender: FfiConverterString.read(from: &buf), 
+                senderProfile: FfiConverterTypeProfileDetails.read(from: &buf), 
+                content: FfiConverterTypeTimelineItemContent.read(from: &buf), 
+                timestamp: FfiConverterTypeTimestamp.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RoomSearchResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.eventId, into: &buf)
+        FfiConverterString.write(value.sender, into: &buf)
+        FfiConverterTypeProfileDetails.write(value.senderProfile, into: &buf)
+        FfiConverterTypeTimelineItemContent.write(value.content, into: &buf)
+        FfiConverterTypeTimestamp.write(value.timestamp, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomSearchResult_lift(_ buf: RustBuffer) throws -> RoomSearchResult {
+    return try FfiConverterTypeRoomSearchResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomSearchResult_lower(_ value: RoomSearchResult) -> RustBuffer {
+    return FfiConverterTypeRoomSearchResult.lower(value)
 }
 
 
@@ -38310,6 +38870,173 @@ public func FfiConverterTypeRuleKind_lower(_ value: RuleKind) -> RustBuffer {
 }
 
 
+
+public enum SearchError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+    
+    
+    case IndexError(String
+    )
+    case EventLoadError(String
+    )
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
+}
+
+#if compiler(>=6)
+extension SearchError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSearchError: FfiConverterRustBuffer {
+    typealias SwiftType = SearchError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SearchError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .IndexError(
+            try FfiConverterString.read(from: &buf)
+            )
+        case 2: return .EventLoadError(
+            try FfiConverterString.read(from: &buf)
+            )
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SearchError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        
+        case let .IndexError(v1):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(v1, into: &buf)
+            
+        
+        case let .EventLoadError(v1):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(v1, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSearchError_lift(_ buf: RustBuffer) throws -> SearchError {
+    return try FfiConverterTypeSearchError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSearchError_lower(_ value: SearchError) -> RustBuffer {
+    return FfiConverterTypeSearchError.lower(value)
+}
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum SearchRoomFilter: Equatable, Hashable {
+    
+    /**
+     * All the joined rooms (= DMs + non-DMs).
+     */
+    case rooms
+    /**
+     * Only joined DM rooms.
+     */
+    case dms
+    /**
+     * Only joined non-DM (group) rooms.
+     */
+    case nonDms
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SearchRoomFilter: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSearchRoomFilter: FfiConverterRustBuffer {
+    typealias SwiftType = SearchRoomFilter
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SearchRoomFilter {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .rooms
+        
+        case 2: return .dms
+        
+        case 3: return .nonDms
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SearchRoomFilter, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .rooms:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .dms:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .nonDms:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSearchRoomFilter_lift(_ buf: RustBuffer) throws -> SearchRoomFilter {
+    return try FfiConverterTypeSearchRoomFilter.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSearchRoomFilter_lower(_ value: SearchRoomFilter) -> RustBuffer {
+    return FfiConverterTypeSearchRoomFilter.lower(value)
+}
+
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
@@ -49258,6 +49985,30 @@ fileprivate struct FfiConverterOptionSequenceString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionSequenceTypeGlobalSearchResult: FfiConverterRustBuffer {
+    typealias SwiftType = [GlobalSearchResult]?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterSequenceTypeGlobalSearchResult.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterSequenceTypeGlobalSearchResult.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionSequenceTypeRoomHero: FfiConverterRustBuffer {
     typealias SwiftType = [RoomHero]?
 
@@ -49298,6 +50049,30 @@ fileprivate struct FfiConverterOptionSequenceTypeRoomMember: FfiConverterRustBuf
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterSequenceTypeRoomMember.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionSequenceTypeRoomSearchResult: FfiConverterRustBuffer {
+    typealias SwiftType = [RoomSearchResult]?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterSequenceTypeRoomSearchResult.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterSequenceTypeRoomSearchResult.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -49627,6 +50402,31 @@ fileprivate struct FfiConverterSequenceTypeConditionalPushRule: FfiConverterRust
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeGlobalSearchResult: FfiConverterRustBuffer {
+    typealias SwiftType = [GlobalSearchResult]
+
+    public static func write(_ value: [GlobalSearchResult], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeGlobalSearchResult.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [GlobalSearchResult] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [GlobalSearchResult]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeGlobalSearchResult.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeIdentityStatusChange: FfiConverterRustBuffer {
     typealias SwiftType = [IdentityStatusChange]
 
@@ -49944,6 +50744,31 @@ fileprivate struct FfiConverterSequenceTypeRoomMember: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeRoomMember.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeRoomSearchResult: FfiConverterRustBuffer {
+    typealias SwiftType = [RoomSearchResult]
+
+    public static func write(_ value: [RoomSearchResult], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRoomSearchResult.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RoomSearchResult] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RoomSearchResult]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRoomSearchResult.read(from: &buf))
         }
         return seq
     }
@@ -51464,7 +52289,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_all_send_queues() != 53800) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_automatic_backpagination() != 6524) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_automatic_backpagination() != 35365) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_enable_send_queue_upload_progress() != 30956) {
@@ -51596,6 +52421,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_remove_avatar() != 12536) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_request_openid_token() != 19654) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_reset_supported_versions() != 12909) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -51722,6 +52550,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recent_emojis() != 49975) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_search_messages() != 64254) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeservercapabilities_can_change_avatar() != 42689) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -51828,6 +52659,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_username() != 9349) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_with_search_index_store() != 6477) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_backup_exists_on_server() != 16984) {
@@ -52370,6 +53204,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_withdraw_verification_and_resend() != 13926) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_search_messages() != 55573) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_roommembersiterator_len() != 59145) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -52521,6 +53358,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediasource_url() != 53516) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_globalsearchiterator_next_events() != 2634) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomsearchiterator_next_events() != 63851) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_accept_verification_request() != 56039) {
