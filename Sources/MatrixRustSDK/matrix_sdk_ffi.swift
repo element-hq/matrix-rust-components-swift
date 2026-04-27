@@ -818,10 +818,10 @@ public func FfiConverterTypeCheckCodeSender_lower(_ value: CheckCodeSender) -> U
 public protocol ClientProtocol: AnyObject, Sendable {
     
     /**
-     * Aborts an existing OIDC login operation that might have been cancelled,
+     * Aborts an existing OAuth login operation that might have been cancelled,
      * failed etc.
      */
-    func abortOidcAuth(authorizationData: OAuthAuthorizationData) async 
+    func abortOauthAuth(authorizationData: OAuthAuthorizationData) async 
     
     /**
      * Get the content of the event of the given type out of the account data
@@ -1134,9 +1134,9 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func loginWithEmail(email: String, password: String, initialDeviceName: String?, deviceId: String?) async throws 
     
     /**
-     * Completes the OIDC login process.
+     * Completes the OAuth login process.
      */
-    func loginWithOidcCallback(callbackUrl: String) async throws 
+    func loginWithOauthCallback(callbackUrl: String) async throws 
     
     /**
      * Log the current user out.
@@ -1155,10 +1155,10 @@ public protocol ClientProtocol: AnyObject, Sendable {
      *
      * # Arguments
      *
-     * * `oidc_configuration` - The data to restore or register the client with
-     * the server.
+     * * `oauth_configuration` - The data to restore or register the client
+     * with the server.
      */
-    func newLoginWithQrCodeHandler(oidcConfiguration: OidcConfiguration)  -> LoginWithQrCodeHandler
+    func newLoginWithQrCodeHandler(oauthConfiguration: OAuthConfiguration)  -> LoginWithQrCodeHandler
     
     func notificationClient(processSetup: NotificationProcessSetup) async throws  -> NotificationClient
     
@@ -1354,6 +1354,14 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func subscribeToMediaPreviewConfig(listener: MediaPreviewConfigListener) async throws  -> TaskHandle
     
     /**
+     * Subscribe to beacon_info updates for the current user across all rooms.
+     *
+     * The listener is only called for new matching updates; there is no
+     * initial replay.
+     */
+    func subscribeToOwnBeaconInfoUpdates(listener: BeaconInfoListener) throws  -> TaskHandle
+    
+    /**
      * Subscribe to [`RoomInfo`] updates given a provided [`RoomId`].
      *
      * This works even for rooms we haven't received yet, so we can subscribe
@@ -1417,14 +1425,14 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWatcher?) async throws  -> String
     
     /**
-     * Requests the URL needed for opening a web view using OIDC. Once the web
-     * view has succeeded, call `login_with_oidc_callback` with the callback it
-     * returns. If a failure occurs and a callback isn't available, make sure
-     * to call `abort_oidc_auth` to inform the client of this.
+     * Requests the URL needed for opening a web view using OAuth. Once the web
+     * view has succeeded, call `login_with_oauth_callback` with the callback
+     * it returns. If a failure occurs and a callback isn't available, make
+     * sure to call `abort_oauth_auth` to inform the client of this.
      *
      * # Arguments
      *
-     * * `oidc_configuration` - The configuration used to load the credentials
+     * * `oauth_configuration` - The configuration used to load the credentials
      * of the client if it is already registered with the authorization
      * server, or register the client and store its credentials if it isn't.
      *
@@ -1450,7 +1458,7 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * [specification](https://spec.matrix.org/v1.15/client-server-api/#allocated-scope-tokens)
      * are always requested.
      */
-    func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?, loginHint: String?, deviceId: String?, additionalScopes: [String]?) async throws  -> OAuthAuthorizationData
+    func urlForOauth(oauthConfiguration: OAuthConfiguration, prompt: OAuthPrompt?, loginHint: String?, deviceId: String?, additionalScopes: [String]?) async throws  -> OAuthAuthorizationData
     
     func userId() throws  -> String
     
@@ -1532,14 +1540,14 @@ open class Client: ClientProtocol, @unchecked Sendable {
 
     
     /**
-     * Aborts an existing OIDC login operation that might have been cancelled,
+     * Aborts an existing OAuth login operation that might have been cancelled,
      * failed etc.
      */
-open func abortOidcAuth(authorizationData: OAuthAuthorizationData)async   {
+open func abortOauthAuth(authorizationData: OAuthAuthorizationData)async   {
     return
         try!  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_abort_oidc_auth(
+                uniffi_matrix_sdk_ffi_fn_method_client_abort_oauth_auth(
                     self.uniffiCloneHandle(),
                     FfiConverterTypeOAuthAuthorizationData_lower(authorizationData)
                 )
@@ -2530,13 +2538,13 @@ open func loginWithEmail(email: String, password: String, initialDeviceName: Str
 }
     
     /**
-     * Completes the OIDC login process.
+     * Completes the OAuth login process.
      */
-open func loginWithOidcCallback(callbackUrl: String)async throws   {
+open func loginWithOauthCallback(callbackUrl: String)async throws   {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_login_with_oidc_callback(
+                uniffi_matrix_sdk_ffi_fn_method_client_login_with_oauth_callback(
                     self.uniffiCloneHandle(),
                     FfiConverterString.lower(callbackUrl)
                 )
@@ -2545,7 +2553,7 @@ open func loginWithOidcCallback(callbackUrl: String)async throws   {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
-            errorHandler: FfiConverterTypeOidcError_lift
+            errorHandler: FfiConverterTypeOAuthError_lift
         )
 }
     
@@ -2587,14 +2595,14 @@ open func newGrantLoginWithQrCodeHandler() -> GrantLoginWithQrCodeHandler  {
      *
      * # Arguments
      *
-     * * `oidc_configuration` - The data to restore or register the client with
-     * the server.
+     * * `oauth_configuration` - The data to restore or register the client
+     * with the server.
      */
-open func newLoginWithQrCodeHandler(oidcConfiguration: OidcConfiguration) -> LoginWithQrCodeHandler  {
+open func newLoginWithQrCodeHandler(oauthConfiguration: OAuthConfiguration) -> LoginWithQrCodeHandler  {
     return try!  FfiConverterTypeLoginWithQrCodeHandler_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_client_new_login_with_qr_code_handler(
             self.uniffiCloneHandle(),
-        FfiConverterTypeOidcConfiguration_lower(oidcConfiguration),$0
+        FfiConverterTypeOAuthConfiguration_lower(oauthConfiguration),$0
     )
 })
 }
@@ -3223,6 +3231,21 @@ open func subscribeToMediaPreviewConfig(listener: MediaPreviewConfigListener)asy
 }
     
     /**
+     * Subscribe to beacon_info updates for the current user across all rooms.
+     *
+     * The listener is only called for new matching updates; there is no
+     * initial replay.
+     */
+open func subscribeToOwnBeaconInfoUpdates(listener: BeaconInfoListener)throws  -> TaskHandle  {
+    return try  FfiConverterTypeTaskHandle_lift(try rustCallWithError(FfiConverterTypeClientError_lift) {
+    uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_own_beacon_info_updates(
+            self.uniffiCloneHandle(),
+        FfiConverterCallbackInterfaceBeaconInfoListener_lower(listener),$0
+    )
+})
+}
+    
+    /**
      * Subscribe to [`RoomInfo`] updates given a provided [`RoomId`].
      *
      * This works even for rooms we haven't received yet, so we can subscribe
@@ -3412,14 +3435,14 @@ open func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWat
 }
     
     /**
-     * Requests the URL needed for opening a web view using OIDC. Once the web
-     * view has succeeded, call `login_with_oidc_callback` with the callback it
-     * returns. If a failure occurs and a callback isn't available, make sure
-     * to call `abort_oidc_auth` to inform the client of this.
+     * Requests the URL needed for opening a web view using OAuth. Once the web
+     * view has succeeded, call `login_with_oauth_callback` with the callback
+     * it returns. If a failure occurs and a callback isn't available, make
+     * sure to call `abort_oauth_auth` to inform the client of this.
      *
      * # Arguments
      *
-     * * `oidc_configuration` - The configuration used to load the credentials
+     * * `oauth_configuration` - The configuration used to load the credentials
      * of the client if it is already registered with the authorization
      * server, or register the client and store its credentials if it isn't.
      *
@@ -3445,20 +3468,20 @@ open func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWat
      * [specification](https://spec.matrix.org/v1.15/client-server-api/#allocated-scope-tokens)
      * are always requested.
      */
-open func urlForOidc(oidcConfiguration: OidcConfiguration, prompt: OidcPrompt?, loginHint: String?, deviceId: String?, additionalScopes: [String]?)async throws  -> OAuthAuthorizationData  {
+open func urlForOauth(oauthConfiguration: OAuthConfiguration, prompt: OAuthPrompt?, loginHint: String?, deviceId: String?, additionalScopes: [String]?)async throws  -> OAuthAuthorizationData  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_url_for_oidc(
+                uniffi_matrix_sdk_ffi_fn_method_client_url_for_oauth(
                     self.uniffiCloneHandle(),
-                    FfiConverterTypeOidcConfiguration_lower(oidcConfiguration),FfiConverterOptionTypeOidcPrompt.lower(prompt),FfiConverterOptionString.lower(loginHint),FfiConverterOptionString.lower(deviceId),FfiConverterOptionSequenceString.lower(additionalScopes)
+                    FfiConverterTypeOAuthConfiguration_lower(oauthConfiguration),FfiConverterOptionTypeOAuthPrompt.lower(prompt),FfiConverterOptionString.lower(loginHint),FfiConverterOptionString.lower(deviceId),FfiConverterOptionSequenceString.lower(additionalScopes)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
             liftFunc: FfiConverterTypeOAuthAuthorizationData_lift,
-            errorHandler: FfiConverterTypeOidcError_lift
+            errorHandler: FfiConverterTypeOAuthError_lift
         )
 }
     
@@ -5441,12 +5464,12 @@ public protocol HomeserverLoginDetailsProtocol: AnyObject, Sendable {
      * The prompts advertised by the authentication issuer for use in the login
      * URL.
      */
-    func supportedOidcPrompts()  -> [OidcPrompt]
+    func supportedOauthPrompts()  -> [OAuthPrompt]
     
     /**
-     * Whether the current homeserver supports login using OIDC.
+     * Whether the current homeserver supports login using OAuth.
      */
-    func supportsOidcLogin()  -> Bool
+    func supportsOauthLogin()  -> Bool
     
     /**
      * Whether the current homeserver supports the password login flow.
@@ -5532,20 +5555,20 @@ open func slidingSyncVersion() -> SlidingSyncVersion  {
      * The prompts advertised by the authentication issuer for use in the login
      * URL.
      */
-open func supportedOidcPrompts() -> [OidcPrompt]  {
-    return try!  FfiConverterSequenceTypeOidcPrompt.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_homeserverlogindetails_supported_oidc_prompts(
+open func supportedOauthPrompts() -> [OAuthPrompt]  {
+    return try!  FfiConverterSequenceTypeOAuthPrompt.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_homeserverlogindetails_supported_oauth_prompts(
             self.uniffiCloneHandle(),$0
     )
 })
 }
     
     /**
-     * Whether the current homeserver supports login using OIDC.
+     * Whether the current homeserver supports login using OAuth.
      */
-open func supportsOidcLogin() -> Bool  {
+open func supportsOauthLogin() -> Bool  {
     return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_homeserverlogindetails_supports_oidc_login(
+    uniffi_matrix_sdk_ffi_fn_method_homeserverlogindetails_supports_oauth_login(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -8798,7 +8821,7 @@ public protocol RoomProtocol: AnyObject, Sendable {
     /**
      * Start the current users live location share in the room.
      */
-    func startLiveLocationShare(durationMillis: UInt64) async throws 
+    func startLiveLocationShare(durationMillis: UInt64) async throws  -> String
     
     /**
      * Stop the current users live location share in the room.
@@ -10438,7 +10461,7 @@ open func setUnreadFlag(newValue: Bool)async throws   {
     /**
      * Start the current users live location share in the room.
      */
-open func startLiveLocationShare(durationMillis: UInt64)async throws   {
+open func startLiveLocationShare(durationMillis: UInt64)async throws  -> String  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -10447,10 +10470,10 @@ open func startLiveLocationShare(durationMillis: UInt64)async throws   {
                     FfiConverterUInt64.lower(durationMillis)
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -18723,6 +18746,85 @@ public func FfiConverterTypeBeaconInfo_lower(_ value: BeaconInfo) -> RustBuffer 
 }
 
 
+/**
+ * A beacon_info update for the current user's live location share.
+ */
+public struct BeaconInfoUpdate: Equatable, Hashable {
+    /**
+     * The room where the beacon_info event changed.
+     */
+    public var roomId: String
+    /**
+     * The beacon_info event ID.
+     */
+    public var eventId: String
+    /**
+     * Whether the share is currently live.
+     */
+    public var live: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The room where the beacon_info event changed.
+         */roomId: String, 
+        /**
+         * The beacon_info event ID.
+         */eventId: String, 
+        /**
+         * Whether the share is currently live.
+         */live: Bool) {
+        self.roomId = roomId
+        self.eventId = eventId
+        self.live = live
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension BeaconInfoUpdate: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeBeaconInfoUpdate: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BeaconInfoUpdate {
+        return
+            try BeaconInfoUpdate(
+                roomId: FfiConverterString.read(from: &buf), 
+                eventId: FfiConverterString.read(from: &buf), 
+                live: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: BeaconInfoUpdate, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.roomId, into: &buf)
+        FfiConverterString.write(value.eventId, into: &buf)
+        FfiConverterBool.write(value.live, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBeaconInfoUpdate_lift(_ buf: RustBuffer) throws -> BeaconInfoUpdate {
+    return try FfiConverterTypeBeaconInfoUpdate.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBeaconInfoUpdate_lower(_ value: BeaconInfoUpdate) -> RustBuffer {
+    return FfiConverterTypeBeaconInfoUpdate.lower(value)
+}
+
+
 public struct ClientProperties: Equatable, Hashable {
     /**
      * The client_id provides the widget with the option to behave differently
@@ -20711,6 +20813,10 @@ public struct LiveLocationShare: Equatable, Hashable {
      * Meaning that the location will stop being shared at ts + timeout.
      */
     public var timeout: UInt64
+    /**
+     * The event ID of the beacon_info state event for this share.
+     */
+    public var beaconId: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -20727,11 +20833,15 @@ public struct LiveLocationShare: Equatable, Hashable {
         /**
          * The duration that the location sharing will be live.
          * Meaning that the location will stop being shared at ts + timeout.
-         */timeout: UInt64) {
+         */timeout: UInt64, 
+        /**
+         * The event ID of the beacon_info state event for this share.
+         */beaconId: String) {
         self.lastLocation = lastLocation
         self.userId = userId
         self.startTs = startTs
         self.timeout = timeout
+        self.beaconId = beaconId
     }
 
     
@@ -20753,7 +20863,8 @@ public struct FfiConverterTypeLiveLocationShare: FfiConverterRustBuffer {
                 lastLocation: FfiConverterOptionTypeLastLocation.read(from: &buf), 
                 userId: FfiConverterString.read(from: &buf), 
                 startTs: FfiConverterUInt64.read(from: &buf), 
-                timeout: FfiConverterUInt64.read(from: &buf)
+                timeout: FfiConverterUInt64.read(from: &buf), 
+                beaconId: FfiConverterString.read(from: &buf)
         )
     }
 
@@ -20762,6 +20873,7 @@ public struct FfiConverterTypeLiveLocationShare: FfiConverterRustBuffer {
         FfiConverterString.write(value.userId, into: &buf)
         FfiConverterUInt64.write(value.startTs, into: &buf)
         FfiConverterUInt64.write(value.timeout, into: &buf)
+        FfiConverterString.write(value.beaconId, into: &buf)
     }
 }
 
@@ -21526,6 +21638,7 @@ public struct NotificationRoomInfo: Equatable, Hashable {
     public var topic: String?
     public var joinRule: JoinRule?
     public var joinedMembersCount: UInt64
+    public var activeServiceMembersCount: UInt64
     public var serviceMembers: [String]
     public var isEncrypted: Bool?
     public var isDirect: Bool
@@ -21533,13 +21646,14 @@ public struct NotificationRoomInfo: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, topic: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, serviceMembers: [String], isEncrypted: Bool?, isDirect: Bool, isSpace: Bool) {
+    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, topic: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, activeServiceMembersCount: UInt64, serviceMembers: [String], isEncrypted: Bool?, isDirect: Bool, isSpace: Bool) {
         self.displayName = displayName
         self.avatarUrl = avatarUrl
         self.canonicalAlias = canonicalAlias
         self.topic = topic
         self.joinRule = joinRule
         self.joinedMembersCount = joinedMembersCount
+        self.activeServiceMembersCount = activeServiceMembersCount
         self.serviceMembers = serviceMembers
         self.isEncrypted = isEncrypted
         self.isDirect = isDirect
@@ -21568,6 +21682,7 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
                 topic: FfiConverterOptionString.read(from: &buf), 
                 joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
                 joinedMembersCount: FfiConverterUInt64.read(from: &buf), 
+                activeServiceMembersCount: FfiConverterUInt64.read(from: &buf), 
                 serviceMembers: FfiConverterSequenceString.read(from: &buf), 
                 isEncrypted: FfiConverterOptionBool.read(from: &buf), 
                 isDirect: FfiConverterBool.read(from: &buf), 
@@ -21582,6 +21697,7 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.topic, into: &buf)
         FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
         FfiConverterUInt64.write(value.joinedMembersCount, into: &buf)
+        FfiConverterUInt64.write(value.activeServiceMembersCount, into: &buf)
         FfiConverterSequenceString.write(value.serviceMembers, into: &buf)
         FfiConverterOptionBool.write(value.isEncrypted, into: &buf)
         FfiConverterBool.write(value.isDirect, into: &buf)
@@ -21664,15 +21780,15 @@ public func FfiConverterTypeNotificationSenderInfo_lower(_ value: NotificationSe
 
 
 /**
- * The configuration to use when authenticating with OIDC.
+ * The configuration to use when authenticating with OAuth.
  */
-public struct OidcConfiguration: Equatable, Hashable {
+public struct OAuthConfiguration: Equatable, Hashable {
     /**
-     * The name of the client that will be shown during OIDC authentication.
+     * The name of the client that will be shown during OAuth authentication.
      */
     public var clientName: String?
     /**
-     * The redirect URI that will be used when OIDC authentication is
+     * The redirect URI that will be used when OAuth authentication is
      * successful.
      */
     public var redirectUri: String
@@ -21705,10 +21821,10 @@ public struct OidcConfiguration: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * The name of the client that will be shown during OIDC authentication.
+         * The name of the client that will be shown during OAuth authentication.
          */clientName: String?, 
         /**
-         * The redirect URI that will be used when OIDC authentication is
+         * The redirect URI that will be used when OAuth authentication is
          * successful.
          */redirectUri: String, 
         /**
@@ -21745,16 +21861,16 @@ public struct OidcConfiguration: Equatable, Hashable {
 }
 
 #if compiler(>=6)
-extension OidcConfiguration: Sendable {}
+extension OAuthConfiguration: Sendable {}
 #endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeOidcConfiguration: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OidcConfiguration {
+public struct FfiConverterTypeOAuthConfiguration: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OAuthConfiguration {
         return
-            try OidcConfiguration(
+            try OAuthConfiguration(
                 clientName: FfiConverterOptionString.read(from: &buf), 
                 redirectUri: FfiConverterString.read(from: &buf), 
                 clientUri: FfiConverterString.read(from: &buf), 
@@ -21765,7 +21881,7 @@ public struct FfiConverterTypeOidcConfiguration: FfiConverterRustBuffer {
         )
     }
 
-    public static func write(_ value: OidcConfiguration, into buf: inout [UInt8]) {
+    public static func write(_ value: OAuthConfiguration, into buf: inout [UInt8]) {
         FfiConverterOptionString.write(value.clientName, into: &buf)
         FfiConverterString.write(value.redirectUri, into: &buf)
         FfiConverterString.write(value.clientUri, into: &buf)
@@ -21780,19 +21896,19 @@ public struct FfiConverterTypeOidcConfiguration: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeOidcConfiguration_lift(_ buf: RustBuffer) throws -> OidcConfiguration {
-    return try FfiConverterTypeOidcConfiguration.lift(buf)
+public func FfiConverterTypeOAuthConfiguration_lift(_ buf: RustBuffer) throws -> OAuthConfiguration {
+    return try FfiConverterTypeOAuthConfiguration.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeOidcConfiguration_lower(_ value: OidcConfiguration) -> RustBuffer {
-    return FfiConverterTypeOidcConfiguration.lower(value)
+public func FfiConverterTypeOAuthConfiguration_lower(_ value: OAuthConfiguration) -> RustBuffer {
+    return FfiConverterTypeOAuthConfiguration.lower(value)
 }
 
 
-public struct OidcCrossSigningResetInfo: Equatable, Hashable {
+public struct OAuthCrossSigningResetInfo: Equatable, Hashable {
     /**
      * The URL where the user can approve the reset of the cross-signing keys.
      */
@@ -21813,21 +21929,21 @@ public struct OidcCrossSigningResetInfo: Equatable, Hashable {
 }
 
 #if compiler(>=6)
-extension OidcCrossSigningResetInfo: Sendable {}
+extension OAuthCrossSigningResetInfo: Sendable {}
 #endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeOidcCrossSigningResetInfo: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OidcCrossSigningResetInfo {
+public struct FfiConverterTypeOAuthCrossSigningResetInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OAuthCrossSigningResetInfo {
         return
-            try OidcCrossSigningResetInfo(
+            try OAuthCrossSigningResetInfo(
                 approvalUrl: FfiConverterString.read(from: &buf)
         )
     }
 
-    public static func write(_ value: OidcCrossSigningResetInfo, into buf: inout [UInt8]) {
+    public static func write(_ value: OAuthCrossSigningResetInfo, into buf: inout [UInt8]) {
         FfiConverterString.write(value.approvalUrl, into: &buf)
     }
 }
@@ -21836,15 +21952,15 @@ public struct FfiConverterTypeOidcCrossSigningResetInfo: FfiConverterRustBuffer 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeOidcCrossSigningResetInfo_lift(_ buf: RustBuffer) throws -> OidcCrossSigningResetInfo {
-    return try FfiConverterTypeOidcCrossSigningResetInfo.lift(buf)
+public func FfiConverterTypeOAuthCrossSigningResetInfo_lift(_ buf: RustBuffer) throws -> OAuthCrossSigningResetInfo {
+    return try FfiConverterTypeOAuthCrossSigningResetInfo.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeOidcCrossSigningResetInfo_lower(_ value: OidcCrossSigningResetInfo) -> RustBuffer {
-    return FfiConverterTypeOidcCrossSigningResetInfo.lower(value)
+public func FfiConverterTypeOAuthCrossSigningResetInfo_lower(_ value: OAuthCrossSigningResetInfo) -> RustBuffer {
+    return FfiConverterTypeOAuthCrossSigningResetInfo.lower(value)
 }
 
 
@@ -23095,6 +23211,7 @@ public struct RoomInfo {
     public var activeMembersCount: UInt64
     public var invitedMembersCount: UInt64
     public var joinedMembersCount: UInt64
+    public var activeServiceMembersCount: UInt64
     public var serviceMembers: [String]
     public var highlightCount: UInt64
     public var notificationCount: UInt64
@@ -23174,7 +23291,7 @@ public struct RoomInfo {
          *
          * Can be missing if the room membership invite event is missing from the
          * store.
-         */inviter: RoomMember?, heroes: [RoomHero], activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, serviceMembers: [String], highlightCount: UInt64, notificationCount: UInt64, cachedUserDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], activeRoomCallConsensusIntent: RtcCallIntentConsensus, 
+         */inviter: RoomMember?, heroes: [RoomHero], activeMembersCount: UInt64, invitedMembersCount: UInt64, joinedMembersCount: UInt64, activeServiceMembersCount: UInt64, serviceMembers: [String], highlightCount: UInt64, notificationCount: UInt64, cachedUserDefinedNotificationMode: RoomNotificationMode?, hasRoomCall: Bool, activeRoomCallParticipants: [String], activeRoomCallConsensusIntent: RtcCallIntentConsensus, 
         /**
          * Whether this room has been explicitly marked as unread
          */isMarkedUnread: Bool, 
@@ -23232,6 +23349,7 @@ public struct RoomInfo {
         self.activeMembersCount = activeMembersCount
         self.invitedMembersCount = invitedMembersCount
         self.joinedMembersCount = joinedMembersCount
+        self.activeServiceMembersCount = activeServiceMembersCount
         self.serviceMembers = serviceMembers
         self.highlightCount = highlightCount
         self.notificationCount = notificationCount
@@ -23288,6 +23406,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 activeMembersCount: FfiConverterUInt64.read(from: &buf), 
                 invitedMembersCount: FfiConverterUInt64.read(from: &buf), 
                 joinedMembersCount: FfiConverterUInt64.read(from: &buf), 
+                activeServiceMembersCount: FfiConverterUInt64.read(from: &buf), 
                 serviceMembers: FfiConverterSequenceString.read(from: &buf), 
                 highlightCount: FfiConverterUInt64.read(from: &buf), 
                 notificationCount: FfiConverterUInt64.read(from: &buf), 
@@ -23330,6 +23449,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.activeMembersCount, into: &buf)
         FfiConverterUInt64.write(value.invitedMembersCount, into: &buf)
         FfiConverterUInt64.write(value.joinedMembersCount, into: &buf)
+        FfiConverterUInt64.write(value.activeServiceMembersCount, into: &buf)
         FfiConverterSequenceString.write(value.serviceMembers, into: &buf)
         FfiConverterUInt64.write(value.highlightCount, into: &buf)
         FfiConverterUInt64.write(value.notificationCount, into: &buf)
@@ -24367,7 +24487,7 @@ public struct Session: Equatable, Hashable {
      * Additional data for this session if OpenID Connect was used for
      * authentication.
      */
-    public var oidcData: String?
+    public var oauthData: String?
     /**
      * The sliding sync version used for this session.
      */
@@ -24396,7 +24516,7 @@ public struct Session: Equatable, Hashable {
         /**
          * Additional data for this session if OpenID Connect was used for
          * authentication.
-         */oidcData: String?, 
+         */oauthData: String?, 
         /**
          * The sliding sync version used for this session.
          */slidingSyncVersion: SlidingSyncVersion) {
@@ -24405,7 +24525,7 @@ public struct Session: Equatable, Hashable {
         self.userId = userId
         self.deviceId = deviceId
         self.homeserverUrl = homeserverUrl
-        self.oidcData = oidcData
+        self.oauthData = oauthData
         self.slidingSyncVersion = slidingSyncVersion
     }
 
@@ -24430,7 +24550,7 @@ public struct FfiConverterTypeSession: FfiConverterRustBuffer {
                 userId: FfiConverterString.read(from: &buf), 
                 deviceId: FfiConverterString.read(from: &buf), 
                 homeserverUrl: FfiConverterString.read(from: &buf), 
-                oidcData: FfiConverterOptionString.read(from: &buf), 
+                oauthData: FfiConverterOptionString.read(from: &buf), 
                 slidingSyncVersion: FfiConverterTypeSlidingSyncVersion.read(from: &buf)
         )
     }
@@ -24441,7 +24561,7 @@ public struct FfiConverterTypeSession: FfiConverterRustBuffer {
         FfiConverterString.write(value.userId, into: &buf)
         FfiConverterString.write(value.deviceId, into: &buf)
         FfiConverterString.write(value.homeserverUrl, into: &buf)
-        FfiConverterOptionString.write(value.oidcData, into: &buf)
+        FfiConverterOptionString.write(value.oauthData, into: &buf)
         FfiConverterTypeSlidingSyncVersion.write(value.slidingSyncVersion, into: &buf)
     }
 }
@@ -28814,7 +28934,11 @@ public enum CrossSigningResetAuthType: Equatable, Hashable {
      * The homeserver requires user-interactive authentication.
      */
     case uiaa
-    case oidc(info: OidcCrossSigningResetInfo
+    /**
+     * OAuth is used for authentication and the user needs to open a URL to
+     * approve the upload of cross-signing keys.
+     */
+    case oAuth(info: OAuthCrossSigningResetInfo
     )
 
 
@@ -28839,7 +28963,7 @@ public struct FfiConverterTypeCrossSigningResetAuthType: FfiConverterRustBuffer 
         
         case 1: return .uiaa
         
-        case 2: return .oidc(info: try FfiConverterTypeOidcCrossSigningResetInfo.read(from: &buf)
+        case 2: return .oAuth(info: try FfiConverterTypeOAuthCrossSigningResetInfo.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -28854,9 +28978,9 @@ public struct FfiConverterTypeCrossSigningResetAuthType: FfiConverterRustBuffer 
             writeInt(&buf, Int32(1))
         
         
-        case let .oidc(info):
+        case let .oAuth(info):
             writeInt(&buf, Int32(2))
-            FfiConverterTypeOidcCrossSigningResetInfo.write(info, into: &buf)
+            FfiConverterTypeOAuthCrossSigningResetInfo.write(info, into: &buf)
             
         }
     }
@@ -31654,7 +31778,7 @@ public enum HumanQrLoginError: Swift.Error, Equatable, Hashable, Foundation.Loca
     case Declined
     case Unknown
     case SlidingSyncNotAvailable
-    case OidcMetadataInvalid
+    case OAuthMetadataInvalid
     case OtherDeviceNotSignedIn
     case CheckCodeAlreadySent
     case CheckCodeCannotBeSent
@@ -31696,7 +31820,7 @@ public struct FfiConverterTypeHumanQrLoginError: FfiConverterRustBuffer {
         case 5: return .Declined
         case 6: return .Unknown
         case 7: return .SlidingSyncNotAvailable
-        case 8: return .OidcMetadataInvalid
+        case 8: return .OAuthMetadataInvalid
         case 9: return .OtherDeviceNotSignedIn
         case 10: return .CheckCodeAlreadySent
         case 11: return .CheckCodeCannotBeSent
@@ -31742,7 +31866,7 @@ public struct FfiConverterTypeHumanQrLoginError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(7))
         
         
-        case .OidcMetadataInvalid:
+        case .OAuthMetadataInvalid:
             writeInt(&buf, Int32(8))
         
         
@@ -34693,7 +34817,7 @@ public func FfiConverterTypeNotificationStatus_lower(_ value: NotificationStatus
 
 
 
-public enum OidcError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+public enum OAuthError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
     
     
@@ -34720,16 +34844,16 @@ public enum OidcError: Swift.Error, Equatable, Hashable, Foundation.LocalizedErr
 }
 
 #if compiler(>=6)
-extension OidcError: Sendable {}
+extension OAuthError: Sendable {}
 #endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeOidcError: FfiConverterRustBuffer {
-    typealias SwiftType = OidcError
+public struct FfiConverterTypeOAuthError: FfiConverterRustBuffer {
+    typealias SwiftType = OAuthError
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OidcError {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OAuthError {
         let variant: Int32 = try readInt(&buf)
         switch variant {
 
@@ -34761,7 +34885,7 @@ public struct FfiConverterTypeOidcError: FfiConverterRustBuffer {
         }
     }
 
-    public static func write(_ value: OidcError, into buf: inout [UInt8]) {
+    public static func write(_ value: OAuthError, into buf: inout [UInt8]) {
         switch value {
 
         
@@ -34787,21 +34911,21 @@ public struct FfiConverterTypeOidcError: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeOidcError_lift(_ buf: RustBuffer) throws -> OidcError {
-    return try FfiConverterTypeOidcError.lift(buf)
+public func FfiConverterTypeOAuthError_lift(_ buf: RustBuffer) throws -> OAuthError {
+    return try FfiConverterTypeOAuthError.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeOidcError_lower(_ value: OidcError) -> RustBuffer {
-    return FfiConverterTypeOidcError.lower(value)
+public func FfiConverterTypeOAuthError_lower(_ value: OAuthError) -> RustBuffer {
+    return FfiConverterTypeOAuthError.lower(value)
 }
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
-public enum OidcPrompt: Equatable, Hashable {
+public enum OAuthPrompt: Equatable, Hashable {
     
     /**
      * The Authorization Server should prompt the End-User to create a user
@@ -34833,16 +34957,16 @@ public enum OidcPrompt: Equatable, Hashable {
 }
 
 #if compiler(>=6)
-extension OidcPrompt: Sendable {}
+extension OAuthPrompt: Sendable {}
 #endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeOidcPrompt: FfiConverterRustBuffer {
-    typealias SwiftType = OidcPrompt
+public struct FfiConverterTypeOAuthPrompt: FfiConverterRustBuffer {
+    typealias SwiftType = OAuthPrompt
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OidcPrompt {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OAuthPrompt {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
@@ -34859,7 +34983,7 @@ public struct FfiConverterTypeOidcPrompt: FfiConverterRustBuffer {
         }
     }
 
-    public static func write(_ value: OidcPrompt, into buf: inout [UInt8]) {
+    public static func write(_ value: OAuthPrompt, into buf: inout [UInt8]) {
         switch value {
         
         
@@ -34887,15 +35011,15 @@ public struct FfiConverterTypeOidcPrompt: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeOidcPrompt_lift(_ buf: RustBuffer) throws -> OidcPrompt {
-    return try FfiConverterTypeOidcPrompt.lift(buf)
+public func FfiConverterTypeOAuthPrompt_lift(_ buf: RustBuffer) throws -> OAuthPrompt {
+    return try FfiConverterTypeOAuthPrompt.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeOidcPrompt_lower(_ value: OidcPrompt) -> RustBuffer {
-    return FfiConverterTypeOidcPrompt.lower(value)
+public func FfiConverterTypeOAuthPrompt_lower(_ value: OAuthPrompt) -> RustBuffer {
+    return FfiConverterTypeOAuthPrompt.lower(value)
 }
 
 
@@ -42565,6 +42689,136 @@ public func FfiConverterCallbackInterfaceBackupSteadyStateListener_lower(_ v: Ba
 
 
 /**
+ * A listener for the current user's client-wide beacon_info updates.
+ */
+public protocol BeaconInfoListener: AnyObject, Sendable {
+    
+    /**
+     * Called whenever the current user's beacon_info changes in any room.
+     */
+    func onUpdate(update: BeaconInfoUpdate) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceBeaconInfoListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // This creates 1-element array, since this seems to be the only way to construct a const
+    // pointer that we can pass to the Rust code.
+    static let vtable: [UniffiVTableCallbackInterfaceBeaconInfoListener] = [UniffiVTableCallbackInterfaceBeaconInfoListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceBeaconInfoListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface BeaconInfoListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceBeaconInfoListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface BeaconInfoListener: handle missing in uniffiClone")
+            }
+        },
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            update: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceBeaconInfoListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     update: try FfiConverterTypeBeaconInfoUpdate_lift(update)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )]
+}
+
+private func uniffiCallbackInitBeaconInfoListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_beaconinfolistener(UniffiCallbackInterfaceBeaconInfoListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceBeaconInfoListener {
+    fileprivate static let handleMap = UniffiHandleMap<BeaconInfoListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceBeaconInfoListener : FfiConverter {
+    typealias SwiftType = BeaconInfoListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceBeaconInfoListener_lift(_ handle: UInt64) throws -> BeaconInfoListener {
+    return try FfiConverterCallbackInterfaceBeaconInfoListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceBeaconInfoListener_lower(_ v: BeaconInfoListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceBeaconInfoListener.lower(v)
+}
+
+
+
+
+/**
  * A listener for receiving call decline events in a room.
  */
 public protocol CallDeclineListener: AnyObject, Sendable {
@@ -49726,8 +49980,8 @@ fileprivate struct FfiConverterOptionTypeMembershipChange: FfiConverterRustBuffe
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionTypeOidcPrompt: FfiConverterRustBuffer {
-    typealias SwiftType = OidcPrompt?
+fileprivate struct FfiConverterOptionTypeOAuthPrompt: FfiConverterRustBuffer {
+    typealias SwiftType = OAuthPrompt?
 
     public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
@@ -49735,13 +49989,13 @@ fileprivate struct FfiConverterOptionTypeOidcPrompt: FfiConverterRustBuffer {
             return
         }
         writeInt(&buf, Int8(1))
-        FfiConverterTypeOidcPrompt.write(value, into: &buf)
+        FfiConverterTypeOAuthPrompt.write(value, into: &buf)
     }
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
-        case 1: return try FfiConverterTypeOidcPrompt.read(from: &buf)
+        case 1: return try FfiConverterTypeOAuthPrompt.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -51301,23 +51555,23 @@ fileprivate struct FfiConverterSequenceTypeMembership: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterSequenceTypeOidcPrompt: FfiConverterRustBuffer {
-    typealias SwiftType = [OidcPrompt]
+fileprivate struct FfiConverterSequenceTypeOAuthPrompt: FfiConverterRustBuffer {
+    typealias SwiftType = [OAuthPrompt]
 
-    public static func write(_ value: [OidcPrompt], into buf: inout [UInt8]) {
+    public static func write(_ value: [OAuthPrompt], into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         for item in value {
-            FfiConverterTypeOidcPrompt.write(item, into: &buf)
+            FfiConverterTypeOAuthPrompt.write(item, into: &buf)
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [OidcPrompt] {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [OAuthPrompt] {
         let len: Int32 = try readInt(&buf)
-        var seq = [OidcPrompt]()
+        var seq = [OAuthPrompt]()
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeOidcPrompt.read(from: &buf))
+            seq.append(try FfiConverterTypeOAuthPrompt.read(from: &buf))
         }
         return seq
     }
@@ -52369,10 +52623,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_sliding_sync_version() != 8075) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_supported_oidc_prompts() != 39919) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_supported_oauth_prompts() != 60664) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_supports_oidc_login() != 22858) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_supports_oauth_login() != 50920) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeserverlogindetails_supports_password_login() != 1406) {
@@ -52390,7 +52644,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_ssohandler_url() != 633) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_abort_oidc_auth() != 17052) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_abort_oauth_auth() != 38124) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_account_data() != 23790) {
@@ -52543,7 +52797,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_email() != 22630) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_oidc_callback() != 63441) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_login_with_oauth_callback() != 24379) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_logout() != 54411) {
@@ -52552,7 +52806,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_new_grant_login_with_qr_code_handler() != 59558) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_new_login_with_qr_code_handler() != 37543) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_new_login_with_qr_code_handler() != 23101) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_notification_client() != 17687) {
@@ -52657,6 +52911,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_media_preview_config() != 11612) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_own_beacon_info_updates() != 8373) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_room_info() != 3308) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -52687,7 +52944,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_upload_media() != 19621) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oidc() != 50450) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oauth() != 38795) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_user_id() != 11375) {
@@ -53287,7 +53544,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_unread_flag() != 38235) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_start_live_location_share() != 43479) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_start_live_location_share() != 55035) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_stop_live_location_share() != 37711) {
@@ -53884,6 +54141,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_accountdatalistener_on_change() != 13017) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_beaconinfolistener_on_update() != 2040) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientdelegate_did_receive_auth_error() != 55975) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -54050,6 +54310,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitAccountDataListener()
     uniffiCallbackInitBackupStateListener()
     uniffiCallbackInitBackupSteadyStateListener()
+    uniffiCallbackInitBeaconInfoListener()
     uniffiCallbackInitCallDeclineListener()
     uniffiCallbackInitClientDelegate()
     uniffiCallbackInitClientSessionDelegate()
