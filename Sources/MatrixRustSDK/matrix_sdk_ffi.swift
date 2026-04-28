@@ -41569,7 +41569,7 @@ public enum TimelineItemContent {
     case msgLike(content: MsgLikeContent
     )
     case callInvite
-    case rtcNotification(callIntent: String?
+    case rtcNotification(callIntent: String?, declinedBy: [String]
     )
     case roomMembership(userId: String, userDisplayName: String?, change: MembershipChange?, reason: String?
     )
@@ -41607,7 +41607,7 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
         
         case 2: return .callInvite
         
-        case 3: return .rtcNotification(callIntent: try FfiConverterOptionString.read(from: &buf)
+        case 3: return .rtcNotification(callIntent: try FfiConverterOptionString.read(from: &buf), declinedBy: try FfiConverterSequenceString.read(from: &buf)
         )
         
         case 4: return .roomMembership(userId: try FfiConverterString.read(from: &buf), userDisplayName: try FfiConverterOptionString.read(from: &buf), change: try FfiConverterOptionTypeMembershipChange.read(from: &buf), reason: try FfiConverterOptionString.read(from: &buf)
@@ -41642,9 +41642,10 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         
         
-        case let .rtcNotification(callIntent):
+        case let .rtcNotification(callIntent,declinedBy):
             writeInt(&buf, Int32(3))
             FfiConverterOptionString.write(callIntent, into: &buf)
+            FfiConverterSequenceString.write(declinedBy, into: &buf)
             
         
         case let .roomMembership(userId,userDisplayName,change,reason):
