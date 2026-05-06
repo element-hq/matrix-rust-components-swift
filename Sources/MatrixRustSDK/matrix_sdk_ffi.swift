@@ -3656,6 +3656,8 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
     
     func disableSslVerification()  -> ClientBuilder
     
+    func dmRoomDefinition(dmRoomDefinition: DmRoomDefinition)  -> ClientBuilder
+    
     /**
      * Set whether to enable the experimental support for sending and receiving
      * encrypted room history on invite, per [MSC4268].
@@ -3912,6 +3914,15 @@ open func disableSslVerification() -> ClientBuilder  {
     return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_disable_ssl_verification(
             self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+open func dmRoomDefinition(dmRoomDefinition: DmRoomDefinition) -> ClientBuilder  {
+    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_dm_room_definition(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeDmRoomDefinition_lower(dmRoomDefinition),$0
     )
 })
 }
@@ -23182,6 +23193,7 @@ public struct RoomInfo {
     public var topic: String?
     public var avatarUrl: String?
     public var isDirect: Bool
+    public var isDm: Bool
     /**
      * Whether the room is public or not, based on the join rules.
      *
@@ -23275,7 +23287,7 @@ public struct RoomInfo {
          */displayName: String?, 
         /**
          * Room name as defined by the room state event only.
-         */rawName: String?, topic: String?, avatarUrl: String?, isDirect: Bool, 
+         */rawName: String?, topic: String?, avatarUrl: String?, isDirect: Bool, isDm: Bool, 
         /**
          * Whether the room is public or not, based on the join rules.
          *
@@ -23336,6 +23348,7 @@ public struct RoomInfo {
         self.topic = topic
         self.avatarUrl = avatarUrl
         self.isDirect = isDirect
+        self.isDm = isDm
         self.isPublic = isPublic
         self.isSpace = isSpace
         self.successorRoom = successorRoom
@@ -23393,6 +23406,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 topic: FfiConverterOptionString.read(from: &buf), 
                 avatarUrl: FfiConverterOptionString.read(from: &buf), 
                 isDirect: FfiConverterBool.read(from: &buf), 
+                isDm: FfiConverterBool.read(from: &buf), 
                 isPublic: FfiConverterOptionBool.read(from: &buf), 
                 isSpace: FfiConverterBool.read(from: &buf), 
                 successorRoom: FfiConverterOptionTypeSuccessorRoom.read(from: &buf), 
@@ -23436,6 +23450,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.topic, into: &buf)
         FfiConverterOptionString.write(value.avatarUrl, into: &buf)
         FfiConverterBool.write(value.isDirect, into: &buf)
+        FfiConverterBool.write(value.isDm, into: &buf)
         FfiConverterOptionBool.write(value.isPublic, into: &buf)
         FfiConverterBool.write(value.isSpace, into: &buf)
         FfiConverterOptionTypeSuccessorRoom.write(value.successorRoom, into: &buf)
@@ -23550,10 +23565,11 @@ public struct RoomMember: Equatable, Hashable {
     public var isIgnored: Bool
     public var suggestedRoleForPowerLevel: RoomMemberRole
     public var membershipChangeReason: String?
+    public var isServiceMember: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(userId: String, displayName: String?, avatarUrl: String?, membership: MembershipState, isNameAmbiguous: Bool, powerLevel: PowerLevel, isIgnored: Bool, suggestedRoleForPowerLevel: RoomMemberRole, membershipChangeReason: String?) {
+    public init(userId: String, displayName: String?, avatarUrl: String?, membership: MembershipState, isNameAmbiguous: Bool, powerLevel: PowerLevel, isIgnored: Bool, suggestedRoleForPowerLevel: RoomMemberRole, membershipChangeReason: String?, isServiceMember: Bool) {
         self.userId = userId
         self.displayName = displayName
         self.avatarUrl = avatarUrl
@@ -23563,6 +23579,7 @@ public struct RoomMember: Equatable, Hashable {
         self.isIgnored = isIgnored
         self.suggestedRoleForPowerLevel = suggestedRoleForPowerLevel
         self.membershipChangeReason = membershipChangeReason
+        self.isServiceMember = isServiceMember
     }
 
     
@@ -23589,7 +23606,8 @@ public struct FfiConverterTypeRoomMember: FfiConverterRustBuffer {
                 powerLevel: FfiConverterTypePowerLevel.read(from: &buf), 
                 isIgnored: FfiConverterBool.read(from: &buf), 
                 suggestedRoleForPowerLevel: FfiConverterTypeRoomMemberRole.read(from: &buf), 
-                membershipChangeReason: FfiConverterOptionString.read(from: &buf)
+                membershipChangeReason: FfiConverterOptionString.read(from: &buf), 
+                isServiceMember: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -23603,6 +23621,7 @@ public struct FfiConverterTypeRoomMember: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isIgnored, into: &buf)
         FfiConverterTypeRoomMemberRole.write(value.suggestedRoleForPowerLevel, into: &buf)
         FfiConverterOptionString.write(value.membershipChangeReason, into: &buf)
+        FfiConverterBool.write(value.isServiceMember, into: &buf)
     }
 }
 
@@ -23812,6 +23831,14 @@ public struct RoomPowerLevelsValues: Equatable, Hashable {
      * The level required to change the space's children.
      */
     public var spaceChild: Int64
+    /**
+     * The level required to send a beacon (live location) message event.
+     */
+    public var beacon: Int64
+    /**
+     * The level required to send a beacon info state event.
+     */
+    public var beaconInfo: Int64
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -23848,7 +23875,13 @@ public struct RoomPowerLevelsValues: Equatable, Hashable {
          */roomTopic: Int64, 
         /**
          * The level required to change the space's children.
-         */spaceChild: Int64) {
+         */spaceChild: Int64, 
+        /**
+         * The level required to send a beacon (live location) message event.
+         */beacon: Int64, 
+        /**
+         * The level required to send a beacon info state event.
+         */beaconInfo: Int64) {
         self.ban = ban
         self.invite = invite
         self.kick = kick
@@ -23860,6 +23893,8 @@ public struct RoomPowerLevelsValues: Equatable, Hashable {
         self.roomAvatar = roomAvatar
         self.roomTopic = roomTopic
         self.spaceChild = spaceChild
+        self.beacon = beacon
+        self.beaconInfo = beaconInfo
     }
 
     
@@ -23888,7 +23923,9 @@ public struct FfiConverterTypeRoomPowerLevelsValues: FfiConverterRustBuffer {
                 roomName: FfiConverterInt64.read(from: &buf), 
                 roomAvatar: FfiConverterInt64.read(from: &buf), 
                 roomTopic: FfiConverterInt64.read(from: &buf), 
-                spaceChild: FfiConverterInt64.read(from: &buf)
+                spaceChild: FfiConverterInt64.read(from: &buf), 
+                beacon: FfiConverterInt64.read(from: &buf), 
+                beaconInfo: FfiConverterInt64.read(from: &buf)
         )
     }
 
@@ -23904,6 +23941,8 @@ public struct FfiConverterTypeRoomPowerLevelsValues: FfiConverterRustBuffer {
         FfiConverterInt64.write(value.roomAvatar, into: &buf)
         FfiConverterInt64.write(value.roomTopic, into: &buf)
         FfiConverterInt64.write(value.spaceChild, into: &buf)
+        FfiConverterInt64.write(value.beacon, into: &buf)
+        FfiConverterInt64.write(value.beaconInfo, into: &buf)
     }
 }
 
@@ -53021,6 +53060,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_ssl_verification() != 17095) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_dm_room_definition() != 42422) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_enable_share_history_on_invite() != 47743) {
