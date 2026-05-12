@@ -21654,10 +21654,11 @@ public struct NotificationRoomInfo: Equatable, Hashable {
     public var isEncrypted: Bool?
     public var isDirect: Bool
     public var isSpace: Bool
+    public var isDm: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, topic: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, activeServiceMembersCount: UInt64, serviceMembers: [String], isEncrypted: Bool?, isDirect: Bool, isSpace: Bool) {
+    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, topic: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, activeServiceMembersCount: UInt64, serviceMembers: [String], isEncrypted: Bool?, isDirect: Bool, isSpace: Bool, isDm: Bool) {
         self.displayName = displayName
         self.avatarUrl = avatarUrl
         self.canonicalAlias = canonicalAlias
@@ -21669,6 +21670,7 @@ public struct NotificationRoomInfo: Equatable, Hashable {
         self.isEncrypted = isEncrypted
         self.isDirect = isDirect
         self.isSpace = isSpace
+        self.isDm = isDm
     }
 
     
@@ -21697,7 +21699,8 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
                 serviceMembers: FfiConverterSequenceString.read(from: &buf), 
                 isEncrypted: FfiConverterOptionBool.read(from: &buf), 
                 isDirect: FfiConverterBool.read(from: &buf), 
-                isSpace: FfiConverterBool.read(from: &buf)
+                isSpace: FfiConverterBool.read(from: &buf), 
+                isDm: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -21713,6 +21716,7 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
         FfiConverterOptionBool.write(value.isEncrypted, into: &buf)
         FfiConverterBool.write(value.isDirect, into: &buf)
         FfiConverterBool.write(value.isSpace, into: &buf)
+        FfiConverterBool.write(value.isDm, into: &buf)
     }
 }
 
@@ -24948,6 +24952,12 @@ public struct SpaceRoom: Equatable, Hashable {
      * The via parameters of the room.
      */
     public var via: [String]
+    /**
+     * Whether this room is a DM, if known.
+     * Note this value can be calculated following some assumptions and is not
+     * guaranteed to be accurate.
+     */
+    public var isDm: Bool?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -25003,7 +25013,12 @@ public struct SpaceRoom: Equatable, Hashable {
          */heroes: [RoomHero]?, 
         /**
          * The via parameters of the room.
-         */via: [String]) {
+         */via: [String], 
+        /**
+         * Whether this room is a DM, if known.
+         * Note this value can be calculated following some assumptions and is not
+         * guaranteed to be accurate.
+         */isDm: Bool?) {
         self.roomId = roomId
         self.canonicalAlias = canonicalAlias
         self.displayName = displayName
@@ -25020,6 +25035,7 @@ public struct SpaceRoom: Equatable, Hashable {
         self.state = state
         self.heroes = heroes
         self.via = via
+        self.isDm = isDm
     }
 
     
@@ -25053,7 +25069,8 @@ public struct FfiConverterTypeSpaceRoom: FfiConverterRustBuffer {
                 childrenCount: FfiConverterUInt64.read(from: &buf), 
                 state: FfiConverterOptionTypeMembership.read(from: &buf), 
                 heroes: FfiConverterOptionSequenceTypeRoomHero.read(from: &buf), 
-                via: FfiConverterSequenceString.read(from: &buf)
+                via: FfiConverterSequenceString.read(from: &buf), 
+                isDm: FfiConverterOptionBool.read(from: &buf)
         )
     }
 
@@ -25074,6 +25091,7 @@ public struct FfiConverterTypeSpaceRoom: FfiConverterRustBuffer {
         FfiConverterOptionTypeMembership.write(value.state, into: &buf)
         FfiConverterOptionSequenceTypeRoomHero.write(value.heroes, into: &buf)
         FfiConverterSequenceString.write(value.via, into: &buf)
+        FfiConverterOptionBool.write(value.isDm, into: &buf)
     }
 }
 
