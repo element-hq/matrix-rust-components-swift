@@ -1144,6 +1144,19 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func logout() async throws 
     
     /**
+     * Mark all joined rooms as read by sending public, private and fully-read
+     * receipts on each room's latest event.
+     *
+     * This is a best-effort operation — per-room errors are logged and
+     * skipped. Receipts are sent unthreaded, which per the Matrix spec
+     * covers all events in a room including those inside threads.
+     *
+     * This is useful to mitigate backend led wrong iOS app badges and work
+     * around https://github.com/element-hq/element-x-ios/issues/3151
+     */
+    func markAllRoomsAsRead() async throws 
+    
+    /**
      * Create a handler for granting login from this device to a new device by
      * way of a QR code.
      */
@@ -1185,6 +1198,26 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * SQLite.
      */
     func optimizeStores() async throws 
+    
+    /**
+     * Pause the client for background suspension.
+     *
+     * This method:
+     * 1. Disables all send queues (prevents new message sends).
+     * 2. Pauses all database stores, waiting for in-flight operations and
+     * releasing all connections and file locks.
+     *
+     * Call [`Client::resume()`] when the app returns to the foreground.
+     *
+     * # iOS
+     *
+     * Call this before the app is suspended to avoid `0xdead10cc` kills.
+     * Typically called from
+     * [`applicationDidEnterBackground`](https://developer.apple.com/documentation/uikit/uiapplicationdelegate/applicationdidenterbackground(_:))
+     * or an equivalent SwiftUI lifecycle event, *after* stopping the
+     * `matrix_sdk_ui::sync_service::SyncService`.
+     */
+    func pause() async throws 
     
     /**
      * Register a handler for notifications generated from sync responses.
@@ -1245,6 +1278,17 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * It reloads a set of rooms controlled by [`RoomLoadSettings`].
      */
     func restoreSessionWith(session: Session, roomLoadSettings: RoomLoadSettings) async throws 
+    
+    /**
+     * Resume the client after a [`Client::pause()`].
+     *
+     * Re-acquires store resources and re-enables send queues.
+     *
+     * If your app stopped the `matrix_sdk_ui::sync_service::SyncService`
+     * before pausing, restart it separately as appropriate for your app
+     * lifecycle.
+     */
+    func resume() async throws 
     
     /**
      * Checks if a room alias exists in the current homeserver.
@@ -2578,6 +2622,34 @@ open func logout()async throws   {
 }
     
     /**
+     * Mark all joined rooms as read by sending public, private and fully-read
+     * receipts on each room's latest event.
+     *
+     * This is a best-effort operation — per-room errors are logged and
+     * skipped. Receipts are sent unthreaded, which per the Matrix spec
+     * covers all events in a room including those inside threads.
+     *
+     * This is useful to mitigate backend led wrong iOS app badges and work
+     * around https://github.com/element-hq/element-x-ios/issues/3151
+     */
+open func markAllRoomsAsRead()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_mark_all_rooms_as_read(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
      * Create a handler for granting login from this device to a new device by
      * way of a QR code.
      */
@@ -2668,6 +2740,41 @@ open func optimizeStores()async throws   {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_optimize_stores(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Pause the client for background suspension.
+     *
+     * This method:
+     * 1. Disables all send queues (prevents new message sends).
+     * 2. Pauses all database stores, waiting for in-flight operations and
+     * releasing all connections and file locks.
+     *
+     * Call [`Client::resume()`] when the app returns to the foreground.
+     *
+     * # iOS
+     *
+     * Call this before the app is suspended to avoid `0xdead10cc` kills.
+     * Typically called from
+     * [`applicationDidEnterBackground`](https://developer.apple.com/documentation/uikit/uiapplicationdelegate/applicationdidenterbackground(_:))
+     * or an equivalent SwiftUI lifecycle event, *after* stopping the
+     * `matrix_sdk_ui::sync_service::SyncService`.
+     */
+open func pause()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_pause(
                     self.uniffiCloneHandle()
                     
                 )
@@ -2851,6 +2958,32 @@ open func restoreSessionWith(session: Session, roomLoadSettings: RoomLoadSetting
                 uniffi_matrix_sdk_ffi_fn_method_client_restore_session_with(
                     self.uniffiCloneHandle(),
                     FfiConverterTypeSession_lower(session),FfiConverterTypeRoomLoadSettings_lower(roomLoadSettings)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Resume the client after a [`Client::pause()`].
+     *
+     * Re-acquires store resources and re-enables send queues.
+     *
+     * If your app stopped the `matrix_sdk_ui::sync_service::SyncService`
+     * before pausing, restart it separately as appropriate for your app
+     * lifecycle.
+     */
+open func resume()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_resume(
+                    self.uniffiCloneHandle()
+                    
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -14121,7 +14254,7 @@ public protocol SpaceRoomListProtocol: AnyObject, Sendable {
     /**
      * Return the current list of rooms.
      */
-    func rooms()  -> [SpaceRoom]
+    func rooms() async  -> [SpaceRoom]
     
     /**
      * Returns the space of the room list if known.
@@ -14136,7 +14269,7 @@ public protocol SpaceRoomListProtocol: AnyObject, Sendable {
     /**
      * Subscribes to room list updates.
      */
-    func subscribeToRoomUpdate(listener: SpaceRoomListEntriesListener)  -> TaskHandle
+    func subscribeToRoomUpdate(listener: SpaceRoomListEntriesListener) async  -> TaskHandle
     
     /**
      * Subscribe to space updates.
@@ -14271,12 +14404,22 @@ open func reset()async   {
     /**
      * Return the current list of rooms.
      */
-open func rooms() -> [SpaceRoom]  {
-    return try!  FfiConverterSequenceTypeSpaceRoom.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_spaceroomlist_rooms(
-            self.uniffiCloneHandle(),$0
-    )
-})
+open func rooms()async  -> [SpaceRoom]  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceroomlist_rooms(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeSpaceRoom.lift,
+            errorHandler: nil
+            
+        )
 }
     
     /**
@@ -14305,13 +14448,22 @@ open func subscribeToPaginationStateUpdates(listener: SpaceRoomListPaginationSta
     /**
      * Subscribes to room list updates.
      */
-open func subscribeToRoomUpdate(listener: SpaceRoomListEntriesListener) -> TaskHandle  {
-    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_spaceroomlist_subscribe_to_room_update(
-            self.uniffiCloneHandle(),
-        FfiConverterCallbackInterfaceSpaceRoomListEntriesListener_lower(listener),$0
-    )
-})
+open func subscribeToRoomUpdate(listener: SpaceRoomListEntriesListener)async  -> TaskHandle  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_spaceroomlist_subscribe_to_room_update(
+                    self.uniffiCloneHandle(),
+                    FfiConverterCallbackInterfaceSpaceRoomListEntriesListener_lower(listener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
+            liftFunc: FfiConverterTypeTaskHandle_lift,
+            errorHandler: nil
+            
+        )
 }
     
     /**
@@ -52861,6 +53013,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_logout() != 54411) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_mark_all_rooms_as_read() != 23334) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_new_grant_login_with_qr_code_handler() != 59558) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -52877,6 +53032,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_optimize_stores() != 53467) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_pause() != 1344) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_register_notification_handler() != 46860) {
@@ -52901,6 +53059,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_restore_session_with() != 21462) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_resume() != 51366) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_room_alias_exists() != 5713) {
@@ -53884,7 +54045,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_reset() != 60888) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_rooms() != 65022) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_rooms() != 3299) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_space() != 63772) {
@@ -53893,7 +54054,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_subscribe_to_pagination_state_updates() != 15348) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_subscribe_to_room_update() != 52629) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_subscribe_to_room_update() != 27260) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_spaceroomlist_subscribe_to_space_updates() != 31589) {
