@@ -15182,7 +15182,14 @@ public protocol SqliteStoreBuilderProtocol: AnyObject, Sendable {
     func journalSizeLimit(limit: UInt32?)  -> SqliteStoreBuilder
     
     /**
-     * Set the passphrase for the stores.
+     * Set the raw key for the stores and removes any [`Self::passphrase`]
+     * previously set.
+     */
+    func key(key: Data?)  -> SqliteStoreBuilder
+    
+    /**
+     * Set the passphrase for the stores and removes any [`Self::key`]
+     * previously set.
      */
     func passphrase(passphrase: String?)  -> SqliteStoreBuilder
     
@@ -15322,7 +15329,21 @@ open func journalSizeLimit(limit: UInt32?) -> SqliteStoreBuilder  {
 }
     
     /**
-     * Set the passphrase for the stores.
+     * Set the raw key for the stores and removes any [`Self::passphrase`]
+     * previously set.
+     */
+open func key(key: Data?) -> SqliteStoreBuilder  {
+    return try!  FfiConverterTypeSqliteStoreBuilder_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_sqlitestorebuilder_key(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionData.lower(key),$0
+    )
+})
+}
+    
+    /**
+     * Set the passphrase for the stores and removes any [`Self::key`]
+     * previously set.
      */
 open func passphrase(passphrase: String?) -> SqliteStoreBuilder  {
     return try!  FfiConverterTypeSqliteStoreBuilder_lift(try! rustCall() {
@@ -23407,6 +23428,10 @@ public struct RoomInfo {
      */
     public var numUnreadMentions: UInt64
     /**
+     * Event ID of the user's `m.fully_read` marker for this room, if any.
+     */
+    public var fullyReadEventId: String?
+    /**
      * The currently pinned event ids.
      */
     public var pinnedEventIds: [String]
@@ -23476,6 +23501,9 @@ public struct RoomInfo {
          * notification settings.
          */numUnreadMentions: UInt64, 
         /**
+         * Event ID of the user's `m.fully_read` marker for this room, if any.
+         */fullyReadEventId: String?, 
+        /**
          * The currently pinned event ids.
          */pinnedEventIds: [String], 
         /**
@@ -23530,6 +23558,7 @@ public struct RoomInfo {
         self.numUnreadMessages = numUnreadMessages
         self.numUnreadNotifications = numUnreadNotifications
         self.numUnreadMentions = numUnreadMentions
+        self.fullyReadEventId = fullyReadEventId
         self.pinnedEventIds = pinnedEventIds
         self.joinRule = joinRule
         self.historyVisibility = historyVisibility
@@ -23588,6 +23617,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 numUnreadMessages: FfiConverterUInt64.read(from: &buf), 
                 numUnreadNotifications: FfiConverterUInt64.read(from: &buf), 
                 numUnreadMentions: FfiConverterUInt64.read(from: &buf), 
+                fullyReadEventId: FfiConverterOptionString.read(from: &buf), 
                 pinnedEventIds: FfiConverterSequenceString.read(from: &buf), 
                 joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
                 historyVisibility: FfiConverterTypeRoomHistoryVisibility.read(from: &buf), 
@@ -23632,6 +23662,7 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.numUnreadMessages, into: &buf)
         FfiConverterUInt64.write(value.numUnreadNotifications, into: &buf)
         FfiConverterUInt64.write(value.numUnreadMentions, into: &buf)
+        FfiConverterOptionString.write(value.fullyReadEventId, into: &buf)
         FfiConverterSequenceString.write(value.pinnedEventIds, into: &buf)
         FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
         FfiConverterTypeRoomHistoryVisibility.write(value.historyVisibility, into: &buf)
@@ -28641,6 +28672,8 @@ public enum ClientBuildError: Swift.Error, Equatable, Hashable, Foundation.Local
     
     case EventCache(message: String)
     
+    case InvalidRawKey(message: String)
+    
     case Generic(message: String)
     
 
@@ -28704,7 +28737,11 @@ public struct FfiConverterTypeClientBuildError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 9: return .Generic(
+        case 9: return .InvalidRawKey(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 10: return .Generic(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -28735,8 +28772,10 @@ public struct FfiConverterTypeClientBuildError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(7))
         case .EventCache(_ /* message is ignored*/):
             writeInt(&buf, Int32(8))
-        case .Generic(_ /* message is ignored*/):
+        case .InvalidRawKey(_ /* message is ignored*/):
             writeInt(&buf, Int32(9))
+        case .Generic(_ /* message is ignored*/):
+            writeInt(&buf, Int32(10))
 
         
         }
@@ -48966,6 +49005,30 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
+    typealias SwiftType = Data?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterData.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterData.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionDuration: FfiConverterRustBuffer {
     typealias SwiftType = TimeInterval?
 
@@ -54099,7 +54162,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_sqlitestorebuilder_journal_size_limit() != 23095) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sqlitestorebuilder_passphrase() != 45337) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sqlitestorebuilder_key() != 24015) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_sqlitestorebuilder_passphrase() != 33498) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sqlitestorebuilder_pool_max_size() != 41218) {
