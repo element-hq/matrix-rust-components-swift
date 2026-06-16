@@ -3827,6 +3827,8 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
     
     func dmRoomDefinition(dmRoomDefinition: DmRoomDefinition)  -> ClientBuilder
     
+    func enableContentScanner(scannerUrl: String)  -> ClientBuilder
+    
     /**
      * Set whether to enable the experimental support for sending and receiving
      * encrypted room history on invite, per [MSC4268].
@@ -4092,6 +4094,15 @@ open func dmRoomDefinition(dmRoomDefinition: DmRoomDefinition) -> ClientBuilder 
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_dm_room_definition(
             self.uniffiCloneHandle(),
         FfiConverterTypeDmRoomDefinition_lower(dmRoomDefinition),$0
+    )
+})
+}
+    
+open func enableContentScanner(scannerUrl: String) -> ClientBuilder  {
+    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_enable_content_scanner(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(scannerUrl),$0
     )
 })
 }
@@ -28842,6 +28853,8 @@ public enum ClientError: Swift.Error, Equatable, Hashable, Foundation.LocalizedE
     )
     case MatrixApi(kind: ErrorKind, code: String, msg: String, details: String?
     )
+    case ContentScanner(reason: ErrorReason, info: String
+    )
 
     
 
@@ -28881,6 +28894,10 @@ public struct FfiConverterTypeClientError: FfiConverterRustBuffer {
             msg: try FfiConverterString.read(from: &buf), 
             details: try FfiConverterOptionString.read(from: &buf)
             )
+        case 3: return .ContentScanner(
+            reason: try FfiConverterTypeErrorReason.read(from: &buf), 
+            info: try FfiConverterString.read(from: &buf)
+            )
 
          default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -28905,6 +28922,12 @@ public struct FfiConverterTypeClientError: FfiConverterRustBuffer {
             FfiConverterString.write(code, into: &buf)
             FfiConverterString.write(msg, into: &buf)
             FfiConverterOptionString.write(details, into: &buf)
+            
+        
+        case let .ContentScanner(reason,info):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeErrorReason.write(reason, into: &buf)
+            FfiConverterString.write(info, into: &buf)
             
         }
     }
@@ -30886,7 +30909,8 @@ public enum FilterTimelineEventCondition: Equatable, Hashable {
      * The event is an `m.room.member` event that represents a membership
      * change (join, leave, etc.).
      */
-    case membershipChange
+    case membershipChange(filter: MembershipChangeFilter
+    )
     /**
      * The event is an `m.room.member` event that represents a profile
      * change (displayname or avatar URL).
@@ -30916,7 +30940,8 @@ public struct FfiConverterTypeFilterTimelineEventCondition: FfiConverterRustBuff
         case 1: return .eventType(eventType: try FfiConverterTypeFilterTimelineEventType.read(from: &buf)
         )
         
-        case 2: return .membershipChange
+        case 2: return .membershipChange(filter: try FfiConverterTypeMembershipChangeFilter.read(from: &buf)
+        )
         
         case 3: return .profileChange
         
@@ -30933,9 +30958,10 @@ public struct FfiConverterTypeFilterTimelineEventCondition: FfiConverterRustBuff
             FfiConverterTypeFilterTimelineEventType.write(eventType, into: &buf)
             
         
-        case .membershipChange:
+        case let .membershipChange(filter):
             writeInt(&buf, Int32(2))
-        
+            FfiConverterTypeMembershipChangeFilter.write(filter, into: &buf)
+            
         
         case .profileChange:
             writeInt(&buf, Int32(3))
@@ -53370,6 +53396,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_dm_room_definition() != 42422) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_enable_content_scanner() != 64503) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_enable_share_history_on_invite() != 47743) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -54708,6 +54737,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitWidgetCapabilitiesProvider()
     uniffiEnsureMatrixSdkBaseInitialized()
     uniffiEnsureMatrixSdkCommonInitialized()
+    uniffiEnsureMatrixSdkContentscannerInitialized()
     uniffiEnsureMatrixSdkCryptoInitialized()
     uniffiEnsureMatrixSdkInitialized()
     uniffiEnsureMatrixSdkUiInitialized()
