@@ -8579,14 +8579,6 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func clearComposerDraft(threadRoot: String?) async throws 
     
     /**
-     * Clear the event cache storage for the current room.
-     *
-     * This will remove all the information related to the event cache, in
-     * memory and in the persisted storage, if enabled.
-     */
-    func clearEventCacheStorage() async throws 
-    
-    /**
      * Declines a call (and stop ringing).
      *
      * # Arguments
@@ -9304,29 +9296,6 @@ open func clearComposerDraft(threadRoot: String?)async throws   {
                 uniffi_matrix_sdk_ffi_fn_method_room_clear_composer_draft(
                     self.uniffiCloneHandle(),
                     FfiConverterOptionString.lower(threadRoot)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
-            errorHandler: FfiConverterTypeClientError_lift
-        )
-}
-    
-    /**
-     * Clear the event cache storage for the current room.
-     *
-     * This will remove all the information related to the event cache, in
-     * memory and in the persisted storage, if enabled.
-     */
-open func clearEventCacheStorage()async throws   {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_clear_event_cache_storage(
-                    self.uniffiCloneHandle()
-                    
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -53712,9 +53681,6 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_composer_draft() != 12270) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_clear_event_cache_storage() != 14531) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_decline_call() != 12323) {
