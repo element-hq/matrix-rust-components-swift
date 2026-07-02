@@ -1555,10 +1555,14 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func getRecentEmojis() async throws  -> [RecentEmoji]
     
     /**
-     * Search across all all rooms for the given query, returning an iterator
-     * over the results.
+     * Create a search service.
+     *
+     * The search service aggregates results of different kinds (currently only
+     * messages) into a single reactive, paginated list of typed
+     * [`SearchResult`]s. Call [`SearchService::set_query`] to start or update
+     * the search, then [`SearchService::paginate`] to load more results.
      */
-    func searchMessages(query: String, filter: SearchRoomFilter) async throws  -> GlobalSearchIterator
+    func searchService()  -> SearchService
     
 }
 open class Client: ClientProtocol, @unchecked Sendable {
@@ -3805,24 +3809,19 @@ open func getRecentEmojis()async throws  -> [RecentEmoji]  {
 }
     
     /**
-     * Search across all all rooms for the given query, returning an iterator
-     * over the results.
+     * Create a search service.
+     *
+     * The search service aggregates results of different kinds (currently only
+     * messages) into a single reactive, paginated list of typed
+     * [`SearchResult`]s. Call [`SearchService::set_query`] to start or update
+     * the search, then [`SearchService::paginate`] to load more results.
      */
-open func searchMessages(query: String, filter: SearchRoomFilter)async throws  -> GlobalSearchIterator  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_search_messages(
-                    self.uniffiCloneHandle(),
-                    FfiConverterString.lower(query),FfiConverterTypeSearchRoomFilter_lower(filter)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
-            liftFunc: FfiConverterTypeGlobalSearchIterator_lift,
-            errorHandler: FfiConverterTypeClientError_lift
-        )
+open func searchService() -> SearchService  {
+    return try!  FfiConverterTypeSearchService_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_search_service(
+            self.uniffiCloneHandle(),$0
+    )
+})
 }
     
 
@@ -5238,139 +5237,6 @@ public func FfiConverterTypeEncryption_lift(_ handle: UInt64) throws -> Encrypti
 #endif
 public func FfiConverterTypeEncryption_lower(_ value: Encryption) -> UInt64 {
     return FfiConverterTypeEncryption.lower(value)
-}
-
-
-
-
-
-
-public protocol GlobalSearchIteratorProtocol: AnyObject, Sendable {
-    
-    /**
-     * Return the next page of search results, or `None` if there are no more
-     * results.
-     */
-    func nextEvents() async throws  -> [GlobalSearchResult]?
-    
-}
-open class GlobalSearchIterator: GlobalSearchIteratorProtocol, @unchecked Sendable {
-    fileprivate let handle: UInt64
-
-    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public struct NoHandle {
-        public init() {}
-    }
-
-    // TODO: We'd like this to be `private` but for Swifty reasons,
-    // we can't implement `FfiConverter` without making this `required` and we can't
-    // make it `required` without making it `public`.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    required public init(unsafeFromHandle handle: UInt64) {
-        self.handle = handle
-    }
-
-    // This constructor can be used to instantiate a fake object.
-    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    //
-    // - Warning:
-    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public init(noHandle: NoHandle) {
-        self.handle = 0
-    }
-
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public func uniffiCloneHandle() -> UInt64 {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_globalsearchiterator(self.handle, $0) }
-    }
-    // No primary constructor declared for this class.
-
-    deinit {
-        if handle == 0 {
-            // Mock objects have handle=0 don't try to free them
-            return
-        }
-
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_globalsearchiterator(handle, $0) }
-    }
-
-    
-
-    
-    /**
-     * Return the next page of search results, or `None` if there are no more
-     * results.
-     */
-open func nextEvents()async throws  -> [GlobalSearchResult]?  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_globalsearchiterator_next_events(
-                    self.uniffiCloneHandle()
-                    
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterOptionSequenceTypeGlobalSearchResult.lift,
-            errorHandler: FfiConverterTypeSearchError_lift
-        )
-}
-    
-
-    
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeGlobalSearchIterator: FfiConverter {
-    typealias FfiType = UInt64
-    typealias SwiftType = GlobalSearchIterator
-
-    public static func lift(_ handle: UInt64) throws -> GlobalSearchIterator {
-        return GlobalSearchIterator(unsafeFromHandle: handle)
-    }
-
-    public static func lower(_ value: GlobalSearchIterator) -> UInt64 {
-        return value.uniffiCloneHandle()
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> GlobalSearchIterator {
-        let handle: UInt64 = try readInt(&buf)
-        return try lift(handle)
-    }
-
-    public static func write(_ value: GlobalSearchIterator, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(value))
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeGlobalSearchIterator_lift(_ handle: UInt64) throws -> GlobalSearchIterator {
-    return try FfiConverterTypeGlobalSearchIterator.lift(handle)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeGlobalSearchIterator_lower(_ value: GlobalSearchIterator) -> UInt64 {
-    return FfiConverterTypeGlobalSearchIterator.lower(value)
 }
 
 
@@ -9363,12 +9229,6 @@ public protocol RoomProtocol: AnyObject, Sendable {
      */
     func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandle) async throws 
     
-    /**
-     * Search for messages in this room matching the given query, returning an
-     * iterator that yields one page of results at a time.
-     */
-    func searchMessages(query: String)  -> RoomSearchIterator
-    
 }
 open class Room: RoomProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
@@ -11274,19 +11134,6 @@ open func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandl
         )
 }
     
-    /**
-     * Search for messages in this room matching the given query, returning an
-     * iterator that yields one page of results at a time.
-     */
-open func searchMessages(query: String) -> RoomSearchIterator  {
-    return try!  FfiConverterTypeRoomSearchIterator_lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_room_search_messages(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(query),$0
-    )
-})
-}
-    
 
     
 }
@@ -13184,16 +13031,44 @@ public func FfiConverterTypeRoomPreview_lower(_ value: RoomPreview) -> UInt64 {
 
 
 
-public protocol RoomSearchIteratorProtocol: AnyObject, Sendable {
+/**
+ * A reactive, paginated search across all the user's data.
+ */
+public protocol SearchServiceProtocol: AnyObject, Sendable {
     
     /**
-     * Return the next page of search results, or `None` if there are no more
-     * results.
+     * Load the next page of results if a page isn't already loading and the
+     * end hasn't been reached. Otherwise it no-ops.
      */
-    func nextEvents() async throws  -> [RoomSearchResult]?
+    func paginate() async throws 
+    
+    /**
+     * Returns the current pagination state.
+     */
+    func paginationState()  -> SearchServicePaginationState
+    
+    /**
+     * Set (or update) the search query.
+     * Clears the current results, restarts pagination from scratch and loads
+     * the first page. Call [`Self::paginate`] to load any further pages.
+     */
+    func setQuery(query: String) async throws 
+    
+    /**
+     * Subscribe to pagination state updates.
+     */
+    func subscribeToPaginationStateUpdates(listener: SearchServicePaginationStateListener)  -> TaskHandle
+    
+    /**
+     * Subscribe to the search results.
+     */
+    func subscribeToResults(listener: SearchServiceResultsListener) async  -> TaskHandle
     
 }
-open class RoomSearchIterator: RoomSearchIteratorProtocol, @unchecked Sendable {
+/**
+ * A reactive, paginated search across all the user's data.
+ */
+open class SearchService: SearchServiceProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
 
     /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
@@ -13230,7 +13105,7 @@ open class RoomSearchIterator: RoomSearchIteratorProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
 #endif
     public func uniffiCloneHandle() -> UInt64 {
-        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_roomsearchiterator(self.handle, $0) }
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_searchservice(self.handle, $0) }
     }
     // No primary constructor declared for this class.
 
@@ -13240,30 +13115,96 @@ open class RoomSearchIterator: RoomSearchIteratorProtocol, @unchecked Sendable {
             return
         }
 
-        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_roomsearchiterator(handle, $0) }
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_searchservice(handle, $0) }
     }
 
     
 
     
     /**
-     * Return the next page of search results, or `None` if there are no more
-     * results.
+     * Load the next page of results if a page isn't already loading and the
+     * end hasn't been reached. Otherwise it no-ops.
      */
-open func nextEvents()async throws  -> [RoomSearchResult]?  {
+open func paginate()async throws   {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_roomsearchiterator_next_events(
+                uniffi_matrix_sdk_ffi_fn_method_searchservice_paginate(
                     self.uniffiCloneHandle()
                     
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterOptionSequenceTypeRoomSearchResult.lift,
-            errorHandler: FfiConverterTypeSearchError_lift
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Returns the current pagination state.
+     */
+open func paginationState() -> SearchServicePaginationState  {
+    return try!  FfiConverterTypeSearchServicePaginationState_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_searchservice_pagination_state(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * Set (or update) the search query.
+     * Clears the current results, restarts pagination from scratch and loads
+     * the first page. Call [`Self::paginate`] to load any further pages.
+     */
+open func setQuery(query: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_searchservice_set_query(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(query)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Subscribe to pagination state updates.
+     */
+open func subscribeToPaginationStateUpdates(listener: SearchServicePaginationStateListener) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_searchservice_subscribe_to_pagination_state_updates(
+            self.uniffiCloneHandle(),
+        FfiConverterCallbackInterfaceSearchServicePaginationStateListener_lower(listener),$0
+    )
+})
+}
+    
+    /**
+     * Subscribe to the search results.
+     */
+open func subscribeToResults(listener: SearchServiceResultsListener)async  -> TaskHandle  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_searchservice_subscribe_to_results(
+                    self.uniffiCloneHandle(),
+                    FfiConverterCallbackInterfaceSearchServiceResultsListener_lower(listener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
+            liftFunc: FfiConverterTypeTaskHandle_lift,
+            errorHandler: nil
+            
         )
 }
     
@@ -13275,24 +13216,24 @@ open func nextEvents()async throws  -> [RoomSearchResult]?  {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeRoomSearchIterator: FfiConverter {
+public struct FfiConverterTypeSearchService: FfiConverter {
     typealias FfiType = UInt64
-    typealias SwiftType = RoomSearchIterator
+    typealias SwiftType = SearchService
 
-    public static func lift(_ handle: UInt64) throws -> RoomSearchIterator {
-        return RoomSearchIterator(unsafeFromHandle: handle)
+    public static func lift(_ handle: UInt64) throws -> SearchService {
+        return SearchService(unsafeFromHandle: handle)
     }
 
-    public static func lower(_ value: RoomSearchIterator) -> UInt64 {
+    public static func lower(_ value: SearchService) -> UInt64 {
         return value.uniffiCloneHandle()
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomSearchIterator {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SearchService {
         let handle: UInt64 = try readInt(&buf)
         return try lift(handle)
     }
 
-    public static func write(_ value: RoomSearchIterator, into buf: inout [UInt8]) {
+    public static func write(_ value: SearchService, into buf: inout [UInt8]) {
         writeInt(&buf, lower(value))
     }
 }
@@ -13301,15 +13242,15 @@ public struct FfiConverterTypeRoomSearchIterator: FfiConverter {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeRoomSearchIterator_lift(_ handle: UInt64) throws -> RoomSearchIterator {
-    return try FfiConverterTypeRoomSearchIterator.lift(handle)
+public func FfiConverterTypeSearchService_lift(_ handle: UInt64) throws -> SearchService {
+    return try FfiConverterTypeSearchService.lift(handle)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeRoomSearchIterator_lower(_ value: RoomSearchIterator) -> UInt64 {
-    return FfiConverterTypeRoomSearchIterator.lower(value)
+public func FfiConverterTypeSearchService_lower(_ value: SearchService) -> UInt64 {
+    return FfiConverterTypeSearchService.lower(value)
 }
 
 
@@ -20322,60 +20263,6 @@ public func FfiConverterTypeGalleryUploadParameters_lower(_ value: GalleryUpload
 }
 
 
-public struct GlobalSearchResult {
-    public var roomId: String
-    public var result: RoomSearchResult
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(roomId: String, result: RoomSearchResult) {
-        self.roomId = roomId
-        self.result = result
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension GlobalSearchResult: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeGlobalSearchResult: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> GlobalSearchResult {
-        return
-            try GlobalSearchResult(
-                roomId: FfiConverterString.read(from: &buf), 
-                result: FfiConverterTypeRoomSearchResult.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: GlobalSearchResult, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.roomId, into: &buf)
-        FfiConverterTypeRoomSearchResult.write(value.result, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeGlobalSearchResult_lift(_ buf: RustBuffer) throws -> GlobalSearchResult {
-    return try FfiConverterTypeGlobalSearchResult.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeGlobalSearchResult_lower(_ value: GlobalSearchResult) -> RustBuffer {
-    return FfiConverterTypeGlobalSearchResult.lower(value)
-}
-
-
 public struct HttpPusherData: Equatable, Hashable {
     public var url: String
     public var format: PushFormat?
@@ -21697,6 +21584,75 @@ public func FfiConverterTypeMessageContent_lift(_ buf: RustBuffer) throws -> Mes
 #endif
 public func FfiConverterTypeMessageContent_lower(_ value: MessageContent) -> RustBuffer {
     return FfiConverterTypeMessageContent.lower(value)
+}
+
+
+/**
+ * A message matching a search query, with its content and sender resolved.
+ */
+public struct MessageSearchResult {
+    public var eventId: String
+    public var sender: String
+    public var senderProfile: ProfileDetails
+    public var content: TimelineItemContent
+    public var timestamp: Timestamp
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(eventId: String, sender: String, senderProfile: ProfileDetails, content: TimelineItemContent, timestamp: Timestamp) {
+        self.eventId = eventId
+        self.sender = sender
+        self.senderProfile = senderProfile
+        self.content = content
+        self.timestamp = timestamp
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension MessageSearchResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMessageSearchResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MessageSearchResult {
+        return
+            try MessageSearchResult(
+                eventId: FfiConverterString.read(from: &buf), 
+                sender: FfiConverterString.read(from: &buf), 
+                senderProfile: FfiConverterTypeProfileDetails.read(from: &buf), 
+                content: FfiConverterTypeTimelineItemContent.read(from: &buf), 
+                timestamp: FfiConverterTypeTimestamp.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MessageSearchResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.eventId, into: &buf)
+        FfiConverterString.write(value.sender, into: &buf)
+        FfiConverterTypeProfileDetails.write(value.senderProfile, into: &buf)
+        FfiConverterTypeTimelineItemContent.write(value.content, into: &buf)
+        FfiConverterTypeTimestamp.write(value.timestamp, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessageSearchResult_lift(_ buf: RustBuffer) throws -> MessageSearchResult {
+    return try FfiConverterTypeMessageSearchResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessageSearchResult_lower(_ value: MessageSearchResult) -> RustBuffer {
+    return FfiConverterTypeMessageSearchResult.lower(value)
 }
 
 
@@ -24560,72 +24516,6 @@ public func FfiConverterTypeRoomPreviewInfo_lift(_ buf: RustBuffer) throws -> Ro
 #endif
 public func FfiConverterTypeRoomPreviewInfo_lower(_ value: RoomPreviewInfo) -> RustBuffer {
     return FfiConverterTypeRoomPreviewInfo.lower(value)
-}
-
-
-public struct RoomSearchResult {
-    public var eventId: String
-    public var sender: String
-    public var senderProfile: ProfileDetails
-    public var content: TimelineItemContent
-    public var timestamp: Timestamp
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(eventId: String, sender: String, senderProfile: ProfileDetails, content: TimelineItemContent, timestamp: Timestamp) {
-        self.eventId = eventId
-        self.sender = sender
-        self.senderProfile = senderProfile
-        self.content = content
-        self.timestamp = timestamp
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension RoomSearchResult: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeRoomSearchResult: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomSearchResult {
-        return
-            try RoomSearchResult(
-                eventId: FfiConverterString.read(from: &buf), 
-                sender: FfiConverterString.read(from: &buf), 
-                senderProfile: FfiConverterTypeProfileDetails.read(from: &buf), 
-                content: FfiConverterTypeTimelineItemContent.read(from: &buf), 
-                timestamp: FfiConverterTypeTimestamp.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: RoomSearchResult, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.eventId, into: &buf)
-        FfiConverterString.write(value.sender, into: &buf)
-        FfiConverterTypeProfileDetails.write(value.senderProfile, into: &buf)
-        FfiConverterTypeTimelineItemContent.write(value.content, into: &buf)
-        FfiConverterTypeTimestamp.write(value.timestamp, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeRoomSearchResult_lift(_ buf: RustBuffer) throws -> RoomSearchResult {
-    return try FfiConverterTypeRoomSearchResult.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeRoomSearchResult_lower(_ value: RoomSearchResult) -> RustBuffer {
-    return FfiConverterTypeRoomSearchResult.lower(value)
 }
 
 
@@ -39388,107 +39278,19 @@ public func FfiConverterTypeRuleKind_lower(_ value: RuleKind) -> RustBuffer {
 }
 
 
-
-public enum SearchError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
-
-    
-    
-    case IndexError(String
-    )
-    case EventLoadError(String
-    )
-
-    
-
-    
-
-    
-    public var errorDescription: String? {
-        String(reflecting: self)
-    }
-    
-}
-
-#if compiler(>=6)
-extension SearchError: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeSearchError: FfiConverterRustBuffer {
-    typealias SwiftType = SearchError
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SearchError {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-
-        
-
-        
-        case 1: return .IndexError(
-            try FfiConverterString.read(from: &buf)
-            )
-        case 2: return .EventLoadError(
-            try FfiConverterString.read(from: &buf)
-            )
-
-         default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: SearchError, into buf: inout [UInt8]) {
-        switch value {
-
-        
-
-        
-        
-        case let .IndexError(v1):
-            writeInt(&buf, Int32(1))
-            FfiConverterString.write(v1, into: &buf)
-            
-        
-        case let .EventLoadError(v1):
-            writeInt(&buf, Int32(2))
-            FfiConverterString.write(v1, into: &buf)
-            
-        }
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeSearchError_lift(_ buf: RustBuffer) throws -> SearchError {
-    return try FfiConverterTypeSearchError.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeSearchError_lower(_ value: SearchError) -> RustBuffer {
-    return FfiConverterTypeSearchError.lower(value)
-}
-
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * A single search result, tagged by the kind of entity it represents.
+ */
 
-public enum SearchRoomFilter: Equatable, Hashable {
+public enum SearchServiceResult {
     
     /**
-     * All the joined rooms (= DMs + non-DMs).
+     * A message (room timeline event) matching the query.
      */
-    case rooms
-    /**
-     * Only joined DM rooms.
-     */
-    case dms
-    /**
-     * Only joined non-DM (group) rooms.
-     */
-    case nonDms
+    case message(roomId: String, result: MessageSearchResult
+    )
 
 
 
@@ -39497,44 +39299,35 @@ public enum SearchRoomFilter: Equatable, Hashable {
 }
 
 #if compiler(>=6)
-extension SearchRoomFilter: Sendable {}
+extension SearchServiceResult: Sendable {}
 #endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeSearchRoomFilter: FfiConverterRustBuffer {
-    typealias SwiftType = SearchRoomFilter
+public struct FfiConverterTypeSearchServiceResult: FfiConverterRustBuffer {
+    typealias SwiftType = SearchServiceResult
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SearchRoomFilter {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SearchServiceResult {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .rooms
-        
-        case 2: return .dms
-        
-        case 3: return .nonDms
+        case 1: return .message(roomId: try FfiConverterString.read(from: &buf), result: try FfiConverterTypeMessageSearchResult.read(from: &buf)
+        )
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
-    public static func write(_ value: SearchRoomFilter, into buf: inout [UInt8]) {
+    public static func write(_ value: SearchServiceResult, into buf: inout [UInt8]) {
         switch value {
         
         
-        case .rooms:
+        case let .message(roomId,result):
             writeInt(&buf, Int32(1))
-        
-        
-        case .dms:
-            writeInt(&buf, Int32(2))
-        
-        
-        case .nonDms:
-            writeInt(&buf, Int32(3))
-        
+            FfiConverterString.write(roomId, into: &buf)
+            FfiConverterTypeMessageSearchResult.write(result, into: &buf)
+            
         }
     }
 }
@@ -39543,15 +39336,171 @@ public struct FfiConverterTypeSearchRoomFilter: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeSearchRoomFilter_lift(_ buf: RustBuffer) throws -> SearchRoomFilter {
-    return try FfiConverterTypeSearchRoomFilter.lift(buf)
+public func FfiConverterTypeSearchServiceResult_lift(_ buf: RustBuffer) throws -> SearchServiceResult {
+    return try FfiConverterTypeSearchServiceResult.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeSearchRoomFilter_lower(_ value: SearchRoomFilter) -> RustBuffer {
-    return FfiConverterTypeSearchRoomFilter.lower(value)
+public func FfiConverterTypeSearchServiceResult_lower(_ value: SearchServiceResult) -> RustBuffer {
+    return FfiConverterTypeSearchServiceResult.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum SearchServiceResultsUpdate {
+    
+    case append(values: [SearchServiceResult]
+    )
+    case clear
+    case pushFront(value: SearchServiceResult
+    )
+    case pushBack(value: SearchServiceResult
+    )
+    case popFront
+    case popBack
+    case insert(index: UInt32, value: SearchServiceResult
+    )
+    case set(index: UInt32, value: SearchServiceResult
+    )
+    case remove(index: UInt32
+    )
+    case truncate(length: UInt32
+    )
+    case reset(values: [SearchServiceResult]
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SearchServiceResultsUpdate: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSearchServiceResultsUpdate: FfiConverterRustBuffer {
+    typealias SwiftType = SearchServiceResultsUpdate
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SearchServiceResultsUpdate {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .append(values: try FfiConverterSequenceTypeSearchServiceResult.read(from: &buf)
+        )
+        
+        case 2: return .clear
+        
+        case 3: return .pushFront(value: try FfiConverterTypeSearchServiceResult.read(from: &buf)
+        )
+        
+        case 4: return .pushBack(value: try FfiConverterTypeSearchServiceResult.read(from: &buf)
+        )
+        
+        case 5: return .popFront
+        
+        case 6: return .popBack
+        
+        case 7: return .insert(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeSearchServiceResult.read(from: &buf)
+        )
+        
+        case 8: return .set(index: try FfiConverterUInt32.read(from: &buf), value: try FfiConverterTypeSearchServiceResult.read(from: &buf)
+        )
+        
+        case 9: return .remove(index: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 10: return .truncate(length: try FfiConverterUInt32.read(from: &buf)
+        )
+        
+        case 11: return .reset(values: try FfiConverterSequenceTypeSearchServiceResult.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SearchServiceResultsUpdate, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .append(values):
+            writeInt(&buf, Int32(1))
+            FfiConverterSequenceTypeSearchServiceResult.write(values, into: &buf)
+            
+        
+        case .clear:
+            writeInt(&buf, Int32(2))
+        
+        
+        case let .pushFront(value):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeSearchServiceResult.write(value, into: &buf)
+            
+        
+        case let .pushBack(value):
+            writeInt(&buf, Int32(4))
+            FfiConverterTypeSearchServiceResult.write(value, into: &buf)
+            
+        
+        case .popFront:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .popBack:
+            writeInt(&buf, Int32(6))
+        
+        
+        case let .insert(index,value):
+            writeInt(&buf, Int32(7))
+            FfiConverterUInt32.write(index, into: &buf)
+            FfiConverterTypeSearchServiceResult.write(value, into: &buf)
+            
+        
+        case let .set(index,value):
+            writeInt(&buf, Int32(8))
+            FfiConverterUInt32.write(index, into: &buf)
+            FfiConverterTypeSearchServiceResult.write(value, into: &buf)
+            
+        
+        case let .remove(index):
+            writeInt(&buf, Int32(9))
+            FfiConverterUInt32.write(index, into: &buf)
+            
+        
+        case let .truncate(length):
+            writeInt(&buf, Int32(10))
+            FfiConverterUInt32.write(length, into: &buf)
+            
+        
+        case let .reset(values):
+            writeInt(&buf, Int32(11))
+            FfiConverterSequenceTypeSearchServiceResult.write(values, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSearchServiceResultsUpdate_lift(_ buf: RustBuffer) throws -> SearchServiceResultsUpdate {
+    return try FfiConverterTypeSearchServiceResultsUpdate.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSearchServiceResultsUpdate_lower(_ value: SearchServiceResultsUpdate) -> RustBuffer {
+    return FfiConverterTypeSearchServiceResultsUpdate.lower(value)
 }
 
 
@@ -45915,6 +45864,254 @@ public func FfiConverterCallbackInterfaceRoomListServiceSyncIndicatorListener_lo
 
 
 
+public protocol SearchServicePaginationStateListener: AnyObject, Sendable {
+    
+    func onUpdate(paginationState: SearchServicePaginationState) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceSearchServicePaginationStateListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // This creates 1-element array, since this seems to be the only way to construct a const
+    // pointer that we can pass to the Rust code.
+    static let vtable: [UniffiVTableCallbackInterfaceSearchServicePaginationStateListener] = [UniffiVTableCallbackInterfaceSearchServicePaginationStateListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceSearchServicePaginationStateListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface SearchServicePaginationStateListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceSearchServicePaginationStateListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface SearchServicePaginationStateListener: handle missing in uniffiClone")
+            }
+        },
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            paginationState: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSearchServicePaginationStateListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     paginationState: try FfiConverterTypeSearchServicePaginationState_lift(paginationState)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )]
+}
+
+private func uniffiCallbackInitSearchServicePaginationStateListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_searchservicepaginationstatelistener(UniffiCallbackInterfaceSearchServicePaginationStateListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceSearchServicePaginationStateListener {
+    fileprivate static let handleMap = UniffiHandleMap<SearchServicePaginationStateListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceSearchServicePaginationStateListener : FfiConverter {
+    typealias SwiftType = SearchServicePaginationStateListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceSearchServicePaginationStateListener_lift(_ handle: UInt64) throws -> SearchServicePaginationStateListener {
+    return try FfiConverterCallbackInterfaceSearchServicePaginationStateListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceSearchServicePaginationStateListener_lower(_ v: SearchServicePaginationStateListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceSearchServicePaginationStateListener.lower(v)
+}
+
+
+
+
+public protocol SearchServiceResultsListener: AnyObject, Sendable {
+    
+    func onUpdate(updates: [SearchServiceResultsUpdate]) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceSearchServiceResultsListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // This creates 1-element array, since this seems to be the only way to construct a const
+    // pointer that we can pass to the Rust code.
+    static let vtable: [UniffiVTableCallbackInterfaceSearchServiceResultsListener] = [UniffiVTableCallbackInterfaceSearchServiceResultsListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceSearchServiceResultsListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface SearchServiceResultsListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceSearchServiceResultsListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface SearchServiceResultsListener: handle missing in uniffiClone")
+            }
+        },
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            updates: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSearchServiceResultsListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     updates: try FfiConverterSequenceTypeSearchServiceResultsUpdate.lift(updates)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )]
+}
+
+private func uniffiCallbackInitSearchServiceResultsListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_searchserviceresultslistener(UniffiCallbackInterfaceSearchServiceResultsListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceSearchServiceResultsListener {
+    fileprivate static let handleMap = UniffiHandleMap<SearchServiceResultsListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceSearchServiceResultsListener : FfiConverter {
+    typealias SwiftType = SearchServiceResultsListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceSearchServiceResultsListener_lift(_ handle: UInt64) throws -> SearchServiceResultsListener {
+    return try FfiConverterCallbackInterfaceSearchServiceResultsListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceSearchServiceResultsListener_lower(_ v: SearchServiceResultsListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceSearchServiceResultsListener.lower(v)
+}
+
+
+
+
 /**
  * A listener to send queue updates in a specific room.
  */
@@ -50363,30 +50560,6 @@ fileprivate struct FfiConverterOptionSequenceString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionSequenceTypeGlobalSearchResult: FfiConverterRustBuffer {
-    typealias SwiftType = [GlobalSearchResult]?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterSequenceTypeGlobalSearchResult.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterSequenceTypeGlobalSearchResult.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterOptionSequenceTypeRoomHero: FfiConverterRustBuffer {
     typealias SwiftType = [RoomHero]?
 
@@ -50427,30 +50600,6 @@ fileprivate struct FfiConverterOptionSequenceTypeRoomMember: FfiConverterRustBuf
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterSequenceTypeRoomMember.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-fileprivate struct FfiConverterOptionSequenceTypeRoomSearchResult: FfiConverterRustBuffer {
-    typealias SwiftType = [RoomSearchResult]?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterSequenceTypeRoomSearchResult.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterSequenceTypeRoomSearchResult.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -50780,31 +50929,6 @@ fileprivate struct FfiConverterSequenceTypeConditionalPushRule: FfiConverterRust
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterSequenceTypeGlobalSearchResult: FfiConverterRustBuffer {
-    typealias SwiftType = [GlobalSearchResult]
-
-    public static func write(_ value: [GlobalSearchResult], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for item in value {
-            FfiConverterTypeGlobalSearchResult.write(item, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [GlobalSearchResult] {
-        let len: Int32 = try readInt(&buf)
-        var seq = [GlobalSearchResult]()
-        seq.reserveCapacity(Int(len))
-        for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeGlobalSearchResult.read(from: &buf))
-        }
-        return seq
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterSequenceTypeIdentityStatusChange: FfiConverterRustBuffer {
     typealias SwiftType = [IdentityStatusChange]
 
@@ -51122,31 +51246,6 @@ fileprivate struct FfiConverterSequenceTypeRoomMember: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeRoomMember.read(from: &buf))
-        }
-        return seq
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-fileprivate struct FfiConverterSequenceTypeRoomSearchResult: FfiConverterRustBuffer {
-    typealias SwiftType = [RoomSearchResult]
-
-    public static func write(_ value: [RoomSearchResult], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for item in value {
-            FfiConverterTypeRoomSearchResult.write(item, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RoomSearchResult] {
-        let len: Int32 = try readInt(&buf)
-        var seq = [RoomSearchResult]()
-        seq.reserveCapacity(Int(len))
-        for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeRoomSearchResult.read(from: &buf))
         }
         return seq
     }
@@ -51672,6 +51771,56 @@ fileprivate struct FfiConverterSequenceTypeRoomMessageEventMessageType: FfiConve
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeRoomMessageEventMessageType.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeSearchServiceResult: FfiConverterRustBuffer {
+    typealias SwiftType = [SearchServiceResult]
+
+    public static func write(_ value: [SearchServiceResult], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeSearchServiceResult.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SearchServiceResult] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [SearchServiceResult]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeSearchServiceResult.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeSearchServiceResultsUpdate: FfiConverterRustBuffer {
+    typealias SwiftType = [SearchServiceResultsUpdate]
+
+    public static func write(_ value: [SearchServiceResultsUpdate], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeSearchServiceResultsUpdate.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SearchServiceResultsUpdate] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [SearchServiceResultsUpdate]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeSearchServiceResultsUpdate.read(from: &buf))
         }
         return seq
     }
@@ -52955,7 +53104,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recent_emojis() != 49975) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_search_messages() != 5999) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_search_service() != 60223) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeservercapabilities_can_change_avatar() != 42689) {
@@ -53612,9 +53761,6 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_withdraw_verification_and_resend() != 13926) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_search_messages() != 29098) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_roommembersiterator_len() != 59145) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -53768,10 +53914,19 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_mediasource_url() != 53516) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_globalsearchiterator_next_events() != 44182) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_searchservice_paginate() != 9347) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_roomsearchiterator_next_events() != 40655) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_searchservice_pagination_state() != 10729) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_searchservice_set_query() != 26375) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_searchservice_subscribe_to_pagination_state_updates() != 33651) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_searchservice_subscribe_to_results() != 60148) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontroller_accept_verification_request() != 56039) {
@@ -54251,6 +54406,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_roomlistservicesyncindicatorlistener_on_update() != 47433) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_searchservicepaginationstatelistener_on_update() != 19630) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_searchserviceresultslistener_on_update() != 27154) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_receive_verification_request() != 58189) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -54341,6 +54502,8 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitRoomListLoadingStateListener()
     uniffiCallbackInitRoomListServiceStateListener()
     uniffiCallbackInitRoomListServiceSyncIndicatorListener()
+    uniffiCallbackInitSearchServicePaginationStateListener()
+    uniffiCallbackInitSearchServiceResultsListener()
     uniffiCallbackInitSendQueueListener()
     uniffiCallbackInitSendQueueRoomErrorListener()
     uniffiCallbackInitSendQueueRoomUpdateListener()
