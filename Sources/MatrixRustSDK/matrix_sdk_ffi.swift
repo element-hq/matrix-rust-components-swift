@@ -8417,6 +8417,187 @@ public func FfiConverterTypeNotificationSettings_lower(_ value: NotificationSett
 
 
 /**
+ * Estimates password strength using caller-supplied thresholds.
+ *
+ * Construct once with your desired thresholds, then call `estimate` for each
+ * password without having to re-supply the thresholds every time.
+ */
+public protocol PasswordStrengthEstimatorProtocol: AnyObject, Sendable {
+    
+    /**
+     * Estimates the strength of `password`.
+     *
+     * Optionally, pass a list of `user_inputs` (e.g. username, email address)
+     * so that the estimator can penalize passwords that contain personal
+     * information.
+     *
+     * The returned ranking is derived from the configured thresholds applied
+     * to the estimated guess count, which already accounts for pattern-based
+     * attacks.
+     */
+    func estimate(password: String, userInputs: [String])  -> PasswordStrengthEstimate
+    
+}
+/**
+ * Estimates password strength using caller-supplied thresholds.
+ *
+ * Construct once with your desired thresholds, then call `estimate` for each
+ * password without having to re-supply the thresholds every time.
+ */
+open class PasswordStrengthEstimator: PasswordStrengthEstimatorProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_passwordstrengthestimator(self.handle, $0) }
+    }
+public convenience init(thresholds: PasswordStrengthThresholds) {
+    let handle =
+        try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_constructor_passwordstrengthestimator_new(
+        FfiConverterTypePasswordStrengthThresholds_lower(thresholds),$0
+    )
+}
+    self.init(unsafeFromHandle: handle)
+}
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_passwordstrengthestimator(handle, $0) }
+    }
+
+    
+    /**
+     * Creates an estimator using thresholds tuned for modern hardware (2025).
+     * Values derived from determining entropy from the chart at https://www.hivesystems.com/blog/are-your-passwords-in-the-green
+     */
+public static func withModernDefaults2025() -> PasswordStrengthEstimator  {
+    return try!  FfiConverterTypePasswordStrengthEstimator_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_constructor_passwordstrengthestimator_with_modern_defaults2025($0
+    )
+})
+}
+    
+    /**
+     * Creates an estimator using zxcvbn's original thresholds.
+     */
+public static func withZxcvbnDefaults() -> PasswordStrengthEstimator  {
+    return try!  FfiConverterTypePasswordStrengthEstimator_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_constructor_passwordstrengthestimator_with_zxcvbn_defaults($0
+    )
+})
+}
+    
+
+    
+    /**
+     * Estimates the strength of `password`.
+     *
+     * Optionally, pass a list of `user_inputs` (e.g. username, email address)
+     * so that the estimator can penalize passwords that contain personal
+     * information.
+     *
+     * The returned ranking is derived from the configured thresholds applied
+     * to the estimated guess count, which already accounts for pattern-based
+     * attacks.
+     */
+open func estimate(password: String, userInputs: [String]) -> PasswordStrengthEstimate  {
+    return try!  FfiConverterTypePasswordStrengthEstimate_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_passwordstrengthestimator_estimate(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(password),
+        FfiConverterSequenceString.lower(userInputs),$0
+    )
+})
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePasswordStrengthEstimator: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = PasswordStrengthEstimator
+
+    public static func lift(_ handle: UInt64) throws -> PasswordStrengthEstimator {
+        return PasswordStrengthEstimator(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: PasswordStrengthEstimator) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordStrengthEstimator {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: PasswordStrengthEstimator, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthEstimator_lift(_ handle: UInt64) throws -> PasswordStrengthEstimator {
+    return try FfiConverterTypePasswordStrengthEstimator.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthEstimator_lower(_ value: PasswordStrengthEstimator) -> UInt64 {
+    return FfiConverterTypePasswordStrengthEstimator.lower(value)
+}
+
+
+
+
+
+
+/**
  * Data for the QR code login mechanism.
  *
  * The [`QrCodeData`] can be serialized and encoded as a QR code or it can be
@@ -22503,6 +22684,258 @@ public func FfiConverterTypePassPhrase_lower(_ value: PassPhrase) -> RustBuffer 
 
 
 /**
+ * The full result of a password strength estimation.
+ */
+public struct PasswordStrengthEstimate: Equatable, Hashable {
+    /**
+     * Overall strength ranking from VeryWeak to VeryStrong.
+     */
+    public var ranking: PasswordStrengthRanking
+    /**
+     * Estimated number of guesses needed to crack the password.
+     */
+    public var guesses: UInt64
+    /**
+     * A numeric score derived from the order of magnitude of `guesses`
+     * (i.e. log base 10).
+     */
+    public var score: Double
+    /**
+     * Verbal feedback to help choose a better password. Only set when the
+     * ranking is Fair or below.
+     */
+    public var feedback: PasswordStrengthFeedback?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Overall strength ranking from VeryWeak to VeryStrong.
+         */ranking: PasswordStrengthRanking, 
+        /**
+         * Estimated number of guesses needed to crack the password.
+         */guesses: UInt64, 
+        /**
+         * A numeric score derived from the order of magnitude of `guesses`
+         * (i.e. log base 10).
+         */score: Double, 
+        /**
+         * Verbal feedback to help choose a better password. Only set when the
+         * ranking is Fair or below.
+         */feedback: PasswordStrengthFeedback?) {
+        self.ranking = ranking
+        self.guesses = guesses
+        self.score = score
+        self.feedback = feedback
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PasswordStrengthEstimate: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePasswordStrengthEstimate: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordStrengthEstimate {
+        return
+            try PasswordStrengthEstimate(
+                ranking: FfiConverterTypePasswordStrengthRanking.read(from: &buf), 
+                guesses: FfiConverterUInt64.read(from: &buf), 
+                score: FfiConverterDouble.read(from: &buf), 
+                feedback: FfiConverterOptionTypePasswordStrengthFeedback.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PasswordStrengthEstimate, into buf: inout [UInt8]) {
+        FfiConverterTypePasswordStrengthRanking.write(value.ranking, into: &buf)
+        FfiConverterUInt64.write(value.guesses, into: &buf)
+        FfiConverterDouble.write(value.score, into: &buf)
+        FfiConverterOptionTypePasswordStrengthFeedback.write(value.feedback, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthEstimate_lift(_ buf: RustBuffer) throws -> PasswordStrengthEstimate {
+    return try FfiConverterTypePasswordStrengthEstimate.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthEstimate_lower(_ value: PasswordStrengthEstimate) -> RustBuffer {
+    return FfiConverterTypePasswordStrengthEstimate.lower(value)
+}
+
+
+/**
+ * Verbal feedback to help the user choose a stronger password.
+ */
+public struct PasswordStrengthFeedback: Equatable, Hashable {
+    /**
+     * An optional warning explaining what is wrong with the password.
+     */
+    public var warning: PasswordStrengthWarning?
+    /**
+     * A possibly-empty list of actionable suggestions.
+     */
+    public var suggestions: [PasswordStrengthSuggestion]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * An optional warning explaining what is wrong with the password.
+         */warning: PasswordStrengthWarning?, 
+        /**
+         * A possibly-empty list of actionable suggestions.
+         */suggestions: [PasswordStrengthSuggestion]) {
+        self.warning = warning
+        self.suggestions = suggestions
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PasswordStrengthFeedback: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePasswordStrengthFeedback: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordStrengthFeedback {
+        return
+            try PasswordStrengthFeedback(
+                warning: FfiConverterOptionTypePasswordStrengthWarning.read(from: &buf), 
+                suggestions: FfiConverterSequenceTypePasswordStrengthSuggestion.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PasswordStrengthFeedback, into buf: inout [UInt8]) {
+        FfiConverterOptionTypePasswordStrengthWarning.write(value.warning, into: &buf)
+        FfiConverterSequenceTypePasswordStrengthSuggestion.write(value.suggestions, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthFeedback_lift(_ buf: RustBuffer) throws -> PasswordStrengthFeedback {
+    return try FfiConverterTypePasswordStrengthFeedback.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthFeedback_lower(_ value: PasswordStrengthFeedback) -> RustBuffer {
+    return FfiConverterTypePasswordStrengthFeedback.lower(value)
+}
+
+
+/**
+ * Minimum `score` (log₁₀ of estimated guesses) required to achieve each
+ * ranking level. Any score below `weak` is ranked `VeryWeak`.
+ */
+public struct PasswordStrengthThresholds: Equatable, Hashable {
+    /**
+     * Minimum score to achieve `Weak`.
+     */
+    public var weak: Double
+    /**
+     * Minimum score to achieve `Fair`.
+     */
+    public var fair: Double
+    /**
+     * Minimum score to achieve `Strong`.
+     */
+    public var strong: Double
+    /**
+     * Minimum score to achieve `VeryStrong`.
+     */
+    public var veryStrong: Double
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Minimum score to achieve `Weak`.
+         */weak: Double, 
+        /**
+         * Minimum score to achieve `Fair`.
+         */fair: Double, 
+        /**
+         * Minimum score to achieve `Strong`.
+         */strong: Double, 
+        /**
+         * Minimum score to achieve `VeryStrong`.
+         */veryStrong: Double) {
+        self.weak = weak
+        self.fair = fair
+        self.strong = strong
+        self.veryStrong = veryStrong
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PasswordStrengthThresholds: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePasswordStrengthThresholds: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordStrengthThresholds {
+        return
+            try PasswordStrengthThresholds(
+                weak: FfiConverterDouble.read(from: &buf), 
+                fair: FfiConverterDouble.read(from: &buf), 
+                strong: FfiConverterDouble.read(from: &buf), 
+                veryStrong: FfiConverterDouble.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PasswordStrengthThresholds, into buf: inout [UInt8]) {
+        FfiConverterDouble.write(value.weak, into: &buf)
+        FfiConverterDouble.write(value.fair, into: &buf)
+        FfiConverterDouble.write(value.strong, into: &buf)
+        FfiConverterDouble.write(value.veryStrong, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthThresholds_lift(_ buf: RustBuffer) throws -> PasswordStrengthThresholds {
+    return try FfiConverterTypePasswordStrengthThresholds.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthThresholds_lower(_ value: PasswordStrengthThresholds) -> RustBuffer {
+    return FfiConverterTypePasswordStrengthThresholds.lower(value)
+}
+
+
+/**
  * Like [`SimplePushRule`], but with an additional `pattern`` field.
  */
 public struct PatternedPushRule: Equatable, Hashable {
@@ -35561,6 +35994,399 @@ public func FfiConverterTypeParseError_lift(_ buf: RustBuffer) throws -> ParseEr
 public func FfiConverterTypeParseError_lower(_ value: ParseError) -> RustBuffer {
     return FfiConverterTypeParseError.lower(value)
 }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * A ranking representing the estimated strength of a password, ranging from
+ * `VeryWeak` (easily guessable) to `VeryStrong` (highly resistant to attack).
+ */
+
+public enum PasswordStrengthRanking: Equatable, Hashable {
+    
+    case veryWeak
+    case weak
+    case fair
+    case strong
+    case veryStrong
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension PasswordStrengthRanking: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePasswordStrengthRanking: FfiConverterRustBuffer {
+    typealias SwiftType = PasswordStrengthRanking
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordStrengthRanking {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .veryWeak
+        
+        case 2: return .weak
+        
+        case 3: return .fair
+        
+        case 4: return .strong
+        
+        case 5: return .veryStrong
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: PasswordStrengthRanking, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .veryWeak:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .weak:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .fair:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .strong:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .veryStrong:
+            writeInt(&buf, Int32(5))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthRanking_lift(_ buf: RustBuffer) throws -> PasswordStrengthRanking {
+    return try FfiConverterTypePasswordStrengthRanking.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthRanking_lower(_ value: PasswordStrengthRanking) -> RustBuffer {
+    return FfiConverterTypePasswordStrengthRanking.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * A suggestion to help the user choose a stronger password.
+ */
+
+public enum PasswordStrengthSuggestion: Equatable, Hashable {
+    
+    case useAFewWordsAvoidCommonPhrases
+    case noNeedForSymbolsDigitsOrUppercaseLetters
+    case addAnotherWordOrTwo
+    case capitalizationDoesntHelpVeryMuch
+    case allUppercaseIsAlmostAsEasyToGuessAsAllLowercase
+    case reversedWordsArentMuchHarderToGuess
+    case predictableSubstitutionsDontHelpVeryMuch
+    case useALongerKeyboardPatternWithMoreTurns
+    case avoidRepeatedWordsAndCharacters
+    case avoidSequences
+    case avoidRecentYears
+    case avoidYearsThatAreAssociatedWithYou
+    case avoidDatesAndYearsThatAreAssociatedWithYou
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension PasswordStrengthSuggestion: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePasswordStrengthSuggestion: FfiConverterRustBuffer {
+    typealias SwiftType = PasswordStrengthSuggestion
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordStrengthSuggestion {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .useAFewWordsAvoidCommonPhrases
+        
+        case 2: return .noNeedForSymbolsDigitsOrUppercaseLetters
+        
+        case 3: return .addAnotherWordOrTwo
+        
+        case 4: return .capitalizationDoesntHelpVeryMuch
+        
+        case 5: return .allUppercaseIsAlmostAsEasyToGuessAsAllLowercase
+        
+        case 6: return .reversedWordsArentMuchHarderToGuess
+        
+        case 7: return .predictableSubstitutionsDontHelpVeryMuch
+        
+        case 8: return .useALongerKeyboardPatternWithMoreTurns
+        
+        case 9: return .avoidRepeatedWordsAndCharacters
+        
+        case 10: return .avoidSequences
+        
+        case 11: return .avoidRecentYears
+        
+        case 12: return .avoidYearsThatAreAssociatedWithYou
+        
+        case 13: return .avoidDatesAndYearsThatAreAssociatedWithYou
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: PasswordStrengthSuggestion, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .useAFewWordsAvoidCommonPhrases:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .noNeedForSymbolsDigitsOrUppercaseLetters:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .addAnotherWordOrTwo:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .capitalizationDoesntHelpVeryMuch:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .allUppercaseIsAlmostAsEasyToGuessAsAllLowercase:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .reversedWordsArentMuchHarderToGuess:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .predictableSubstitutionsDontHelpVeryMuch:
+            writeInt(&buf, Int32(7))
+        
+        
+        case .useALongerKeyboardPatternWithMoreTurns:
+            writeInt(&buf, Int32(8))
+        
+        
+        case .avoidRepeatedWordsAndCharacters:
+            writeInt(&buf, Int32(9))
+        
+        
+        case .avoidSequences:
+            writeInt(&buf, Int32(10))
+        
+        
+        case .avoidRecentYears:
+            writeInt(&buf, Int32(11))
+        
+        
+        case .avoidYearsThatAreAssociatedWithYou:
+            writeInt(&buf, Int32(12))
+        
+        
+        case .avoidDatesAndYearsThatAreAssociatedWithYou:
+            writeInt(&buf, Int32(13))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthSuggestion_lift(_ buf: RustBuffer) throws -> PasswordStrengthSuggestion {
+    return try FfiConverterTypePasswordStrengthSuggestion.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthSuggestion_lower(_ value: PasswordStrengthSuggestion) -> RustBuffer {
+    return FfiConverterTypePasswordStrengthSuggestion.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * A warning explaining what is wrong with the password.
+ */
+
+public enum PasswordStrengthWarning: Equatable, Hashable {
+    
+    case straightRowsOfKeysAreEasyToGuess
+    case shortKeyboardPatternsAreEasyToGuess
+    case repeatsLikeAaaAreEasyToGuess
+    case repeatsLikeAbcAbcAreOnlySlightlyHarderToGuess
+    case thisIsATop10Password
+    case thisIsATop100Password
+    case thisIsACommonPassword
+    case thisIsSimilarToACommonlyUsedPassword
+    case sequencesLikeAbcAreEasyToGuess
+    case recentYearsAreEasyToGuess
+    case aWordByItselfIsEasyToGuess
+    case datesAreOftenEasyToGuess
+    case namesAndSurnamesByThemselvesAreEasyToGuess
+    case commonNamesAndSurnamesAreEasyToGuess
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension PasswordStrengthWarning: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePasswordStrengthWarning: FfiConverterRustBuffer {
+    typealias SwiftType = PasswordStrengthWarning
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PasswordStrengthWarning {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .straightRowsOfKeysAreEasyToGuess
+        
+        case 2: return .shortKeyboardPatternsAreEasyToGuess
+        
+        case 3: return .repeatsLikeAaaAreEasyToGuess
+        
+        case 4: return .repeatsLikeAbcAbcAreOnlySlightlyHarderToGuess
+        
+        case 5: return .thisIsATop10Password
+        
+        case 6: return .thisIsATop100Password
+        
+        case 7: return .thisIsACommonPassword
+        
+        case 8: return .thisIsSimilarToACommonlyUsedPassword
+        
+        case 9: return .sequencesLikeAbcAreEasyToGuess
+        
+        case 10: return .recentYearsAreEasyToGuess
+        
+        case 11: return .aWordByItselfIsEasyToGuess
+        
+        case 12: return .datesAreOftenEasyToGuess
+        
+        case 13: return .namesAndSurnamesByThemselvesAreEasyToGuess
+        
+        case 14: return .commonNamesAndSurnamesAreEasyToGuess
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: PasswordStrengthWarning, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .straightRowsOfKeysAreEasyToGuess:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .shortKeyboardPatternsAreEasyToGuess:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .repeatsLikeAaaAreEasyToGuess:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .repeatsLikeAbcAbcAreOnlySlightlyHarderToGuess:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .thisIsATop10Password:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .thisIsATop100Password:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .thisIsACommonPassword:
+            writeInt(&buf, Int32(7))
+        
+        
+        case .thisIsSimilarToACommonlyUsedPassword:
+            writeInt(&buf, Int32(8))
+        
+        
+        case .sequencesLikeAbcAreEasyToGuess:
+            writeInt(&buf, Int32(9))
+        
+        
+        case .recentYearsAreEasyToGuess:
+            writeInt(&buf, Int32(10))
+        
+        
+        case .aWordByItselfIsEasyToGuess:
+            writeInt(&buf, Int32(11))
+        
+        
+        case .datesAreOftenEasyToGuess:
+            writeInt(&buf, Int32(12))
+        
+        
+        case .namesAndSurnamesByThemselvesAreEasyToGuess:
+            writeInt(&buf, Int32(13))
+        
+        
+        case .commonNamesAndSurnamesAreEasyToGuess:
+            writeInt(&buf, Int32(14))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthWarning_lift(_ buf: RustBuffer) throws -> PasswordStrengthWarning {
+    return try FfiConverterTypePasswordStrengthWarning.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePasswordStrengthWarning_lower(_ value: PasswordStrengthWarning) -> RustBuffer {
+    return FfiConverterTypePasswordStrengthWarning.lower(value)
+}
+
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
@@ -49552,6 +50378,30 @@ fileprivate struct FfiConverterOptionTypePassPhrase: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypePasswordStrengthFeedback: FfiConverterRustBuffer {
+    typealias SwiftType = PasswordStrengthFeedback?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypePasswordStrengthFeedback.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypePasswordStrengthFeedback.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypePowerLevelChanges: FfiConverterRustBuffer {
     typealias SwiftType = PowerLevelChanges?
 
@@ -50168,6 +51018,30 @@ fileprivate struct FfiConverterOptionTypeOAuthPrompt: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeOAuthPrompt.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypePasswordStrengthWarning: FfiConverterRustBuffer {
+    typealias SwiftType = PasswordStrengthWarning?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypePasswordStrengthWarning.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypePasswordStrengthWarning.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -51646,6 +52520,31 @@ fileprivate struct FfiConverterSequenceTypeOAuthPrompt: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeOAuthPrompt.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypePasswordStrengthSuggestion: FfiConverterRustBuffer {
+    typealias SwiftType = [PasswordStrengthSuggestion]
+
+    public static func write(_ value: [PasswordStrengthSuggestion], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypePasswordStrengthSuggestion.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [PasswordStrengthSuggestion] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [PasswordStrengthSuggestion]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypePasswordStrengthSuggestion.read(from: &buf))
         }
         return seq
     }
@@ -53416,6 +54315,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_notificationsettings_unmute_room() != 54475) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_passwordstrengthestimator_estimate() != 1202) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_span_enter() != 10876) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -54263,6 +55165,15 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_secretsbundlewithuserid_from_str() != 28891) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_passwordstrengthestimator_new() != 40017) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_passwordstrengthestimator_with_modern_defaults2025() != 49633) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_passwordstrengthestimator_with_zxcvbn_defaults() != 43669) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_span_current() != 3197) {
