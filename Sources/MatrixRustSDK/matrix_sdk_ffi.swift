@@ -8437,6 +8437,11 @@ public protocol PasswordStrengthEstimatorProtocol: AnyObject, Sendable {
      */
     func estimate(password: String, userInputs: [String])  -> PasswordStrengthEstimate
     
+    /**
+     * Returns the thresholds this estimator was configured with.
+     */
+    func thresholds()  -> PasswordStrengthThresholds
+    
 }
 /**
  * Estimates password strength using caller-supplied thresholds.
@@ -8543,6 +8548,17 @@ open func estimate(password: String, userInputs: [String]) -> PasswordStrengthEs
             self.uniffiCloneHandle(),
         FfiConverterString.lower(password),
         FfiConverterSequenceString.lower(userInputs),$0
+    )
+})
+}
+    
+    /**
+     * Returns the thresholds this estimator was configured with.
+     */
+open func thresholds() -> PasswordStrengthThresholds  {
+    return try!  FfiConverterTypePasswordStrengthThresholds_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_passwordstrengthestimator_thresholds(
+            self.uniffiCloneHandle(),$0
     )
 })
 }
@@ -22688,7 +22704,7 @@ public func FfiConverterTypePassPhrase_lower(_ value: PassPhrase) -> RustBuffer 
  */
 public struct PasswordStrengthEstimate: Equatable, Hashable {
     /**
-     * Overall strength ranking from VeryWeak to VeryStrong.
+     * Overall strength ranking from `VeryWeak` to `VeryStrong`.
      */
     public var ranking: PasswordStrengthRanking
     /**
@@ -22701,6 +22717,12 @@ public struct PasswordStrengthEstimate: Equatable, Hashable {
      */
     public var score: Double
     /**
+     * A normalized score from 0 to 1.0 derived from `score` and the
+     * estimator's `very_strong` threshold (`score / very_strong`).
+     * Scores above the `VeryStrong` threshold *can* exceed 1.0.
+     */
+    public var normalScore: Double
+    /**
      * Verbal feedback to help choose a better password. Only set when the
      * ranking is Fair or below.
      */
@@ -22710,7 +22732,7 @@ public struct PasswordStrengthEstimate: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * Overall strength ranking from VeryWeak to VeryStrong.
+         * Overall strength ranking from `VeryWeak` to `VeryStrong`.
          */ranking: PasswordStrengthRanking, 
         /**
          * Estimated number of guesses needed to crack the password.
@@ -22720,12 +22742,18 @@ public struct PasswordStrengthEstimate: Equatable, Hashable {
          * (i.e. log base 10).
          */score: Double, 
         /**
+         * A normalized score from 0 to 1.0 derived from `score` and the
+         * estimator's `very_strong` threshold (`score / very_strong`).
+         * Scores above the `VeryStrong` threshold *can* exceed 1.0.
+         */normalScore: Double, 
+        /**
          * Verbal feedback to help choose a better password. Only set when the
          * ranking is Fair or below.
          */feedback: PasswordStrengthFeedback?) {
         self.ranking = ranking
         self.guesses = guesses
         self.score = score
+        self.normalScore = normalScore
         self.feedback = feedback
     }
 
@@ -22748,6 +22776,7 @@ public struct FfiConverterTypePasswordStrengthEstimate: FfiConverterRustBuffer {
                 ranking: FfiConverterTypePasswordStrengthRanking.read(from: &buf), 
                 guesses: FfiConverterUInt64.read(from: &buf), 
                 score: FfiConverterDouble.read(from: &buf), 
+                normalScore: FfiConverterDouble.read(from: &buf), 
                 feedback: FfiConverterOptionTypePasswordStrengthFeedback.read(from: &buf)
         )
     }
@@ -22756,6 +22785,7 @@ public struct FfiConverterTypePasswordStrengthEstimate: FfiConverterRustBuffer {
         FfiConverterTypePasswordStrengthRanking.write(value.ranking, into: &buf)
         FfiConverterUInt64.write(value.guesses, into: &buf)
         FfiConverterDouble.write(value.score, into: &buf)
+        FfiConverterDouble.write(value.normalScore, into: &buf)
         FfiConverterOptionTypePasswordStrengthFeedback.write(value.feedback, into: &buf)
     }
 }
@@ -22847,23 +22877,26 @@ public func FfiConverterTypePasswordStrengthFeedback_lower(_ value: PasswordStre
 
 /**
  * Minimum `score` (log₁₀ of estimated guesses) required to achieve each
- * ranking level. Any score below `weak` is ranked `VeryWeak`.
+ * ranking level. In [`PasswordStrengthEstimator`], any score below `weak` is
+ * ranked [`PasswordStrengthRanking::VeryWeak`]. Each value is assumed to be
+ * greater than the previous — if a lesser threshold carries a greater value
+ * than a higher threshold, ranking calculations will break.
  */
 public struct PasswordStrengthThresholds: Equatable, Hashable {
     /**
-     * Minimum score to achieve `Weak`.
+     * Minimum score to achieve [`PasswordStrengthRanking::Weak`].
      */
     public var weak: Double
     /**
-     * Minimum score to achieve `Fair`.
+     * Minimum score to achieve [`PasswordStrengthRanking::Fair`].
      */
     public var fair: Double
     /**
-     * Minimum score to achieve `Strong`.
+     * Minimum score to achieve [`PasswordStrengthRanking::Strong`].
      */
     public var strong: Double
     /**
-     * Minimum score to achieve `VeryStrong`.
+     * Minimum score to achieve [`PasswordStrengthRanking::VeryStrong`].
      */
     public var veryStrong: Double
 
@@ -22871,16 +22904,16 @@ public struct PasswordStrengthThresholds: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * Minimum score to achieve `Weak`.
+         * Minimum score to achieve [`PasswordStrengthRanking::Weak`].
          */weak: Double, 
         /**
-         * Minimum score to achieve `Fair`.
+         * Minimum score to achieve [`PasswordStrengthRanking::Fair`].
          */fair: Double, 
         /**
-         * Minimum score to achieve `Strong`.
+         * Minimum score to achieve [`PasswordStrengthRanking::Strong`].
          */strong: Double, 
         /**
-         * Minimum score to achieve `VeryStrong`.
+         * Minimum score to achieve [`PasswordStrengthRanking::VeryStrong`].
          */veryStrong: Double) {
         self.weak = weak
         self.fair = fair
@@ -54316,6 +54349,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_passwordstrengthestimator_estimate() != 1202) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_passwordstrengthestimator_thresholds() != 26350) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_span_enter() != 10876) {
