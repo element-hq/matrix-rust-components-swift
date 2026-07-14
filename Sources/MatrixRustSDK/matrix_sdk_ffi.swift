@@ -897,6 +897,15 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func clearCaches(syncService: SyncService?) async throws 
     
     /**
+     * Clear the current user's status (MSC4426).
+     *
+     * Deletes both `m.status` and `m.call` concurrently. Clearing `m.status`
+     * alone would let `m.call` immediately reappear if the user were in a
+     * call.
+     */
+    func clearUserStatus() async throws 
+    
+    /**
      * Returns the currently used [`ContentScanner`] instance, if any.
      */
     func contentScanner() async  -> ContentScanner?
@@ -1388,6 +1397,14 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func setPusher(identifiers: PusherIdentifiers, kind: PusherKind, appDisplayName: String, deviceDisplayName: String, profileTag: String?, lang: String, append: Bool) async throws 
     
     /**
+     * Set the current user's status (MSC4426 `m.status` profile field).
+     *
+     * Replaces any existing status. Use [`Self::clear_user_status`] to
+     * remove it.
+     */
+    func setUserStatus(status: UserStatus) async throws 
+    
+    /**
      * Sets the [`UnableToDecryptDelegate`] which will inform about UTDs.
      * Returns an error if the delegate was already set.
      */
@@ -1815,6 +1832,30 @@ open func clearCaches(syncService: SyncService?)async throws   {
                 uniffi_matrix_sdk_ffi_fn_method_client_clear_caches(
                     self.uniffiCloneHandle(),
                     FfiConverterOptionTypeSyncService.lower(syncService)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Clear the current user's status (MSC4426).
+     *
+     * Deletes both `m.status` and `m.call` concurrently. Clearing `m.status`
+     * alone would let `m.call` immediately reappear if the user were in a
+     * call.
+     */
+open func clearUserStatus()async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_clear_user_status(
+                    self.uniffiCloneHandle()
+                    
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -3344,6 +3385,29 @@ open func setPusher(identifiers: PusherIdentifiers, kind: PusherKind, appDisplay
                 uniffi_matrix_sdk_ffi_fn_method_client_set_pusher(
                     self.uniffiCloneHandle(),
                     FfiConverterTypePusherIdentifiers_lower(identifiers),FfiConverterTypePusherKind_lower(kind),FfiConverterString.lower(appDisplayName),FfiConverterString.lower(deviceDisplayName),FfiConverterOptionString.lower(profileTag),FfiConverterString.lower(lang),FfiConverterBool.lower(append)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Set the current user's status (MSC4426 `m.status` profile field).
+     *
+     * Replaces any existing status. Use [`Self::clear_user_status`] to
+     * remove it.
+     */
+open func setUserStatus(status: UserStatus)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_set_user_status(
+                    self.uniffiCloneHandle(),
+                    FfiConverterTypeUserStatus_lower(status)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -16180,6 +16244,14 @@ public protocol SyncServiceBuilderProtocol: AnyObject, Sendable {
     func withOfflineMode()  -> SyncServiceBuilder
     
     /**
+     * Enable the Profiles sliding sync extension for the room list service.
+     *
+     * Required to merge the global `m.status` and `m.call` fields into the
+     * room members and profiles read from the SDK.
+     */
+    func withProfilesExtension()  -> SyncServiceBuilder
+    
+    /**
      * Set a custom Sliding Sync connection ID for the room list service.
      *
      * By default [`matrix_sdk_ui::room_list_service::DEFAULT_CONNECTION_ID`]
@@ -16276,6 +16348,20 @@ open func finish()async throws  -> SyncService  {
 open func withOfflineMode() -> SyncServiceBuilder  {
     return try!  FfiConverterTypeSyncServiceBuilder_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_offline_mode(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * Enable the Profiles sliding sync extension for the room list service.
+     *
+     * Required to merge the global `m.status` and `m.call` fields into the
+     * room members and profiles read from the SDK.
+     */
+open func withProfilesExtension() -> SyncServiceBuilder  {
+    return try!  FfiConverterTypeSyncServiceBuilder_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_syncservicebuilder_with_profiles_extension(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -24403,6 +24489,8 @@ public struct RoomMember: Equatable, Hashable {
     public var userId: String
     public var displayName: String?
     public var avatarUrl: String?
+    public var status: UserStatus?
+    public var call: UserCall?
     public var membership: MembershipState
     public var isNameAmbiguous: Bool
     public var powerLevel: PowerLevel
@@ -24413,10 +24501,12 @@ public struct RoomMember: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(userId: String, displayName: String?, avatarUrl: String?, membership: MembershipState, isNameAmbiguous: Bool, powerLevel: PowerLevel, isIgnored: Bool, suggestedRoleForPowerLevel: RoomMemberRole, membershipChangeReason: String?, isServiceMember: Bool) {
+    public init(userId: String, displayName: String?, avatarUrl: String?, status: UserStatus?, call: UserCall?, membership: MembershipState, isNameAmbiguous: Bool, powerLevel: PowerLevel, isIgnored: Bool, suggestedRoleForPowerLevel: RoomMemberRole, membershipChangeReason: String?, isServiceMember: Bool) {
         self.userId = userId
         self.displayName = displayName
         self.avatarUrl = avatarUrl
+        self.status = status
+        self.call = call
         self.membership = membership
         self.isNameAmbiguous = isNameAmbiguous
         self.powerLevel = powerLevel
@@ -24445,6 +24535,8 @@ public struct FfiConverterTypeRoomMember: FfiConverterRustBuffer {
                 userId: FfiConverterString.read(from: &buf), 
                 displayName: FfiConverterOptionString.read(from: &buf), 
                 avatarUrl: FfiConverterOptionString.read(from: &buf), 
+                status: FfiConverterOptionTypeUserStatus.read(from: &buf), 
+                call: FfiConverterOptionTypeUserCall.read(from: &buf), 
                 membership: FfiConverterTypeMembershipState.read(from: &buf), 
                 isNameAmbiguous: FfiConverterBool.read(from: &buf), 
                 powerLevel: FfiConverterTypePowerLevel.read(from: &buf), 
@@ -24459,6 +24551,8 @@ public struct FfiConverterTypeRoomMember: FfiConverterRustBuffer {
         FfiConverterString.write(value.userId, into: &buf)
         FfiConverterOptionString.write(value.displayName, into: &buf)
         FfiConverterOptionString.write(value.avatarUrl, into: &buf)
+        FfiConverterOptionTypeUserStatus.write(value.status, into: &buf)
+        FfiConverterOptionTypeUserCall.write(value.call, into: &buf)
         FfiConverterTypeMembershipState.write(value.membership, into: &buf)
         FfiConverterBool.write(value.isNameAmbiguous, into: &buf)
         FfiConverterTypePowerLevel.write(value.powerLevel, into: &buf)
@@ -27542,6 +27636,62 @@ public func FfiConverterTypeUploadParameters_lower(_ value: UploadParameters) ->
 
 
 /**
+ * The user's call indicator (MSC4426 `m.call` profile field value).
+ *
+ * Presence of a `UserCall` value means the user is in a call. The optional
+ * `call_joined_ts` is the Unix-epoch seconds when they joined, if known.
+ */
+public struct UserCall: Equatable, Hashable {
+    public var callJoinedTs: UInt64?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(callJoinedTs: UInt64?) {
+        self.callJoinedTs = callJoinedTs
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension UserCall: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUserCall: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UserCall {
+        return
+            try UserCall(
+                callJoinedTs: FfiConverterOptionUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: UserCall, into buf: inout [UInt8]) {
+        FfiConverterOptionUInt64.write(value.callJoinedTs, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUserCall_lift(_ buf: RustBuffer) throws -> UserCall {
+    return try FfiConverterTypeUserCall.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUserCall_lower(_ value: UserCall) -> RustBuffer {
+    return FfiConverterTypeUserCall.lower(value)
+}
+
+
+/**
  * An update for a particular user's power level within the room.
  */
 public struct UserPowerLevelUpdate: Equatable, Hashable {
@@ -27614,13 +27764,35 @@ public struct UserProfile: Equatable, Hashable {
     public var userId: String
     public var displayName: String?
     public var avatarUrl: String?
+    /**
+     * The user's status (MSC4426 `m.status` profile field), if set.
+     */
+    public var status: UserStatus?
+    /**
+     * Set when the user is in a call (MSC4426 `m.call` profile field).
+     *
+     * `None` means the user is not in a call. `Some(UserCall { call_joined_ts:
+     * None })` means the user is in a call but the join time wasn't recorded.
+     */
+    public var call: UserCall?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(userId: String, displayName: String?, avatarUrl: String?) {
+    public init(userId: String, displayName: String?, avatarUrl: String?, 
+        /**
+         * The user's status (MSC4426 `m.status` profile field), if set.
+         */status: UserStatus?, 
+        /**
+         * Set when the user is in a call (MSC4426 `m.call` profile field).
+         *
+         * `None` means the user is not in a call. `Some(UserCall { call_joined_ts:
+         * None })` means the user is in a call but the join time wasn't recorded.
+         */call: UserCall?) {
         self.userId = userId
         self.displayName = displayName
         self.avatarUrl = avatarUrl
+        self.status = status
+        self.call = call
     }
 
     
@@ -27641,7 +27813,9 @@ public struct FfiConverterTypeUserProfile: FfiConverterRustBuffer {
             try UserProfile(
                 userId: FfiConverterString.read(from: &buf), 
                 displayName: FfiConverterOptionString.read(from: &buf), 
-                avatarUrl: FfiConverterOptionString.read(from: &buf)
+                avatarUrl: FfiConverterOptionString.read(from: &buf), 
+                status: FfiConverterOptionTypeUserStatus.read(from: &buf), 
+                call: FfiConverterOptionTypeUserCall.read(from: &buf)
         )
     }
 
@@ -27649,6 +27823,8 @@ public struct FfiConverterTypeUserProfile: FfiConverterRustBuffer {
         FfiConverterString.write(value.userId, into: &buf)
         FfiConverterOptionString.write(value.displayName, into: &buf)
         FfiConverterOptionString.write(value.avatarUrl, into: &buf)
+        FfiConverterOptionTypeUserStatus.write(value.status, into: &buf)
+        FfiConverterOptionTypeUserCall.write(value.call, into: &buf)
     }
 }
 
@@ -27665,6 +27841,63 @@ public func FfiConverterTypeUserProfile_lift(_ buf: RustBuffer) throws -> UserPr
 #endif
 public func FfiConverterTypeUserProfile_lower(_ value: UserProfile) -> RustBuffer {
     return FfiConverterTypeUserProfile.lower(value)
+}
+
+
+/**
+ * A user-set status (MSC4426 `m.status` profile field value).
+ */
+public struct UserStatus: Equatable, Hashable {
+    public var emoji: String
+    public var text: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(emoji: String, text: String) {
+        self.emoji = emoji
+        self.text = text
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension UserStatus: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUserStatus: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UserStatus {
+        return
+            try UserStatus(
+                emoji: FfiConverterString.read(from: &buf), 
+                text: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: UserStatus, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.emoji, into: &buf)
+        FfiConverterString.write(value.text, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUserStatus_lift(_ buf: RustBuffer) throws -> UserStatus {
+    return try FfiConverterTypeUserStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUserStatus_lower(_ value: UserStatus) -> RustBuffer {
+    return FfiConverterTypeUserStatus.lower(value)
 }
 
 
@@ -34573,6 +34806,7 @@ public enum MessageLikeEventContent {
     case roomRedaction(redactedEventId: String?, reason: String?
     )
     case sticker
+    case beacon
 
 
 
@@ -34634,6 +34868,8 @@ public struct FfiConverterTypeMessageLikeEventContent: FfiConverterRustBuffer {
         )
         
         case 18: return .sticker
+        
+        case 19: return .beacon
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -34722,6 +34958,10 @@ public struct FfiConverterTypeMessageLikeEventContent: FfiConverterRustBuffer {
         
         case .sticker:
             writeInt(&buf, Int32(18))
+        
+        
+        case .beacon:
+            writeInt(&buf, Int32(19))
         
         }
     }
@@ -36647,7 +36887,7 @@ public enum ProfileDetails: Equatable, Hashable {
     
     case unavailable
     case pending
-    case ready(displayName: String?, displayNameAmbiguous: Bool, avatarUrl: String?
+    case ready(displayName: String?, displayNameAmbiguous: Bool, avatarUrl: String?, status: UserStatus?, call: UserCall?
     )
     case error(message: String
     )
@@ -36676,7 +36916,7 @@ public struct FfiConverterTypeProfileDetails: FfiConverterRustBuffer {
         
         case 2: return .pending
         
-        case 3: return .ready(displayName: try FfiConverterOptionString.read(from: &buf), displayNameAmbiguous: try FfiConverterBool.read(from: &buf), avatarUrl: try FfiConverterOptionString.read(from: &buf)
+        case 3: return .ready(displayName: try FfiConverterOptionString.read(from: &buf), displayNameAmbiguous: try FfiConverterBool.read(from: &buf), avatarUrl: try FfiConverterOptionString.read(from: &buf), status: try FfiConverterOptionTypeUserStatus.read(from: &buf), call: try FfiConverterOptionTypeUserCall.read(from: &buf)
         )
         
         case 4: return .error(message: try FfiConverterString.read(from: &buf)
@@ -36698,11 +36938,13 @@ public struct FfiConverterTypeProfileDetails: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         
         
-        case let .ready(displayName,displayNameAmbiguous,avatarUrl):
+        case let .ready(displayName,displayNameAmbiguous,avatarUrl,status,call):
             writeInt(&buf, Int32(3))
             FfiConverterOptionString.write(displayName, into: &buf)
             FfiConverterBool.write(displayNameAmbiguous, into: &buf)
             FfiConverterOptionString.write(avatarUrl, into: &buf)
+            FfiConverterOptionTypeUserStatus.write(status, into: &buf)
+            FfiConverterOptionTypeUserCall.write(call, into: &buf)
             
         
         case let .error(message):
@@ -41174,6 +41416,7 @@ public enum StateEventContent: Equatable, Hashable {
     )
     case spaceChild
     case spaceParent
+    case beaconInfo
 
 
 
@@ -41236,6 +41479,8 @@ public struct FfiConverterTypeStateEventContent: FfiConverterRustBuffer {
         case 19: return .spaceChild
         
         case 20: return .spaceParent
+        
+        case 21: return .beaconInfo
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -41326,6 +41571,10 @@ public struct FfiConverterTypeStateEventContent: FfiConverterRustBuffer {
         
         case .spaceParent:
             writeInt(&buf, Int32(20))
+        
+        
+        case .beaconInfo:
+            writeInt(&buf, Int32(21))
         
         }
     }
@@ -42279,7 +42528,7 @@ public enum TimelineItemContent {
     case msgLike(content: MsgLikeContent
     )
     case callInvite
-    case rtcNotification(callIntent: String?, declinedBy: [String]
+    case rtcNotification(callIntent: String?, declinedBy: [String], activeMembers: [String], callStartTsMillis: UInt64?, isJoined: Bool
     )
     case roomMembership(userId: String, userDisplayName: String?, change: MembershipChange?, reason: String?
     )
@@ -42317,7 +42566,7 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
         
         case 2: return .callInvite
         
-        case 3: return .rtcNotification(callIntent: try FfiConverterOptionString.read(from: &buf), declinedBy: try FfiConverterSequenceString.read(from: &buf)
+        case 3: return .rtcNotification(callIntent: try FfiConverterOptionString.read(from: &buf), declinedBy: try FfiConverterSequenceString.read(from: &buf), activeMembers: try FfiConverterSequenceString.read(from: &buf), callStartTsMillis: try FfiConverterOptionUInt64.read(from: &buf), isJoined: try FfiConverterBool.read(from: &buf)
         )
         
         case 4: return .roomMembership(userId: try FfiConverterString.read(from: &buf), userDisplayName: try FfiConverterOptionString.read(from: &buf), change: try FfiConverterOptionTypeMembershipChange.read(from: &buf), reason: try FfiConverterOptionString.read(from: &buf)
@@ -42352,10 +42601,13 @@ public struct FfiConverterTypeTimelineItemContent: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         
         
-        case let .rtcNotification(callIntent,declinedBy):
+        case let .rtcNotification(callIntent,declinedBy,activeMembers,callStartTsMillis,isJoined):
             writeInt(&buf, Int32(3))
             FfiConverterOptionString.write(callIntent, into: &buf)
             FfiConverterSequenceString.write(declinedBy, into: &buf)
+            FfiConverterSequenceString.write(activeMembers, into: &buf)
+            FfiConverterOptionUInt64.write(callStartTsMillis, into: &buf)
+            FfiConverterBool.write(isJoined, into: &buf)
             
         
         case let .roomMembership(userId,userDisplayName,change,reason):
@@ -50795,6 +51047,54 @@ fileprivate struct FfiConverterOptionTypeUnstableVoiceContent: FfiConverterRustB
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeUserCall: FfiConverterRustBuffer {
+    typealias SwiftType = UserCall?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeUserCall.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeUserCall.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeUserStatus: FfiConverterRustBuffer {
+    typealias SwiftType = UserStatus?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeUserStatus.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeUserStatus.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeVideoInfo: FfiConverterRustBuffer {
     typealias SwiftType = VideoInfo?
 
@@ -53727,6 +54027,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_clear_caches() != 61351) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_clear_user_status() != 2903) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_content_scanner() != 52585) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -53962,6 +54265,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_pusher() != 42931) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_user_status() != 64952) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_utd_delegate() != 53527) {
@@ -55000,6 +55306,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_offline_mode() != 48885) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_profiles_extension() != 15111) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_syncservicebuilder_with_room_list_connection_id() != 13768) {
