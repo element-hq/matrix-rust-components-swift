@@ -758,6 +758,10 @@ public enum GlobalAccountDataEventType: Equatable, Hashable, CustomStringConvert
      */
     case ignoredUserList
     /**
+     * m.image_pack.rooms
+     */
+    case imagePackRooms
+    /**
      * m.push_rules
      */
     case pushRules
@@ -778,22 +782,6 @@ public enum GlobalAccountDataEventType: Equatable, Hashable, CustomStringConvert
      * io.element.msc4278.media_preview_config
      */
     case unstableMediaPreviewConfig
-    /**
-     * m.image_pack
-     *
-     * This variant uses the unstable type `im.ponies.user_emotes`.
-     *
-     * This variant can also be deserialized from the `m.image_pack` type.
-     */
-    case accountImagePack
-    /**
-     * m.image_pack.rooms
-     *
-     * This variant uses the unstable type `im.ponies.emote_rooms`.
-     *
-     * This variant can also be deserialized from the `m.image_pack.rooms` type.
-     */
-    case imagePackRooms
     /**
      * m.recent_emoji
      */
@@ -869,26 +857,24 @@ public struct FfiConverterTypeGlobalAccountDataEventType: FfiConverterRustBuffer
         
         case 4: return .ignoredUserList
         
-        case 5: return .pushRules
+        case 5: return .imagePackRooms
         
-        case 6: return .secretStorageDefaultKey
+        case 6: return .pushRules
         
-        case 7: return .secretStorageKey(try FfiConverterString.read(from: &buf)
+        case 7: return .secretStorageDefaultKey
+        
+        case 8: return .secretStorageKey(try FfiConverterString.read(from: &buf)
         )
         
-        case 8: return .mediaPreviewConfig
+        case 9: return .mediaPreviewConfig
         
-        case 9: return .unstableMediaPreviewConfig
+        case 10: return .unstableMediaPreviewConfig
         
-        case 10: return .accountImagePack
+        case 11: return .recentEmoji
         
-        case 11: return .imagePackRooms
+        case 12: return .keyBackup
         
-        case 12: return .recentEmoji
-        
-        case 13: return .keyBackup
-        
-        case 14: return .custom(try FfiConverterTypePrivOwnedStr.read(from: &buf)
+        case 13: return .custom(try FfiConverterTypePrivOwnedStr.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -915,45 +901,41 @@ public struct FfiConverterTypeGlobalAccountDataEventType: FfiConverterRustBuffer
             writeInt(&buf, Int32(4))
         
         
-        case .pushRules:
+        case .imagePackRooms:
             writeInt(&buf, Int32(5))
         
         
-        case .secretStorageDefaultKey:
+        case .pushRules:
             writeInt(&buf, Int32(6))
         
         
-        case let .secretStorageKey(v1):
+        case .secretStorageDefaultKey:
             writeInt(&buf, Int32(7))
+        
+        
+        case let .secretStorageKey(v1):
+            writeInt(&buf, Int32(8))
             FfiConverterString.write(v1, into: &buf)
             
         
         case .mediaPreviewConfig:
-            writeInt(&buf, Int32(8))
-        
-        
-        case .unstableMediaPreviewConfig:
             writeInt(&buf, Int32(9))
         
         
-        case .accountImagePack:
+        case .unstableMediaPreviewConfig:
             writeInt(&buf, Int32(10))
         
         
-        case .imagePackRooms:
+        case .recentEmoji:
             writeInt(&buf, Int32(11))
         
         
-        case .recentEmoji:
+        case .keyBackup:
             writeInt(&buf, Int32(12))
         
         
-        case .keyBackup:
-            writeInt(&buf, Int32(13))
-        
-        
         case let .custom(v1):
-            writeInt(&buf, Int32(14))
+            writeInt(&buf, Int32(13))
             FfiConverterTypePrivOwnedStr.write(v1, into: &buf)
             
         }
@@ -1751,6 +1733,10 @@ public enum StateEventType: Equatable, Hashable, CustomStringConvertible {
      */
     case roomHistoryVisibility
     /**
+     * m.room.image_pack
+     */
+    case roomImagePack
+    /**
      * m.room.join_rules
      */
     case roomJoinRules
@@ -1806,14 +1792,6 @@ public enum StateEventType: Equatable, Hashable, CustomStringConvertible {
      * m.space.parent
      */
     case spaceParent
-    /**
-     * m.image_pack
-     *
-     * This variant uses the unstable type `im.ponies.room_emotes`.
-     *
-     * This variant can also be deserialized from the `m.image_pack` type.
-     */
-    case roomImagePack
     /**
      * m.beacon_info
      *
@@ -1915,33 +1893,33 @@ public struct FfiConverterTypeStateEventType: FfiConverterRustBuffer {
         
         case 9: return .roomHistoryVisibility
         
-        case 10: return .roomJoinRules
+        case 10: return .roomImagePack
         
-        case 11: return .roomLanguage
+        case 11: return .roomJoinRules
         
-        case 12: return .roomMember
+        case 12: return .roomLanguage
         
-        case 13: return .roomName
+        case 13: return .roomMember
         
-        case 14: return .roomPinnedEvents
+        case 14: return .roomName
         
-        case 15: return .roomPolicy
+        case 15: return .roomPinnedEvents
         
-        case 16: return .roomPowerLevels
+        case 16: return .roomPolicy
         
-        case 17: return .roomServerAcl
+        case 17: return .roomPowerLevels
         
-        case 18: return .roomThirdPartyInvite
+        case 18: return .roomServerAcl
         
-        case 19: return .roomTombstone
+        case 19: return .roomThirdPartyInvite
         
-        case 20: return .roomTopic
+        case 20: return .roomTombstone
         
-        case 21: return .spaceChild
+        case 21: return .roomTopic
         
-        case 22: return .spaceParent
+        case 22: return .spaceChild
         
-        case 23: return .roomImagePack
+        case 23: return .spaceParent
         
         case 24: return .beaconInfo
         
@@ -1996,59 +1974,59 @@ public struct FfiConverterTypeStateEventType: FfiConverterRustBuffer {
             writeInt(&buf, Int32(9))
         
         
-        case .roomJoinRules:
+        case .roomImagePack:
             writeInt(&buf, Int32(10))
         
         
-        case .roomLanguage:
+        case .roomJoinRules:
             writeInt(&buf, Int32(11))
         
         
-        case .roomMember:
+        case .roomLanguage:
             writeInt(&buf, Int32(12))
         
         
-        case .roomName:
+        case .roomMember:
             writeInt(&buf, Int32(13))
         
         
-        case .roomPinnedEvents:
+        case .roomName:
             writeInt(&buf, Int32(14))
         
         
-        case .roomPolicy:
+        case .roomPinnedEvents:
             writeInt(&buf, Int32(15))
         
         
-        case .roomPowerLevels:
+        case .roomPolicy:
             writeInt(&buf, Int32(16))
         
         
-        case .roomServerAcl:
+        case .roomPowerLevels:
             writeInt(&buf, Int32(17))
         
         
-        case .roomThirdPartyInvite:
+        case .roomServerAcl:
             writeInt(&buf, Int32(18))
         
         
-        case .roomTombstone:
+        case .roomThirdPartyInvite:
             writeInt(&buf, Int32(19))
         
         
-        case .roomTopic:
+        case .roomTombstone:
             writeInt(&buf, Int32(20))
         
         
-        case .spaceChild:
+        case .roomTopic:
             writeInt(&buf, Int32(21))
         
         
-        case .spaceParent:
+        case .spaceChild:
             writeInt(&buf, Int32(22))
         
         
-        case .roomImagePack:
+        case .spaceParent:
             writeInt(&buf, Int32(23))
         
         
@@ -2343,6 +2321,10 @@ public enum TimelineEventType: Equatable, Hashable, CustomStringConvertible {
      */
     case roomHistoryVisibility
     /**
+     * m.room.image_pack
+     */
+    case roomImagePack
+    /**
      * m.room.join_rules
      */
     case roomJoinRules
@@ -2398,14 +2380,6 @@ public enum TimelineEventType: Equatable, Hashable, CustomStringConvertible {
      * m.space.parent
      */
     case spaceParent
-    /**
-     * m.image_pack
-     *
-     * This variant uses the unstable type `im.ponies.room_emotes`.
-     *
-     * This variant can also be deserialized from the `m.image_pack` type.
-     */
-    case roomImagePack
     /**
      * m.beacon_info
      *
@@ -2585,33 +2559,33 @@ public struct FfiConverterTypeTimelineEventType: FfiConverterRustBuffer {
         
         case 48: return .roomHistoryVisibility
         
-        case 49: return .roomJoinRules
+        case 49: return .roomImagePack
         
-        case 50: return .roomLanguage
+        case 50: return .roomJoinRules
         
-        case 51: return .roomMember
+        case 51: return .roomLanguage
         
-        case 52: return .roomName
+        case 52: return .roomMember
         
-        case 53: return .roomPinnedEvents
+        case 53: return .roomName
         
-        case 54: return .roomPolicy
+        case 54: return .roomPinnedEvents
         
-        case 55: return .roomPowerLevels
+        case 55: return .roomPolicy
         
-        case 56: return .roomServerAcl
+        case 56: return .roomPowerLevels
         
-        case 57: return .roomThirdPartyInvite
+        case 57: return .roomServerAcl
         
-        case 58: return .roomTombstone
+        case 58: return .roomThirdPartyInvite
         
-        case 59: return .roomTopic
+        case 59: return .roomTombstone
         
-        case 60: return .spaceChild
+        case 60: return .roomTopic
         
-        case 61: return .spaceParent
+        case 61: return .spaceChild
         
-        case 62: return .roomImagePack
+        case 62: return .spaceParent
         
         case 63: return .beaconInfo
         
@@ -2822,59 +2796,59 @@ public struct FfiConverterTypeTimelineEventType: FfiConverterRustBuffer {
             writeInt(&buf, Int32(48))
         
         
-        case .roomJoinRules:
+        case .roomImagePack:
             writeInt(&buf, Int32(49))
         
         
-        case .roomLanguage:
+        case .roomJoinRules:
             writeInt(&buf, Int32(50))
         
         
-        case .roomMember:
+        case .roomLanguage:
             writeInt(&buf, Int32(51))
         
         
-        case .roomName:
+        case .roomMember:
             writeInt(&buf, Int32(52))
         
         
-        case .roomPinnedEvents:
+        case .roomName:
             writeInt(&buf, Int32(53))
         
         
-        case .roomPolicy:
+        case .roomPinnedEvents:
             writeInt(&buf, Int32(54))
         
         
-        case .roomPowerLevels:
+        case .roomPolicy:
             writeInt(&buf, Int32(55))
         
         
-        case .roomServerAcl:
+        case .roomPowerLevels:
             writeInt(&buf, Int32(56))
         
         
-        case .roomThirdPartyInvite:
+        case .roomServerAcl:
             writeInt(&buf, Int32(57))
         
         
-        case .roomTombstone:
+        case .roomThirdPartyInvite:
             writeInt(&buf, Int32(58))
         
         
-        case .roomTopic:
+        case .roomTombstone:
             writeInt(&buf, Int32(59))
         
         
-        case .spaceChild:
+        case .roomTopic:
             writeInt(&buf, Int32(60))
         
         
-        case .spaceParent:
+        case .spaceChild:
             writeInt(&buf, Int32(61))
         
         
-        case .roomImagePack:
+        case .spaceParent:
             writeInt(&buf, Int32(62))
         
         

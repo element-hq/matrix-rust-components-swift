@@ -1444,6 +1444,17 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func subscribeToOwnBeaconInfoUpdates(listener: BeaconInfoListener) throws  -> TaskHandle
     
     /**
+     * Subscribe to the current user's profile.
+     *
+     * Emits the current value immediately, if present, then again whenever the
+     * user's profile changes during sync.
+     *
+     * **Note:** Without the Profiles sliding sync extension enabled only an
+     * empty profile will be emitted and no updates will be published.
+     */
+    func subscribeToOwnProfile(listener: ProfileListener) throws  -> TaskHandle
+    
+    /**
      * Subscribe to [`RoomInfo`] updates given a provided [`RoomId`].
      *
      * This works even for rooms we haven't received yet, so we can subscribe
@@ -3541,6 +3552,24 @@ open func subscribeToOwnBeaconInfoUpdates(listener: BeaconInfoListener)throws  -
     uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_own_beacon_info_updates(
             self.uniffiCloneHandle(),
         FfiConverterCallbackInterfaceBeaconInfoListener_lower(listener),$0
+    )
+})
+}
+    
+    /**
+     * Subscribe to the current user's profile.
+     *
+     * Emits the current value immediately, if present, then again whenever the
+     * user's profile changes during sync.
+     *
+     * **Note:** Without the Profiles sliding sync extension enabled only an
+     * empty profile will be emitted and no updates will be published.
+     */
+open func subscribeToOwnProfile(listener: ProfileListener)throws  -> TaskHandle  {
+    return try  FfiConverterTypeTaskHandle_lift(try rustCallWithError(FfiConverterTypeClientError_lift) {
+    uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_own_profile(
+            self.uniffiCloneHandle(),
+        FfiConverterCallbackInterfaceProfileListener_lower(listener),$0
     )
 })
 }
@@ -9013,7 +9042,7 @@ public protocol RoomProtocol: AnyObject, Sendable {
     /**
      * Returns the room heroes for this room.
      */
-    func heroes()  -> [RoomHero]
+    func heroes() async  -> [RoomHero]
     
     func id()  -> String
     
@@ -9878,12 +9907,22 @@ open func hasActiveRoomCall() -> Bool  {
     /**
      * Returns the room heroes for this room.
      */
-open func heroes() -> [RoomHero]  {
-    return try!  FfiConverterSequenceTypeRoomHero.lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_room_heroes(
-            self.uniffiCloneHandle(),$0
-    )
-})
+open func heroes()async  -> [RoomHero]  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_heroes(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeRoomHero.lift,
+            errorHandler: nil
+            
+        )
 }
     
 open func id() -> String  {
@@ -24034,6 +24073,14 @@ public struct RoomHero: Equatable, Hashable {
      * The avatar URL of the hero.
      */
     public var avatarUrl: String?
+    /**
+     * The hero's user-set status, taken from their global profile.
+     */
+    public var status: UserStatus?
+    /**
+     * The hero's call indicator, taken from their global profile.
+     */
+    public var call: UserCall?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -24046,10 +24093,18 @@ public struct RoomHero: Equatable, Hashable {
          */displayName: String?, 
         /**
          * The avatar URL of the hero.
-         */avatarUrl: String?) {
+         */avatarUrl: String?, 
+        /**
+         * The hero's user-set status, taken from their global profile.
+         */status: UserStatus?, 
+        /**
+         * The hero's call indicator, taken from their global profile.
+         */call: UserCall?) {
         self.userId = userId
         self.displayName = displayName
         self.avatarUrl = avatarUrl
+        self.status = status
+        self.call = call
     }
 
     
@@ -24070,7 +24125,9 @@ public struct FfiConverterTypeRoomHero: FfiConverterRustBuffer {
             try RoomHero(
                 userId: FfiConverterString.read(from: &buf), 
                 displayName: FfiConverterOptionString.read(from: &buf), 
-                avatarUrl: FfiConverterOptionString.read(from: &buf)
+                avatarUrl: FfiConverterOptionString.read(from: &buf), 
+                status: FfiConverterOptionTypeUserStatus.read(from: &buf), 
+                call: FfiConverterOptionTypeUserCall.read(from: &buf)
         )
     }
 
@@ -24078,6 +24135,8 @@ public struct FfiConverterTypeRoomHero: FfiConverterRustBuffer {
         FfiConverterString.write(value.userId, into: &buf)
         FfiConverterOptionString.write(value.displayName, into: &buf)
         FfiConverterOptionString.write(value.avatarUrl, into: &buf)
+        FfiConverterOptionTypeUserStatus.write(value.status, into: &buf)
+        FfiConverterOptionTypeUserCall.write(value.call, into: &buf)
     }
 }
 
@@ -45727,6 +45786,136 @@ public func FfiConverterCallbackInterfacePaginationStatusListener_lower(_ v: Pag
 
 
 
+/**
+ * A listener for the current user's global profile.
+ */
+public protocol ProfileListener: AnyObject, Sendable {
+    
+    /**
+     * Called whenever the current user's global profile changes.
+     */
+    func onUpdate(profile: UserProfile) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceProfileListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // This creates 1-element array, since this seems to be the only way to construct a const
+    // pointer that we can pass to the Rust code.
+    static let vtable: [UniffiVTableCallbackInterfaceProfileListener] = [UniffiVTableCallbackInterfaceProfileListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceProfileListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface ProfileListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceProfileListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface ProfileListener: handle missing in uniffiClone")
+            }
+        },
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            profile: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceProfileListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     profile: try FfiConverterTypeUserProfile_lift(profile)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )]
+}
+
+private func uniffiCallbackInitProfileListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_profilelistener(UniffiCallbackInterfaceProfileListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceProfileListener {
+    fileprivate static let handleMap = UniffiHandleMap<ProfileListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceProfileListener : FfiConverter {
+    typealias SwiftType = ProfileListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceProfileListener_lift(_ handle: UInt64) throws -> ProfileListener {
+    return try FfiConverterCallbackInterfaceProfileListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceProfileListener_lower(_ v: ProfileListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceProfileListener.lower(v)
+}
+
+
+
+
 public protocol ProgressWatcher: AnyObject, Sendable {
     
     func transmissionProgress(progress: TransmissionProgress) 
@@ -54294,6 +54483,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_own_beacon_info_updates() != 8373) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_own_profile() != 50951) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_room_info() != 3308) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -54768,7 +54960,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_has_active_room_call() != 1287) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_heroes() != 38402) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_heroes() != 39470) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_id() != 34667) {
@@ -55581,6 +55773,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_mediapreviewconfiglistener_on_change() != 45931) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_profilelistener_on_update() != 37474) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_progresswatcher_transmission_progress() != 41998) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -55748,6 +55943,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitMediaPreviewConfigListener()
     uniffiCallbackInitNotificationSettingsDelegate()
     uniffiCallbackInitPaginationStatusListener()
+    uniffiCallbackInitProfileListener()
     uniffiCallbackInitProgressWatcher()
     uniffiCallbackInitQrLoginProgressListener()
     uniffiCallbackInitRecoveryStateListener()
