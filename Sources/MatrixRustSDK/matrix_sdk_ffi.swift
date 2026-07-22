@@ -1114,6 +1114,11 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func isRoomAliasAvailable(alias: String) async throws  -> Bool
     
     /**
+     * Checks if the server supports user status.
+     */
+    func isUserStatusSupported() async throws  -> Bool
+    
+    /**
      * Join a room by its ID.
      *
      * Use this method when the homeserver already knows of the given room ID.
@@ -2570,6 +2575,26 @@ open func isRoomAliasAvailable(alias: String)async throws  -> Bool  {
                 uniffi_matrix_sdk_ffi_fn_method_client_is_room_alias_available(
                     self.uniffiCloneHandle(),
                     FfiConverterString.lower(alias)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Checks if the server supports user status.
+     */
+open func isUserStatusSupported()async throws  -> Bool  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_is_user_status_supported(
+                    self.uniffiCloneHandle()
+                    
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
@@ -54331,6 +54356,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_is_room_alias_available() != 53090) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_user_status_supported() != 6029) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_join_room_by_id() != 28397) {
