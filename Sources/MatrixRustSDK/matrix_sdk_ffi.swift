@@ -1095,8 +1095,13 @@ public protocol ClientProtocol: AnyObject, Sendable {
     
     /**
      * Checks if the server supports the LiveKit RTC focus for placing calls.
+     *
+     * Transports are discovered through the authenticated
+     * `GET /_matrix/client/v1/rtc/transports` endpoint (MSC4143). If the
+     * homeserver doesn't implement it and `fallback_to_well_known` is `true`,
+     * then the well-known will be queried.
      */
-    func isLivekitRtcSupported() async throws  -> Bool
+    func isLivekitRtcSupported(fallbackToWellKnown: Bool) async throws  -> Bool
     
     /**
      * Checks if the server supports login using a QR code.
@@ -2519,14 +2524,19 @@ open func ignoredUsers()async throws  -> [String]  {
     
     /**
      * Checks if the server supports the LiveKit RTC focus for placing calls.
+     *
+     * Transports are discovered through the authenticated
+     * `GET /_matrix/client/v1/rtc/transports` endpoint (MSC4143). If the
+     * homeserver doesn't implement it and `fallback_to_well_known` is `true`,
+     * then the well-known will be queried.
      */
-open func isLivekitRtcSupported()async throws  -> Bool  {
+open func isLivekitRtcSupported(fallbackToWellKnown: Bool = false)async throws  -> Bool  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_is_livekit_rtc_supported(
-                    self.uniffiCloneHandle()
-                    
+                    self.uniffiCloneHandle(),
+                    FfiConverterBool.lower(fallbackToWellKnown)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
@@ -28895,6 +28905,11 @@ public struct WidgetCapabilities: Equatable, Hashable {
      * This allows the widget to download files (avatars)
      */
     public var downloadFiles: Bool
+    /**
+     * This allows the widget to discover the RTC transports advertised by the
+     * homeserver (MSC4515).
+     */
+    public var rtcTransports: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -28920,13 +28935,18 @@ public struct WidgetCapabilities: Equatable, Hashable {
          */sendDelayedEvent: Bool, 
         /**
          * This allows the widget to download files (avatars)
-         */downloadFiles: Bool) {
+         */downloadFiles: Bool, 
+        /**
+         * This allows the widget to discover the RTC transports advertised by the
+         * homeserver (MSC4515).
+         */rtcTransports: Bool) {
         self.read = read
         self.send = send
         self.requiresClient = requiresClient
         self.updateDelayedEvent = updateDelayedEvent
         self.sendDelayedEvent = sendDelayedEvent
         self.downloadFiles = downloadFiles
+        self.rtcTransports = rtcTransports
     }
 
     
@@ -28950,7 +28970,8 @@ public struct FfiConverterTypeWidgetCapabilities: FfiConverterRustBuffer {
                 requiresClient: FfiConverterBool.read(from: &buf), 
                 updateDelayedEvent: FfiConverterBool.read(from: &buf), 
                 sendDelayedEvent: FfiConverterBool.read(from: &buf), 
-                downloadFiles: FfiConverterBool.read(from: &buf)
+                downloadFiles: FfiConverterBool.read(from: &buf), 
+                rtcTransports: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -28961,6 +28982,7 @@ public struct FfiConverterTypeWidgetCapabilities: FfiConverterRustBuffer {
         FfiConverterBool.write(value.updateDelayedEvent, into: &buf)
         FfiConverterBool.write(value.sendDelayedEvent, into: &buf)
         FfiConverterBool.write(value.downloadFiles, into: &buf)
+        FfiConverterBool.write(value.rtcTransports, into: &buf)
     }
 }
 
@@ -55589,7 +55611,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_ignored_users() != 57288) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_livekit_rtc_supported() != 48327) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_livekit_rtc_supported() != 41745) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_is_login_with_qr_code_supported() != 14689) {
