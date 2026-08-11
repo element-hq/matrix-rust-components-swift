@@ -17722,6 +17722,16 @@ public protocol TimelineProtocol: AnyObject, Sendable {
     func toggleReaction(itemId: EventOrTransactionId, key: String) async throws  -> Bool
     
     /**
+     * Like [`Self::toggle_reaction`], but merges the given additional
+     * top-level fields (a JSON object, encoded as a string) into the
+     * reaction's content when one is added.
+     *
+     * Removing a reaction is a redaction, which carries no content, so the
+     * extra fields are only used when adding one.
+     */
+    func toggleReactionWithExtraContent(itemId: EventOrTransactionId, key: String, extraContentJson: String?) async throws  -> Bool
+    
+    /**
      * Adds a new pinned event by sending an updated `m.room.pinned_events`
      * event without the event id we want to remove.
      *
@@ -18330,6 +18340,31 @@ open func toggleReaction(itemId: EventOrTransactionId, key: String)async throws 
                 uniffi_matrix_sdk_ffi_fn_method_timeline_toggle_reaction(
                     self.uniffiCloneHandle(),
                     FfiConverterTypeEventOrTransactionId_lower(itemId),FfiConverterString.lower(key)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Like [`Self::toggle_reaction`], but merges the given additional
+     * top-level fields (a JSON object, encoded as a string) into the
+     * reaction's content when one is added.
+     *
+     * Removing a reaction is a redaction, which carries no content, so the
+     * extra fields are only used when adding one.
+     */
+open func toggleReactionWithExtraContent(itemId: EventOrTransactionId, key: String, extraContentJson: String?)async throws  -> Bool  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_toggle_reaction_with_extra_content(
+                    self.uniffiCloneHandle(),
+                    FfiConverterTypeEventOrTransactionId_lower(itemId),FfiConverterString.lower(key),FfiConverterOptionString.lower(extraContentJson)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
@@ -56959,6 +56994,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_toggle_reaction() != 42673) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_toggle_reaction_with_extra_content() != 37370) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_unpin_event() != 18514) {
