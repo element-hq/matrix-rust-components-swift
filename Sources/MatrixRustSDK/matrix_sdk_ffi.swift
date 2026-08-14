@@ -940,6 +940,18 @@ public protocol ClientProtocol: AnyObject, Sendable {
     
     func deviceId() throws  -> String
     
+    /**
+     * Change whether this client is allowed to look up the homeserver's
+     * `/.well-known/matrix/client` file.
+     *
+     * Some deployments must not emit any request to the well-known URI of
+     * their domain. When disabled, [`Client::tile_server`] returns `None`,
+     * [`Client::well_known_rtc_transports`] returns an empty list, and
+     * [`Client::discover_rtc_transports`] doesn't fall back to the well-known
+     * `m.rtc_foci`, relying only on the MSC4143 discovery endpoint.
+     */
+    func disableWellKnownLookup(disable: Bool) 
+    
     func displayName() async throws  -> String
     
     /**
@@ -1098,15 +1110,22 @@ public protocol ClientProtocol: AnyObject, Sendable {
      *
      * Transports are discovered through the authenticated
      * `GET /_matrix/client/v1/rtc/transports` endpoint (MSC4143). If the
-     * homeserver doesn't implement it and `fallback_to_well_known` is `true`,
-     * then the well-known will be queried.
+     * homeserver doesn't implement it, the well-known `m.rtc_foci` are used as
+     * a fallback, unless well-known discovery was disabled with
+     * [`ClientBuilder::disable_well_known_lookup`] or
+     * [`Client::disable_well_known_lookup`].
      */
-    func isLivekitRtcSupported(fallbackToWellKnown: Bool) async throws  -> Bool
+    func isLivekitRtcSupported() async throws  -> Bool
     
     /**
      * Checks if the server supports login using a QR code.
      */
     func isLoginWithQrCodeSupported() async throws  -> Bool
+    
+    /**
+     * Checks if the server supports the Profiles sliding sync extension.
+     */
+    func isProfilesSlidingSyncExtensionSupported() async throws  -> Bool
     
     /**
      * Checks if the server supports the report room API.
@@ -2010,6 +2029,24 @@ open func deviceId()throws  -> String  {
 })
 }
     
+    /**
+     * Change whether this client is allowed to look up the homeserver's
+     * `/.well-known/matrix/client` file.
+     *
+     * Some deployments must not emit any request to the well-known URI of
+     * their domain. When disabled, [`Client::tile_server`] returns `None`,
+     * [`Client::well_known_rtc_transports`] returns an empty list, and
+     * [`Client::discover_rtc_transports`] doesn't fall back to the well-known
+     * `m.rtc_foci`, relying only on the MSC4143 discovery endpoint.
+     */
+open func disableWellKnownLookup(disable: Bool)  {try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_disable_well_known_lookup(
+            self.uniffiCloneHandle(),
+        FfiConverterBool.lower(disable),$0
+    )
+}
+}
+    
 open func displayName()async throws  -> String  {
     return
         try  await uniffiRustCallAsync(
@@ -2527,16 +2564,18 @@ open func ignoredUsers()async throws  -> [String]  {
      *
      * Transports are discovered through the authenticated
      * `GET /_matrix/client/v1/rtc/transports` endpoint (MSC4143). If the
-     * homeserver doesn't implement it and `fallback_to_well_known` is `true`,
-     * then the well-known will be queried.
+     * homeserver doesn't implement it, the well-known `m.rtc_foci` are used as
+     * a fallback, unless well-known discovery was disabled with
+     * [`ClientBuilder::disable_well_known_lookup`] or
+     * [`Client::disable_well_known_lookup`].
      */
-open func isLivekitRtcSupported(fallbackToWellKnown: Bool = false)async throws  -> Bool  {
+open func isLivekitRtcSupported()async throws  -> Bool  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_is_livekit_rtc_supported(
-                    self.uniffiCloneHandle(),
-                    FfiConverterBool.lower(fallbackToWellKnown)
+                    self.uniffiCloneHandle()
+                    
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
@@ -2555,6 +2594,26 @@ open func isLoginWithQrCodeSupported()async throws  -> Bool  {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_is_login_with_qr_code_supported(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Checks if the server supports the Profiles sliding sync extension.
+     */
+open func isProfilesSlidingSyncExtensionSupported()async throws  -> Bool  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_is_profiles_sliding_sync_extension_supported(
                     self.uniffiCloneHandle()
                     
                 )
@@ -4059,6 +4118,27 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
     
     func disableSslVerification()  -> ClientBuilder
     
+    /**
+     * Disable all the `.well-known/matrix/client` lookups, both the one
+     * performed by `ClientBuilder::build` to discover the homeserver, and all
+     * the ones performed later by the built client.
+     *
+     * Some deployments must not emit any request to the well-known URI of
+     * their domain. When disabled, `Client::tile_server` returns `None` and
+     * RTC transport discovery doesn't fall back to the well-known
+     * `m.rtc_foci`, meaning `Client::is_livekit_rtc_supported` only relies on
+     * the MSC4143 discovery endpoint.
+     *
+     * The homeserver must then be resolvable without a well-known lookup, so
+     * `ClientBuilder::homeserver_url` must be used.
+     * `ClientBuilder::server_name` and `ClientBuilder::username` can only
+     * be resolved through the well-known, and `ClientBuilder::build` fails
+     * with `ClientBuildError::WellKnownLookupDisabled` in that case.
+     * `ClientBuilder::server_name_or_homeserver_url` skips the well-known step
+     * and works only when given a homeserver URL.
+     */
+    func disableWellKnownLookup(disableWellKnownLookup: Bool)  -> ClientBuilder
+    
     func dmRoomDefinition(dmRoomDefinition: DmRoomDefinition)  -> ClientBuilder
     
     /**
@@ -4131,6 +4211,16 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
     
     func userAgent(userAgent: String)  -> ClientBuilder
     
+    /**
+     * Set the user ID the homeserver is derived from, when none of
+     * `homeserver_url`, `server_name` or `server_name_or_homeserver_url` was
+     * called.
+     *
+     * The homeserver is then discovered from the server name of that user ID,
+     * which requires a `.well-known/matrix/client` lookup. This is therefore
+     * incompatible with `disable_well_known_lookup`, which makes `build` fail
+     * with `ClientBuildError::WellKnownLookupDisabled`.
+     */
     func username(username: String)  -> ClientBuilder
     
     /**
@@ -4321,6 +4411,34 @@ open func disableSslVerification() -> ClientBuilder  {
 })
 }
     
+    /**
+     * Disable all the `.well-known/matrix/client` lookups, both the one
+     * performed by `ClientBuilder::build` to discover the homeserver, and all
+     * the ones performed later by the built client.
+     *
+     * Some deployments must not emit any request to the well-known URI of
+     * their domain. When disabled, `Client::tile_server` returns `None` and
+     * RTC transport discovery doesn't fall back to the well-known
+     * `m.rtc_foci`, meaning `Client::is_livekit_rtc_supported` only relies on
+     * the MSC4143 discovery endpoint.
+     *
+     * The homeserver must then be resolvable without a well-known lookup, so
+     * `ClientBuilder::homeserver_url` must be used.
+     * `ClientBuilder::server_name` and `ClientBuilder::username` can only
+     * be resolved through the well-known, and `ClientBuilder::build` fails
+     * with `ClientBuildError::WellKnownLookupDisabled` in that case.
+     * `ClientBuilder::server_name_or_homeserver_url` skips the well-known step
+     * and works only when given a homeserver URL.
+     */
+open func disableWellKnownLookup(disableWellKnownLookup: Bool) -> ClientBuilder  {
+    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_disable_well_known_lookup(
+            self.uniffiCloneHandle(),
+        FfiConverterBool.lower(disableWellKnownLookup),$0
+    )
+})
+}
+    
 open func dmRoomDefinition(dmRoomDefinition: DmRoomDefinition) -> ClientBuilder  {
     return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_dm_room_definition(
@@ -4505,6 +4623,16 @@ open func userAgent(userAgent: String) -> ClientBuilder  {
 })
 }
     
+    /**
+     * Set the user ID the homeserver is derived from, when none of
+     * `homeserver_url`, `server_name` or `server_name_or_homeserver_url` was
+     * called.
+     *
+     * The homeserver is then discovered from the server name of that user ID,
+     * which requires a `.well-known/matrix/client` lookup. This is therefore
+     * incompatible with `disable_well_known_lookup`, which makes `build` fail
+     * with `ClientBuildError::WellKnownLookupDisabled`.
+     */
 open func username(username: String) -> ClientBuilder  {
     return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_username(
@@ -30298,6 +30426,8 @@ public enum ClientBuildError: Swift.Error, Equatable, Hashable, Foundation.Local
     
     case InvalidServerName(message: String)
     
+    case WellKnownLookupDisabled(message: String)
+    
     case ServerUnreachable(message: String)
     
     case WellKnownLookupFailed(message: String)
@@ -30349,39 +30479,43 @@ public struct FfiConverterTypeClientBuildError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 2: return .ServerUnreachable(
+        case 2: return .WellKnownLookupDisabled(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 3: return .WellKnownLookupFailed(
+        case 3: return .ServerUnreachable(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 4: return .WellKnownDeserializationError(
+        case 4: return .WellKnownLookupFailed(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 5: return .SlidingSync(
+        case 5: return .WellKnownDeserializationError(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 6: return .SlidingSyncVersion(
+        case 6: return .SlidingSync(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 7: return .Sdk(
+        case 7: return .SlidingSyncVersion(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 8: return .EventCache(
+        case 8: return .Sdk(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 9: return .InvalidRawKey(
+        case 9: return .EventCache(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 10: return .Generic(
+        case 10: return .InvalidRawKey(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 11: return .Generic(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -30398,24 +30532,26 @@ public struct FfiConverterTypeClientBuildError: FfiConverterRustBuffer {
         
         case .InvalidServerName(_ /* message is ignored*/):
             writeInt(&buf, Int32(1))
-        case .ServerUnreachable(_ /* message is ignored*/):
+        case .WellKnownLookupDisabled(_ /* message is ignored*/):
             writeInt(&buf, Int32(2))
-        case .WellKnownLookupFailed(_ /* message is ignored*/):
+        case .ServerUnreachable(_ /* message is ignored*/):
             writeInt(&buf, Int32(3))
-        case .WellKnownDeserializationError(_ /* message is ignored*/):
+        case .WellKnownLookupFailed(_ /* message is ignored*/):
             writeInt(&buf, Int32(4))
-        case .SlidingSync(_ /* message is ignored*/):
+        case .WellKnownDeserializationError(_ /* message is ignored*/):
             writeInt(&buf, Int32(5))
-        case .SlidingSyncVersion(_ /* message is ignored*/):
+        case .SlidingSync(_ /* message is ignored*/):
             writeInt(&buf, Int32(6))
-        case .Sdk(_ /* message is ignored*/):
+        case .SlidingSyncVersion(_ /* message is ignored*/):
             writeInt(&buf, Int32(7))
-        case .EventCache(_ /* message is ignored*/):
+        case .Sdk(_ /* message is ignored*/):
             writeInt(&buf, Int32(8))
-        case .InvalidRawKey(_ /* message is ignored*/):
+        case .EventCache(_ /* message is ignored*/):
             writeInt(&buf, Int32(9))
-        case .Generic(_ /* message is ignored*/):
+        case .InvalidRawKey(_ /* message is ignored*/):
             writeInt(&buf, Int32(10))
+        case .Generic(_ /* message is ignored*/):
+            writeInt(&buf, Int32(11))
 
         
         }
@@ -55559,6 +55695,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_device_id() != 63337) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_disable_well_known_lookup() != 45272) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_display_name() != 20054) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -55646,10 +55785,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_ignored_users() != 57288) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_livekit_rtc_supported() != 41745) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_livekit_rtc_supported() != 26302) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_is_login_with_qr_code_supported() != 14689) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_profiles_sliding_sync_extension_supported() != 59683) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_is_report_room_api_supported() != 48577) {
@@ -55925,6 +56067,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_ssl_verification() != 17095) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_well_known_lookup() != 1386) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_dm_room_definition() != 42422) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -55973,7 +56118,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_user_agent() != 31638) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_username() != 9349) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_username() != 7329) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_with_search_index_store() != 6477) {
