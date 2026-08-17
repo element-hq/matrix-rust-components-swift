@@ -17816,9 +17816,9 @@ public protocol TimelineProtocol: AnyObject, Sendable {
      *
      * If the replied to event has a thread relation, it is forwarded on the
      * reply so that clients that support threads can render the reply
-     * inside the thread.
+     * inside the thread. Returns a handle to abort the pending send.
      */
-    func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String) async throws 
+    func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String) async throws  -> SendHandle
     
     func sendVideo(params: UploadParameters, thumbnailSource: UploadSource?, videoInfo: VideoInfo) throws  -> SendAttachmentJoinHandle
     
@@ -18367,9 +18367,9 @@ open func sendReadReceipt(receiptType: ReceiptType, eventId: String)async throws
      *
      * If the replied to event has a thread relation, it is forwarded on the
      * reply so that clients that support threads can render the reply
-     * inside the thread.
+     * inside the thread. Returns a handle to abort the pending send.
      */
-open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String)async throws   {
+open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String)async throws  -> SendHandle  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
@@ -18378,10 +18378,10 @@ open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String
                     FfiConverterTypeRoomMessageEventContentWithoutRelation_lower(msg),FfiConverterString.lower(eventId)
                 )
             },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
-            liftFunc: { $0 },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
+            liftFunc: FfiConverterTypeSendHandle_lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -57123,7 +57123,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_read_receipt() != 6077) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 25065) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 40610) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 21275) {
