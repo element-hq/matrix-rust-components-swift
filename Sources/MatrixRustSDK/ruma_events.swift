@@ -1769,6 +1769,14 @@ public enum StateEventType: Equatable, Hashable, CustomStringConvertible {
      */
     case roomPowerLevels
     /**
+     * m.room.retention
+     *
+     * This variant uses the unstable type `org.matrix.msc1763.retention`.
+     *
+     * This variant can also be deserialized from the `m.room.retention` type.
+     */
+    case roomRetention
+    /**
      * m.room.server_acl
      */
     case roomServerAcl
@@ -1909,25 +1917,27 @@ public struct FfiConverterTypeStateEventType: FfiConverterRustBuffer {
         
         case 17: return .roomPowerLevels
         
-        case 18: return .roomServerAcl
+        case 18: return .roomRetention
         
-        case 19: return .roomThirdPartyInvite
+        case 19: return .roomServerAcl
         
-        case 20: return .roomTombstone
+        case 20: return .roomThirdPartyInvite
         
-        case 21: return .roomTopic
+        case 21: return .roomTombstone
         
-        case 22: return .spaceChild
+        case 22: return .roomTopic
         
-        case 23: return .spaceParent
+        case 23: return .spaceChild
         
-        case 24: return .beaconInfo
+        case 24: return .spaceParent
         
-        case 25: return .callMember
+        case 25: return .beaconInfo
         
-        case 26: return .memberHints
+        case 26: return .callMember
         
-        case 27: return .custom(try FfiConverterTypePrivOwnedStr.read(from: &buf)
+        case 27: return .memberHints
+        
+        case 28: return .custom(try FfiConverterTypePrivOwnedStr.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -2006,44 +2016,48 @@ public struct FfiConverterTypeStateEventType: FfiConverterRustBuffer {
             writeInt(&buf, Int32(17))
         
         
-        case .roomServerAcl:
+        case .roomRetention:
             writeInt(&buf, Int32(18))
         
         
-        case .roomThirdPartyInvite:
+        case .roomServerAcl:
             writeInt(&buf, Int32(19))
         
         
-        case .roomTombstone:
+        case .roomThirdPartyInvite:
             writeInt(&buf, Int32(20))
         
         
-        case .roomTopic:
+        case .roomTombstone:
             writeInt(&buf, Int32(21))
         
         
-        case .spaceChild:
+        case .roomTopic:
             writeInt(&buf, Int32(22))
         
         
-        case .spaceParent:
+        case .spaceChild:
             writeInt(&buf, Int32(23))
         
         
-        case .beaconInfo:
+        case .spaceParent:
             writeInt(&buf, Int32(24))
         
         
-        case .callMember:
+        case .beaconInfo:
             writeInt(&buf, Int32(25))
         
         
-        case .memberHints:
+        case .callMember:
             writeInt(&buf, Int32(26))
         
         
-        case let .custom(v1):
+        case .memberHints:
             writeInt(&buf, Int32(27))
+        
+        
+        case let .custom(v1):
+            writeInt(&buf, Int32(28))
             FfiConverterTypePrivOwnedStr.write(v1, into: &buf)
             
         }
@@ -2357,6 +2371,14 @@ public enum TimelineEventType: Equatable, Hashable, CustomStringConvertible {
      */
     case roomPowerLevels
     /**
+     * m.room.retention
+     *
+     * This variant uses the unstable type `org.matrix.msc1763.retention`.
+     *
+     * This variant can also be deserialized from the `m.room.retention` type.
+     */
+    case roomRetention
+    /**
      * m.room.server_acl
      */
     case roomServerAcl
@@ -2575,25 +2597,27 @@ public struct FfiConverterTypeTimelineEventType: FfiConverterRustBuffer {
         
         case 56: return .roomPowerLevels
         
-        case 57: return .roomServerAcl
+        case 57: return .roomRetention
         
-        case 58: return .roomThirdPartyInvite
+        case 58: return .roomServerAcl
         
-        case 59: return .roomTombstone
+        case 59: return .roomThirdPartyInvite
         
-        case 60: return .roomTopic
+        case 60: return .roomTombstone
         
-        case 61: return .spaceChild
+        case 61: return .roomTopic
         
-        case 62: return .spaceParent
+        case 62: return .spaceChild
         
-        case 63: return .beaconInfo
+        case 63: return .spaceParent
         
-        case 64: return .callMember
+        case 64: return .beaconInfo
         
-        case 65: return .memberHints
+        case 65: return .callMember
         
-        case 66: return .custom(try FfiConverterTypePrivOwnedStr.read(from: &buf)
+        case 66: return .memberHints
+        
+        case 67: return .custom(try FfiConverterTypePrivOwnedStr.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -2828,44 +2852,48 @@ public struct FfiConverterTypeTimelineEventType: FfiConverterRustBuffer {
             writeInt(&buf, Int32(56))
         
         
-        case .roomServerAcl:
+        case .roomRetention:
             writeInt(&buf, Int32(57))
         
         
-        case .roomThirdPartyInvite:
+        case .roomServerAcl:
             writeInt(&buf, Int32(58))
         
         
-        case .roomTombstone:
+        case .roomThirdPartyInvite:
             writeInt(&buf, Int32(59))
         
         
-        case .roomTopic:
+        case .roomTombstone:
             writeInt(&buf, Int32(60))
         
         
-        case .spaceChild:
+        case .roomTopic:
             writeInt(&buf, Int32(61))
         
         
-        case .spaceParent:
+        case .spaceChild:
             writeInt(&buf, Int32(62))
         
         
-        case .beaconInfo:
+        case .spaceParent:
             writeInt(&buf, Int32(63))
         
         
-        case .callMember:
+        case .beaconInfo:
             writeInt(&buf, Int32(64))
         
         
-        case .memberHints:
+        case .callMember:
             writeInt(&buf, Int32(65))
         
         
-        case let .custom(v1):
+        case .memberHints:
             writeInt(&buf, Int32(66))
+        
+        
+        case let .custom(v1):
+            writeInt(&buf, Int32(67))
             FfiConverterTypePrivOwnedStr.write(v1, into: &buf)
             
         }
@@ -2908,6 +2936,10 @@ public enum ToDeviceEventType: Equatable, Hashable, CustomStringConvertible {
      * m.room_key
      */
     case roomKey
+    /**
+     * m.room_key_bundle
+     */
+    case roomKeyBundle
     /**
      * m.room_key_request
      */
@@ -3035,37 +3067,39 @@ public struct FfiConverterTypeToDeviceEventType: FfiConverterRustBuffer {
         
         case 2: return .roomKey
         
-        case 3: return .roomKeyRequest
+        case 3: return .roomKeyBundle
         
-        case 4: return .roomKeyWithheld
+        case 4: return .roomKeyRequest
         
-        case 5: return .forwardedRoomKey
+        case 5: return .roomKeyWithheld
         
-        case 6: return .keyVerificationRequest
+        case 6: return .forwardedRoomKey
         
-        case 7: return .keyVerificationReady
+        case 7: return .keyVerificationRequest
         
-        case 8: return .keyVerificationStart
+        case 8: return .keyVerificationReady
         
-        case 9: return .keyVerificationCancel
+        case 9: return .keyVerificationStart
         
-        case 10: return .keyVerificationAccept
+        case 10: return .keyVerificationCancel
         
-        case 11: return .keyVerificationKey
+        case 11: return .keyVerificationAccept
         
-        case 12: return .keyVerificationMac
+        case 12: return .keyVerificationKey
         
-        case 13: return .keyVerificationDone
+        case 13: return .keyVerificationMac
         
-        case 14: return .roomEncrypted
+        case 14: return .keyVerificationDone
         
-        case 15: return .secretRequest
+        case 15: return .roomEncrypted
         
-        case 16: return .secretSend
+        case 16: return .secretRequest
         
-        case 17: return .secretPush
+        case 17: return .secretSend
         
-        case 18: return .custom(try FfiConverterTypePrivOwnedStr.read(from: &buf)
+        case 18: return .secretPush
+        
+        case 19: return .custom(try FfiConverterTypePrivOwnedStr.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -3084,68 +3118,72 @@ public struct FfiConverterTypeToDeviceEventType: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
         
         
-        case .roomKeyRequest:
+        case .roomKeyBundle:
             writeInt(&buf, Int32(3))
         
         
-        case .roomKeyWithheld:
+        case .roomKeyRequest:
             writeInt(&buf, Int32(4))
         
         
-        case .forwardedRoomKey:
+        case .roomKeyWithheld:
             writeInt(&buf, Int32(5))
         
         
-        case .keyVerificationRequest:
+        case .forwardedRoomKey:
             writeInt(&buf, Int32(6))
         
         
-        case .keyVerificationReady:
+        case .keyVerificationRequest:
             writeInt(&buf, Int32(7))
         
         
-        case .keyVerificationStart:
+        case .keyVerificationReady:
             writeInt(&buf, Int32(8))
         
         
-        case .keyVerificationCancel:
+        case .keyVerificationStart:
             writeInt(&buf, Int32(9))
         
         
-        case .keyVerificationAccept:
+        case .keyVerificationCancel:
             writeInt(&buf, Int32(10))
         
         
-        case .keyVerificationKey:
+        case .keyVerificationAccept:
             writeInt(&buf, Int32(11))
         
         
-        case .keyVerificationMac:
+        case .keyVerificationKey:
             writeInt(&buf, Int32(12))
         
         
-        case .keyVerificationDone:
+        case .keyVerificationMac:
             writeInt(&buf, Int32(13))
         
         
-        case .roomEncrypted:
+        case .keyVerificationDone:
             writeInt(&buf, Int32(14))
         
         
-        case .secretRequest:
+        case .roomEncrypted:
             writeInt(&buf, Int32(15))
         
         
-        case .secretSend:
+        case .secretRequest:
             writeInt(&buf, Int32(16))
         
         
-        case .secretPush:
+        case .secretSend:
             writeInt(&buf, Int32(17))
         
         
-        case let .custom(v1):
+        case .secretPush:
             writeInt(&buf, Int32(18))
+        
+        
+        case let .custom(v1):
+            writeInt(&buf, Int32(19))
             FfiConverterTypePrivOwnedStr.write(v1, into: &buf)
             
         }

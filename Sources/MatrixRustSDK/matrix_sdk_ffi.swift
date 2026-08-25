@@ -4131,9 +4131,10 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
      *
      * The homeserver must then be resolvable without a well-known lookup, so
      * `ClientBuilder::homeserver_url` must be used.
-     * `ClientBuilder::server_name` and `ClientBuilder::username` can only
-     * be resolved through the well-known, and `ClientBuilder::build` fails
-     * with `ClientBuildError::WellKnownLookupDisabled` in that case.
+     * `ClientBuilder::server_name` and
+     * `ClientBuilder::server_name_from_user_id` can only be resolved through
+     * the well-known, and `ClientBuilder::build` fails with
+     * `ClientBuildError::WellKnownLookupDisabled` in that case.
      * `ClientBuilder::server_name_or_homeserver_url` skips the well-known step
      * and works only when given a homeserver URL.
      */
@@ -4149,6 +4150,18 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
      */
     func enableShareHistoryOnInvite(enableShareHistoryOnInvite: Bool)  -> ClientBuilder
     
+    /**
+     * Set the homeserver URL to use.
+     *
+     * The following methods are mutually exclusive: [`Self::homeserver_url`],
+     * [`Self::server_name`], [`Self::server_name_or_homeserver_url`] and
+     * [`Self::server_name_from_user_id`]. If you set more than one, then
+     * whichever was set last will be used.
+     *
+     * This is the only one of them that never performs a
+     * `.well-known/matrix/client` lookup, so it is the one to use together
+     * with [`Self::disable_well_known_lookup`].
+     */
     func homeserverUrl(url: String)  -> ClientBuilder
     
     /**
@@ -4169,8 +4182,57 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
      */
     func roomKeyRecipientStrategy(strategy: CollectStrategy)  -> ClientBuilder
     
+    /**
+     * Set the server name to discover the homeserver from.
+     *
+     * The following methods are mutually exclusive: [`Self::homeserver_url`],
+     * [`Self::server_name`], [`Self::server_name_or_homeserver_url`] and
+     * [`Self::server_name_from_user_id`]. If you set more than one, then
+     * whichever was set last will be used.
+     *
+     * This performs a `.well-known/matrix/client` lookup, and is therefore
+     * incompatible with [`Self::disable_well_known_lookup`]: [`Self::build`]
+     * then fails with [`ClientBuildError::WellKnownLookupDisabled`].
+     */
     func serverName(serverName: String)  -> ClientBuilder
     
+    /**
+     * Uses the server name from the supplied the user ID to discover the
+     * homeserver.
+     *
+     * When building a client for restoration, prefer to use
+     * [`Self::homeserver_url`] as the restoration will pick up the user ID
+     * from the [`Session`], and using this will result in a needless request
+     * to re-discover the homeserver.
+     *
+     * The following methods are mutually exclusive: [`Self::homeserver_url`],
+     * [`Self::server_name`], [`Self::server_name_or_homeserver_url`] and
+     * [`Self::server_name_from_user_id`]. If you set more than one, then
+     * whichever was set last will be used.
+     *
+     * This performs a `.well-known/matrix/client` lookup, and is therefore
+     * incompatible with [`Self::disable_well_known_lookup`]: [`Self::build`]
+     * then fails with [`ClientBuildError::WellKnownLookupDisabled`].
+     */
+    func serverNameFromUserId(userId: String)  -> ClientBuilder
+    
+    /**
+     * Set the server name to discover the homeserver from, falling back to
+     * using it as a homeserver URL if discovery fails. When falling back to a
+     * homeserver URL, a check is made to ensure that the server exists (unlike
+     * [`Self::homeserver_url`], so you can guarantee that the client is ready
+     * to use.
+     *
+     * The following methods are mutually exclusive: [`Self::homeserver_url`],
+     * [`Self::server_name`], [`Self::server_name_or_homeserver_url`] and
+     * [`Self::server_name_from_user_id`]. If you set more than one, then
+     * whichever was set last will be used.
+     *
+     * With [`Self::disable_well_known_lookup`], the discovery step is skipped
+     * and only the homeserver URL check is performed, so a homeserver URL
+     * still works while a delegating server name fails with
+     * [`ClientBuildError::InvalidServerName`].
+     */
     func serverNameOrHomeserverUrl(serverNameOrUrl: String)  -> ClientBuilder
     
     /**
@@ -4210,18 +4272,6 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
     func threadsEnabled(enabled: Bool, threadSubscriptions: Bool)  -> ClientBuilder
     
     func userAgent(userAgent: String)  -> ClientBuilder
-    
-    /**
-     * Set the user ID the homeserver is derived from, when none of
-     * `homeserver_url`, `server_name` or `server_name_or_homeserver_url` was
-     * called.
-     *
-     * The homeserver is then discovered from the server name of that user ID,
-     * which requires a `.well-known/matrix/client` lookup. This is therefore
-     * incompatible with `disable_well_known_lookup`, which makes `build` fail
-     * with `ClientBuildError::WellKnownLookupDisabled`.
-     */
-    func username(username: String)  -> ClientBuilder
     
     /**
      * Set up the search index store for this client, which is used to store
@@ -4424,9 +4474,10 @@ open func disableSslVerification() -> ClientBuilder  {
      *
      * The homeserver must then be resolvable without a well-known lookup, so
      * `ClientBuilder::homeserver_url` must be used.
-     * `ClientBuilder::server_name` and `ClientBuilder::username` can only
-     * be resolved through the well-known, and `ClientBuilder::build` fails
-     * with `ClientBuildError::WellKnownLookupDisabled` in that case.
+     * `ClientBuilder::server_name` and
+     * `ClientBuilder::server_name_from_user_id` can only be resolved through
+     * the well-known, and `ClientBuilder::build` fails with
+     * `ClientBuildError::WellKnownLookupDisabled` in that case.
      * `ClientBuilder::server_name_or_homeserver_url` skips the well-known step
      * and works only when given a homeserver URL.
      */
@@ -4463,6 +4514,18 @@ open func enableShareHistoryOnInvite(enableShareHistoryOnInvite: Bool) -> Client
 })
 }
     
+    /**
+     * Set the homeserver URL to use.
+     *
+     * The following methods are mutually exclusive: [`Self::homeserver_url`],
+     * [`Self::server_name`], [`Self::server_name_or_homeserver_url`] and
+     * [`Self::server_name_from_user_id`]. If you set more than one, then
+     * whichever was set last will be used.
+     *
+     * This is the only one of them that never performs a
+     * `.well-known/matrix/client` lookup, so it is the one to use together
+     * with [`Self::disable_well_known_lookup`].
+     */
 open func homeserverUrl(url: String) -> ClientBuilder  {
     return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_homeserver_url(
@@ -4517,6 +4580,18 @@ open func roomKeyRecipientStrategy(strategy: CollectStrategy) -> ClientBuilder  
 })
 }
     
+    /**
+     * Set the server name to discover the homeserver from.
+     *
+     * The following methods are mutually exclusive: [`Self::homeserver_url`],
+     * [`Self::server_name`], [`Self::server_name_or_homeserver_url`] and
+     * [`Self::server_name_from_user_id`]. If you set more than one, then
+     * whichever was set last will be used.
+     *
+     * This performs a `.well-known/matrix/client` lookup, and is therefore
+     * incompatible with [`Self::disable_well_known_lookup`]: [`Self::build`]
+     * then fails with [`ClientBuildError::WellKnownLookupDisabled`].
+     */
 open func serverName(serverName: String) -> ClientBuilder  {
     return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_server_name(
@@ -4526,6 +4601,50 @@ open func serverName(serverName: String) -> ClientBuilder  {
 })
 }
     
+    /**
+     * Uses the server name from the supplied the user ID to discover the
+     * homeserver.
+     *
+     * When building a client for restoration, prefer to use
+     * [`Self::homeserver_url`] as the restoration will pick up the user ID
+     * from the [`Session`], and using this will result in a needless request
+     * to re-discover the homeserver.
+     *
+     * The following methods are mutually exclusive: [`Self::homeserver_url`],
+     * [`Self::server_name`], [`Self::server_name_or_homeserver_url`] and
+     * [`Self::server_name_from_user_id`]. If you set more than one, then
+     * whichever was set last will be used.
+     *
+     * This performs a `.well-known/matrix/client` lookup, and is therefore
+     * incompatible with [`Self::disable_well_known_lookup`]: [`Self::build`]
+     * then fails with [`ClientBuildError::WellKnownLookupDisabled`].
+     */
+open func serverNameFromUserId(userId: String) -> ClientBuilder  {
+    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_server_name_from_user_id(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(userId),$0
+    )
+})
+}
+    
+    /**
+     * Set the server name to discover the homeserver from, falling back to
+     * using it as a homeserver URL if discovery fails. When falling back to a
+     * homeserver URL, a check is made to ensure that the server exists (unlike
+     * [`Self::homeserver_url`], so you can guarantee that the client is ready
+     * to use.
+     *
+     * The following methods are mutually exclusive: [`Self::homeserver_url`],
+     * [`Self::server_name`], [`Self::server_name_or_homeserver_url`] and
+     * [`Self::server_name_from_user_id`]. If you set more than one, then
+     * whichever was set last will be used.
+     *
+     * With [`Self::disable_well_known_lookup`], the discovery step is skipped
+     * and only the homeserver URL check is performed, so a homeserver URL
+     * still works while a delegating server name fails with
+     * [`ClientBuildError::InvalidServerName`].
+     */
 open func serverNameOrHomeserverUrl(serverNameOrUrl: String) -> ClientBuilder  {
     return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_server_name_or_homeserver_url(
@@ -4619,25 +4738,6 @@ open func userAgent(userAgent: String) -> ClientBuilder  {
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_user_agent(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(userAgent),$0
-    )
-})
-}
-    
-    /**
-     * Set the user ID the homeserver is derived from, when none of
-     * `homeserver_url`, `server_name` or `server_name_or_homeserver_url` was
-     * called.
-     *
-     * The homeserver is then discovered from the server name of that user ID,
-     * which requires a `.well-known/matrix/client` lookup. This is therefore
-     * incompatible with `disable_well_known_lookup`, which makes `build` fail
-     * with `ClientBuildError::WellKnownLookupDisabled`.
-     */
-open func username(username: String) -> ClientBuilder  {
-    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_username(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(username),$0
     )
 })
 }
@@ -9694,6 +9794,16 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func loadOrFetchEvent(eventId: String) async throws  -> TimelineEvent
     
     /**
+     * Either loads the event associated with the `event_id` from the event
+     * cache or fetches it from the homeserver, along with the events related
+     * to it (e.g. reactions and edits), fetched recursively.
+     *
+     * An optional filter restricts the relation types fetched; no filter
+     * fetches relations of all types.
+     */
+    func loadOrFetchEventWithRelations(eventId: String, relationFilter: [RelationType]?) async throws  -> EventWithRelations
+    
+    /**
      * Load the receipt of the given type for the given user in this room,
      * optionally scoped to a thread.
      *
@@ -10846,6 +10956,31 @@ open func loadOrFetchEvent(eventId: String)async throws  -> TimelineEvent  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
             liftFunc: FfiConverterTypeTimelineEvent_lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Either loads the event associated with the `event_id` from the event
+     * cache or fetches it from the homeserver, along with the events related
+     * to it (e.g. reactions and edits), fetched recursively.
+     *
+     * An optional filter restricts the relation types fetched; no filter
+     * fetches relations of all types.
+     */
+open func loadOrFetchEventWithRelations(eventId: String, relationFilter: [RelationType]?)async throws  -> EventWithRelations  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_load_or_fetch_event_with_relations(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(eventId),FfiConverterOptionSequenceTypeRelationType.lower(relationFilter)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeEventWithRelations_lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -17336,8 +17471,9 @@ public protocol ThreadListServiceProtocol: AnyObject, Sendable {
     /**
      * Subscribes to changes in the pagination state.
      *
-     * The `listener` is called once for every state transition. The returned
-     * [`TaskHandle`] keeps the subscription alive
+     * The `listener` is immediately called with the current state, then once
+     * for every state transition. The returned [`TaskHandle`] keeps the
+     * subscription alive
      */
     func subscribeToPaginationStateUpdates(listener: ThreadListPaginationStateListener)  -> TaskHandle
     
@@ -17494,8 +17630,9 @@ open func subscribeToItemsUpdates(listener: ThreadListEntriesListener) -> TaskHa
     /**
      * Subscribes to changes in the pagination state.
      *
-     * The `listener` is called once for every state transition. The returned
-     * [`TaskHandle`] keeps the subscription alive
+     * The `listener` is immediately called with the current state, then once
+     * for every state transition. The returned [`TaskHandle`] keeps the
+     * subscription alive
      */
 open func subscribeToPaginationStateUpdates(listener: ThreadListPaginationStateListener) -> TaskHandle  {
     return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
@@ -20899,6 +21036,78 @@ public func FfiConverterTypeEventTimelineItemDebugInfo_lift(_ buf: RustBuffer) t
 #endif
 public func FfiConverterTypeEventTimelineItemDebugInfo_lower(_ value: EventTimelineItemDebugInfo) -> RustBuffer {
     return FfiConverterTypeEventTimelineItemDebugInfo.lower(value)
+}
+
+
+/**
+ * An event and the events related to it, as returned by
+ * [`Room::load_or_fetch_event_with_relations`].
+ */
+public struct EventWithRelations {
+    /**
+     * The event itself.
+     */
+    public var event: TimelineEvent
+    /**
+     * The events related to it, directly or (recursively) through other
+     * related events.
+     */
+    public var relatedEvents: [TimelineEvent]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The event itself.
+         */event: TimelineEvent, 
+        /**
+         * The events related to it, directly or (recursively) through other
+         * related events.
+         */relatedEvents: [TimelineEvent]) {
+        self.event = event
+        self.relatedEvents = relatedEvents
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension EventWithRelations: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeEventWithRelations: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EventWithRelations {
+        return
+            try EventWithRelations(
+                event: FfiConverterTypeTimelineEvent.read(from: &buf), 
+                relatedEvents: FfiConverterSequenceTypeTimelineEvent.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: EventWithRelations, into buf: inout [UInt8]) {
+        FfiConverterTypeTimelineEvent.write(value.event, into: &buf)
+        FfiConverterSequenceTypeTimelineEvent.write(value.relatedEvents, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEventWithRelations_lift(_ buf: RustBuffer) throws -> EventWithRelations {
+    return try FfiConverterTypeEventWithRelations.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEventWithRelations_lower(_ value: EventWithRelations) -> RustBuffer {
+    return FfiConverterTypeEventWithRelations.lower(value)
 }
 
 
@@ -39337,6 +39546,103 @@ public func FfiConverterTypeRecoveryState_lower(_ value: RecoveryState) -> RustB
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * The relation types that can be used to filter related events when calling
+ * [`Room::load_or_fetch_event_with_relations`].
+ */
+
+public enum RelationType: Equatable, Hashable {
+    
+    /**
+     * An annotation to an event (e.g. a reaction), `m.annotation`.
+     */
+    case annotation
+    /**
+     * A reference to another event, `m.reference`.
+     */
+    case reference
+    /**
+     * An event that replaces another event (e.g. an edit), `m.replace`.
+     */
+    case replacement
+    /**
+     * An event that belongs to a thread, `m.thread`.
+     */
+    case thread
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension RelationType: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRelationType: FfiConverterRustBuffer {
+    typealias SwiftType = RelationType
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RelationType {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .annotation
+        
+        case 2: return .reference
+        
+        case 3: return .replacement
+        
+        case 4: return .thread
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RelationType, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .annotation:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .reference:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .replacement:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .thread:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRelationType_lift(_ buf: RustBuffer) throws -> RelationType {
+    return try FfiConverterTypeRelationType.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRelationType_lower(_ value: RelationType) -> RustBuffer {
+    return FfiConverterTypeRelationType.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * Room account data events.
  */
 
@@ -53486,6 +53792,30 @@ fileprivate struct FfiConverterOptionSequenceTypeAction: FfiConverterRustBuffer 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionSequenceTypeRelationType: FfiConverterRustBuffer {
+    typealias SwiftType = [RelationType]?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterSequenceTypeRelationType.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterSequenceTypeRelationType.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionDictionaryStringInt64: FfiConverterRustBuffer {
     typealias SwiftType = [String: Int64]?
 
@@ -53700,6 +54030,31 @@ fileprivate struct FfiConverterSequenceTypeSessionVerificationEmoji: FfiConverte
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeSessionVerificationEmoji.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeTimelineEvent: FfiConverterRustBuffer {
+    typealias SwiftType = [TimelineEvent]
+
+    public static func write(_ value: [TimelineEvent], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeTimelineEvent.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [TimelineEvent] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [TimelineEvent]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeTimelineEvent.read(from: &buf))
         }
         return seq
     }
@@ -54550,6 +54905,31 @@ fileprivate struct FfiConverterSequenceTypePushCondition: FfiConverterRustBuffer
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypePushCondition.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeRelationType: FfiConverterRustBuffer {
+    typealias SwiftType = [RelationType]
+
+    public static func write(_ value: [RelationType], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRelationType.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RelationType] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RelationType]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRelationType.read(from: &buf))
         }
         return seq
     }
@@ -56067,7 +56447,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_ssl_verification() != 17095) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_well_known_lookup() != 1386) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_well_known_lookup() != 21661) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_dm_room_definition() != 42422) {
@@ -56076,7 +56456,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_enable_share_history_on_invite() != 47743) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_homeserver_url() != 27846) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_homeserver_url() != 20298) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_in_memory_store() != 7770) {
@@ -56091,10 +56471,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_room_key_recipient_strategy() != 7083) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name() != 27235) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name() != 50969) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name_or_homeserver_url() != 11561) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name_from_user_id() != 425) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name_or_homeserver_url() != 50246) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_session_paths() != 52143) {
@@ -56116,9 +56499,6 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_user_agent() != 31638) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_username() != 7329) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_with_search_index_store() != 6477) {
@@ -56521,6 +56901,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_load_or_fetch_event() != 47103) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_load_or_fetch_event_with_relations() != 53875) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_load_user_receipt() != 16820) {
@@ -57195,7 +57578,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_threadlistservice_subscribe_to_items_updates() != 62027) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_threadlistservice_subscribe_to_pagination_state_updates() != 52158) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_threadlistservice_subscribe_to_pagination_state_updates() != 1253) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_widgetdriver_run() != 61502) {
