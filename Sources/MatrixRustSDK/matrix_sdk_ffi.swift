@@ -17839,6 +17839,15 @@ public protocol TimelineProtocol: AnyObject, Sendable {
      */
     func edit(eventOrTransactionId: EventOrTransactionId, newContent: EditedContent) async throws 
     
+    /**
+     * Get the edit history for the given event.
+     *
+     * Returns all revisions of the event, in chronological order.
+     * The first entry is the original event content, followed by each
+     * edit in the order they were applied.
+     */
+    func editRevisions(eventId: String) async throws  -> [EditRevisionRecord]
+    
     func endPoll(pollStartEventId: String, text: String) async throws 
     
     func fetchDetailsForEvent(eventId: String) async throws 
@@ -18128,6 +18137,30 @@ open func edit(eventOrTransactionId: EventOrTransactionId, newContent: EditedCon
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Get the edit history for the given event.
+     *
+     * Returns all revisions of the event, in chronological order.
+     * The first entry is the original event content, followed by each
+     * edit in the order they were applied.
+     */
+open func editRevisions(eventId: String)async throws  -> [EditRevisionRecord]  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_edit_revisions(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(eventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeEditRevisionRecord.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -20796,6 +20829,60 @@ public func FfiConverterTypeDuplicateOneTimeKeyErrorMessage_lift(_ buf: RustBuff
 #endif
 public func FfiConverterTypeDuplicateOneTimeKeyErrorMessage_lower(_ value: DuplicateOneTimeKeyErrorMessage) -> RustBuffer {
     return FfiConverterTypeDuplicateOneTimeKeyErrorMessage.lower(value)
+}
+
+
+public struct EditRevisionRecord {
+    public var content: TimelineItemContent
+    public var timestamp: UInt64?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(content: TimelineItemContent, timestamp: UInt64?) {
+        self.content = content
+        self.timestamp = timestamp
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension EditRevisionRecord: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeEditRevisionRecord: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EditRevisionRecord {
+        return
+            try EditRevisionRecord(
+                content: FfiConverterTypeTimelineItemContent.read(from: &buf), 
+                timestamp: FfiConverterOptionUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: EditRevisionRecord, into buf: inout [UInt8]) {
+        FfiConverterTypeTimelineItemContent.write(value.content, into: &buf)
+        FfiConverterOptionUInt64.write(value.timestamp, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEditRevisionRecord_lift(_ buf: RustBuffer) throws -> EditRevisionRecord {
+    return try FfiConverterTypeEditRevisionRecord.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEditRevisionRecord_lower(_ value: EditRevisionRecord) -> RustBuffer {
+    return FfiConverterTypeEditRevisionRecord.lower(value)
 }
 
 
@@ -54138,6 +54225,31 @@ fileprivate struct FfiConverterSequenceTypeConditionalPushRule: FfiConverterRust
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeEditRevisionRecord: FfiConverterRustBuffer {
+    typealias SwiftType = [EditRevisionRecord]
+
+    public static func write(_ value: [EditRevisionRecord], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeEditRevisionRecord.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [EditRevisionRecord] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [EditRevisionRecord]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeEditRevisionRecord.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeIdentityStatusChange: FfiConverterRustBuffer {
     typealias SwiftType = [IdentityStatusChange]
 
@@ -55831,6 +55943,19 @@ public func createCaptionEdit(caption: String?, formattedCaption: FormattedBody?
 })
 }
 /**
+ * The server name part of the given user ID, including the port when the
+ * server name has one.
+ *
+ * Returns an error if the user ID is invalid.
+ */
+public func serverNameFromUserId(userId: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeClientError_lift) {
+    uniffi_matrix_sdk_ffi_fn_func_server_name_from_user_id(
+        FfiConverterString.lower(userId),$0
+    )
+})
+}
+/**
  * Create the actual url that can be used to setup the WebView or IFrame
  * that contains the widget.
  *
@@ -55986,6 +56111,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_create_caption_edit() != 57776) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_func_server_name_from_user_id() != 32123) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_func_generate_webview_url() != 42271) {
@@ -57447,6 +57575,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit() != 46968) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_edit_revisions() != 11010) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_end_poll() != 2766) {
