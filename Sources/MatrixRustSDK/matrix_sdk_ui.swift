@@ -771,6 +771,181 @@ public func FfiConverterTypeMembershipChangeFilter_lower(_ value: MembershipChan
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * An enum to represent whether a room is about “people” (strictly 2 users) or
+ * “group” (1 or more than 2 users).
+ *
+ * Ideally, we would only want to rely on the
+ * [`matrix_sdk::BaseRoom::is_direct`] method, but the rules are a little bit
+ * different for this high-level UI API.
+ *
+ * This is implemented this way so that it's impossible to filter by “group”
+ * and by “people” at the same time: these criteria are mutually
+ * exclusive by design per filter.
+ */
+
+public enum RoomListFilterCategory: Equatable, Hashable {
+    
+    case group
+    case people
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension RoomListFilterCategory: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRoomListFilterCategory: FfiConverterRustBuffer {
+    typealias SwiftType = RoomListFilterCategory
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomListFilterCategory {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .group
+        
+        case 2: return .people
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RoomListFilterCategory, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .group:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .people:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomListFilterCategory_lift(_ buf: RustBuffer) throws -> RoomListFilterCategory {
+    return try FfiConverterTypeRoomListFilterCategory.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomListFilterCategory_lower(_ value: RoomListFilterCategory) -> RustBuffer {
+    return FfiConverterTypeRoomListFilterCategory.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Filter read receipts by…
+ *
+ * This type decides which fields to reach in [`ReadReceipts`].
+ *
+ * [`ReadReceipts`]: matrix_sdk_base::read_receipts::ReadReceipts
+ */
+
+public enum RoomListFilterReadReceipts: Equatable, Hashable {
+    
+    /**
+     * Filter by mentions, i.e. [`ReadReceipts::num_mentions`].
+     *
+     * [`ReadReceipts::num_mentions`]: matrix_sdk_base::read_receipts::ReadReceipts::num_mentions
+     */
+    case mentions
+    /**
+     * Filter by notifications, i.e. [`ReadReceipts::num_notifications`].
+     *
+     * [`ReadReceipts::num_notifications`]: matrix_sdk_base::read_receipts::ReadReceipts::num_notifications
+     */
+    case notifications
+    /**
+     * Filter by messages, i.e. [`ReadReceipts::num_unread`].
+     *
+     * [`ReadReceipts::num_unread`]: matrix_sdk_base::read_receipts::ReadReceipts::num_unread
+     */
+    case messages
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension RoomListFilterReadReceipts: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRoomListFilterReadReceipts: FfiConverterRustBuffer {
+    typealias SwiftType = RoomListFilterReadReceipts
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomListFilterReadReceipts {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .mentions
+        
+        case 2: return .notifications
+        
+        case 3: return .messages
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RoomListFilterReadReceipts, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .mentions:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .notifications:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .messages:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomListFilterReadReceipts_lift(_ buf: RustBuffer) throws -> RoomListFilterReadReceipts {
+    return try FfiConverterTypeRoomListFilterReadReceipts.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomListFilterReadReceipts_lower(_ value: RoomListFilterReadReceipts) -> RustBuffer {
+    return FfiConverterTypeRoomListFilterReadReceipts.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * The type of change between the previous and current pinned events.
  */
 
