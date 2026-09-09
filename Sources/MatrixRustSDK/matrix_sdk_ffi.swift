@@ -1554,6 +1554,12 @@ public protocol ClientProtocol: AnyObject, Sendable {
      */
     func tileServer() async  -> TileServerInfo?
     
+    /**
+     * The total number of client-side computed unread notifications across all
+     * joined rooms.
+     */
+    func totalUnreadNotifications()  -> UInt64
+    
     func trackRecentlyVisitedRoom(room: String) async throws 
     
     func unignoreUser(userId: String) async throws 
@@ -3841,6 +3847,18 @@ open func tileServer()async  -> TileServerInfo?  {
             errorHandler: nil
             
         )
+}
+    
+    /**
+     * The total number of client-side computed unread notifications across all
+     * joined rooms.
+     */
+open func totalUnreadNotifications() -> UInt64  {
+    return try!  FfiConverterUInt64.lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_total_unread_notifications(
+            self.uniffiCloneHandle(),$0
+    )
+})
 }
     
 open func trackRecentlyVisitedRoom(room: String)async throws   {
@@ -56152,6 +56170,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_tile_server() != 43179) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_total_unread_notifications() != 56252) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_track_recently_visited_room() != 40498) {
