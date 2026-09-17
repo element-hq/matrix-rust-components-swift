@@ -25,13 +25,13 @@ fileprivate extension RustBuffer {
     }
 
     static func from(_ ptr: UnsafeBufferPointer<UInt8>) -> RustBuffer {
-        try! rustCall { ffi_matrix_sdk_common_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
+        try! rustCall { ffi_matrix_sdk_sqlite_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0) }
     }
 
     // Frees the buffer in place.
     // The buffer must not be used after this is called.
     func deallocate() {
-        try! rustCall { ffi_matrix_sdk_common_rustbuffer_free(self, $0) }
+        try! rustCall { ffi_matrix_sdk_sqlite_rustbuffer_free(self, $0) }
     }
 }
 
@@ -327,7 +327,7 @@ private func makeRustCall<T, E: Swift.Error>(
     _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T,
     errorHandler: ((RustBuffer) throws -> E)?
 ) throws -> T {
-    uniffiEnsureMatrixSdkCommonInitialized()
+    uniffiEnsureMatrixSdkSqliteInitialized()
     var callStatus = RustCallStatus.init()
     let returnedVal = callback(&callStatus)
     try uniffiCheckCallStatus(callStatus: callStatus, errorHandler: errorHandler)
@@ -510,34 +510,23 @@ fileprivate struct FfiConverterString: FfiConverter {
 
 
 /**
- * Reason why a background task failed.
+ * Enum controlling how the high-entropy passphrase used to be created on the
+ * client side.
+ *
+ * This allows us to replicate how a random key was converted into a passphrase
+ * to migrate from said passphrase to the plain key.
  */
 
-public enum BackgroundTaskFailureReason: Equatable, Hashable {
+public enum Base64Variant: Equatable, Hashable {
     
     /**
-     * The task panicked.
+     * Unpadded base64 was used to create the high-entropy passphrase.
      */
-    case panic(
-        /**
-         * The panic message, if it could be extracted.
-         */message: String?, 
-        /**
-         * Backtrace captured after the panic (if available).
-         */panicBacktrace: String?
-    )
+    case unpadded
     /**
-     * The task returned an error.
+     * Standard padded base64 was used to create the high-entropy passphrase.
      */
-    case error(
-        /**
-         * String representation of the error.
-         */error: String
-    )
-    /**
-     * The task ended unexpectedly (for tasks expected to run forever).
-     */
-    case earlyTermination
+    case padded
 
 
 
@@ -546,165 +535,38 @@ public enum BackgroundTaskFailureReason: Equatable, Hashable {
 }
 
 #if compiler(>=6)
-extension BackgroundTaskFailureReason: Sendable {}
+extension Base64Variant: Sendable {}
 #endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeBackgroundTaskFailureReason: FfiConverterRustBuffer {
-    typealias SwiftType = BackgroundTaskFailureReason
+public struct FfiConverterTypeBase64Variant: FfiConverterRustBuffer {
+    typealias SwiftType = Base64Variant
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BackgroundTaskFailureReason {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Base64Variant {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .panic(message: try FfiConverterOptionString.read(from: &buf), panicBacktrace: try FfiConverterOptionString.read(from: &buf)
-        )
+        case 1: return .unpadded
         
-        case 2: return .error(error: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 3: return .earlyTermination
+        case 2: return .padded
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
-    public static func write(_ value: BackgroundTaskFailureReason, into buf: inout [UInt8]) {
+    public static func write(_ value: Base64Variant, into buf: inout [UInt8]) {
         switch value {
         
         
-        case let .panic(message,panicBacktrace):
-            writeInt(&buf, Int32(1))
-            FfiConverterOptionString.write(message, into: &buf)
-            FfiConverterOptionString.write(panicBacktrace, into: &buf)
-            
-        
-        case let .error(error):
-            writeInt(&buf, Int32(2))
-            FfiConverterString.write(error, into: &buf)
-            
-        
-        case .earlyTermination:
-            writeInt(&buf, Int32(3))
-        
-        }
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeBackgroundTaskFailureReason_lift(_ buf: RustBuffer) throws -> BackgroundTaskFailureReason {
-    return try FfiConverterTypeBackgroundTaskFailureReason.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeBackgroundTaskFailureReason_lower(_ value: BackgroundTaskFailureReason) -> RustBuffer {
-    return FfiConverterTypeBackgroundTaskFailureReason.lower(value)
-}
-
-
-
-/**
- * A machine-readable representation of the authenticity for a `ShieldState`.
- */
-
-public enum ShieldStateCode: Equatable, Hashable {
-    
-    /**
-     * Not enough information available to check the authenticity.
-     */
-    case authenticityNotGuaranteed
-    /**
-     * The sending device isn't yet known by the Client.
-     */
-    case unknownDevice
-    /**
-     * The sending device hasn't been verified by the sender.
-     */
-    case unsignedDevice
-    /**
-     * The sender hasn't been verified by the Client's user.
-     */
-    case unverifiedIdentity
-    /**
-     * The sender was previously verified but changed their identity.
-     */
-    case verificationViolation
-    /**
-     * The `sender` field on the event does not match the owner of the device
-     * that established the Megolm session.
-     */
-    case mismatchedSender
-
-
-
-
-
-}
-
-#if compiler(>=6)
-extension ShieldStateCode: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeShieldStateCode: FfiConverterRustBuffer {
-    typealias SwiftType = ShieldStateCode
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ShieldStateCode {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .authenticityNotGuaranteed
-        
-        case 2: return .unknownDevice
-        
-        case 3: return .unsignedDevice
-        
-        case 4: return .unverifiedIdentity
-        
-        case 5: return .verificationViolation
-        
-        case 6: return .mismatchedSender
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: ShieldStateCode, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case .authenticityNotGuaranteed:
+        case .unpadded:
             writeInt(&buf, Int32(1))
         
         
-        case .unknownDevice:
+        case .padded:
             writeInt(&buf, Int32(2))
         
-        
-        case .unsignedDevice:
-            writeInt(&buf, Int32(3))
-        
-        
-        case .unverifiedIdentity:
-            writeInt(&buf, Int32(4))
-        
-        
-        case .verificationViolation:
-            writeInt(&buf, Int32(5))
-        
-        
-        case .mismatchedSender:
-            writeInt(&buf, Int32(6))
-        
         }
     }
 }
@@ -713,41 +575,17 @@ public struct FfiConverterTypeShieldStateCode: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeShieldStateCode_lift(_ buf: RustBuffer) throws -> ShieldStateCode {
-    return try FfiConverterTypeShieldStateCode.lift(buf)
+public func FfiConverterTypeBase64Variant_lift(_ buf: RustBuffer) throws -> Base64Variant {
+    return try FfiConverterTypeBase64Variant.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeShieldStateCode_lower(_ value: ShieldStateCode) -> RustBuffer {
-    return FfiConverterTypeShieldStateCode.lower(value)
+public func FfiConverterTypeBase64Variant_lower(_ value: Base64Variant) -> RustBuffer {
+    return FfiConverterTypeBase64Variant.lower(value)
 }
 
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
-    typealias SwiftType = String?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterString.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterString.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
 
 private enum InitializationResult {
     case ok
@@ -760,7 +598,7 @@ private let initializationResult: InitializationResult = {
     // Get the bindings contract version from our ComponentInterface
     let bindings_contract_version = 30
     // Get the scaffolding contract version by calling the into the dylib
-    let scaffolding_contract_version = ffi_matrix_sdk_common_uniffi_contract_version()
+    let scaffolding_contract_version = ffi_matrix_sdk_sqlite_uniffi_contract_version()
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
@@ -770,7 +608,7 @@ private let initializationResult: InitializationResult = {
 
 // Make the ensure init function public so that other modules which have external type references to
 // our types can call it.
-public func uniffiEnsureMatrixSdkCommonInitialized() {
+public func uniffiEnsureMatrixSdkSqliteInitialized() {
     switch initializationResult {
     case .ok:
         break
