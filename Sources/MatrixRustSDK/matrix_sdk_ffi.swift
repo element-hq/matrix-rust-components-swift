@@ -1542,6 +1542,21 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func startSsoLogin(redirectUrl: String, idpId: String?) async throws  -> SsoHandler
     
     /**
+     * Subscribe to the custom to-device messages received by this client.
+     *
+     * The listener is called with every to-device message whose type is one
+     * of `event_types`, or with every custom to-device message if
+     * `event_types` is empty. A message that was sent encrypted is delivered
+     * decrypted, along with its encryption info.
+     *
+     * The to-device traffic the SDK uses for its own crypto machinery and the
+     * messages it could not decrypt are never delivered.
+     *
+     * Use the returned [`TaskHandle`] to cancel the subscription.
+     */
+    func subscribeToCustomToDeviceMessages(eventTypes: [String], listener: ToDeviceMessageListener)  -> TaskHandle
+    
+    /**
      * Subscribe to duplicate key upload errors triggered by requests to
      * /keys/upload.
      */
@@ -3715,6 +3730,30 @@ open func startSsoLogin(redirectUrl: String, idpId: String?)async throws  -> Sso
             liftFunc: FfiConverterTypeSsoHandler_lift,
             errorHandler: FfiConverterTypeSsoError_lift
         )
+}
+    
+    /**
+     * Subscribe to the custom to-device messages received by this client.
+     *
+     * The listener is called with every to-device message whose type is one
+     * of `event_types`, or with every custom to-device message if
+     * `event_types` is empty. A message that was sent encrypted is delivered
+     * decrypted, along with its encryption info.
+     *
+     * The to-device traffic the SDK uses for its own crypto machinery and the
+     * messages it could not decrypt are never delivered.
+     *
+     * Use the returned [`TaskHandle`] to cancel the subscription.
+     */
+open func subscribeToCustomToDeviceMessages(eventTypes: [String], listener: ToDeviceMessageListener) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_custom_to_device_messages(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceString.lower(eventTypes),
+        FfiConverterCallbackInterfaceToDeviceMessageListener_lower(listener),uniffiCallStatus
+    )
+})
 }
     
     /**
@@ -10240,6 +10279,21 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func startLiveLocationShare(durationMillis: UInt64) async throws  -> String
     
     /**
+     * The current room state events of the given type, one per state key.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the state events to read. For a type that
+     * has no variant of its own, build one from its string representation
+     * with `stateEventTypeFromString("com.example.custom")`.
+     *
+     * Only the state the sync asked for is stored locally, so for a custom
+     * event type this is empty unless that type is part of the sliding sync
+     * `required_state`.
+     */
+    func stateEvents(eventType: StateEventType) async throws  -> [RoomStateEvent]
+    
+    /**
      * Stop the current users live location share in the room.
      */
     func stopLiveLocationShare() async throws 
@@ -10275,6 +10329,24 @@ public protocol RoomProtocol: AnyObject, Sendable {
      * the queue.
      */
     func subscribeToSendQueueUpdates(listener: SendQueueListener) async throws  -> TaskHandle
+    
+    /**
+     * Subscribe to the room state events of the given type.
+     *
+     * The listener is called with the full current list of state events of
+     * that type, one per state key, immediately and then after every sync
+     * that changed any of them. All the changes of one sync are reported as a
+     * single snapshot.
+     *
+     * Use the returned [`TaskHandle`] to cancel the subscription.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the state events to listen to. For a type
+     * that has no variant of its own, build one from its string
+     * representation with `stateEventTypeFromString("com.example.custom")`.
+     */
+    func subscribeToStateEvents(eventType: StateEventType, listener: RoomStateEventsListener)  -> TaskHandle
     
     func subscribeToTypingNotifications(listener: TypingNotificationsListener)  -> TaskHandle
     
@@ -11955,6 +12027,35 @@ open func startLiveLocationShare(durationMillis: UInt64)async throws  -> String 
 }
     
     /**
+     * The current room state events of the given type, one per state key.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the state events to read. For a type that
+     * has no variant of its own, build one from its string representation
+     * with `stateEventTypeFromString("com.example.custom")`.
+     *
+     * Only the state the sync asked for is stored locally, so for a custom
+     * event type this is empty unless that type is part of the sliding sync
+     * `required_state`.
+     */
+open func stateEvents(eventType: StateEventType)async throws  -> [RoomStateEvent]  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_state_events(
+                        self.uniffiCloneHandle(),FfiConverterTypeStateEventType_lower(eventType)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeRoomStateEvent.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
      * Stop the current users live location share in the room.
      */
 open func stopLiveLocationShare()async throws   {
@@ -12062,6 +12163,33 @@ open func subscribeToSendQueueUpdates(listener: SendQueueListener)async throws  
             liftFunc: FfiConverterTypeTaskHandle_lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
+}
+    
+    /**
+     * Subscribe to the room state events of the given type.
+     *
+     * The listener is called with the full current list of state events of
+     * that type, one per state key, immediately and then after every sync
+     * that changed any of them. All the changes of one sync are reported as a
+     * single snapshot.
+     *
+     * Use the returned [`TaskHandle`] to cancel the subscription.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the state events to listen to. For a type
+     * that has no variant of its own, build one from its string
+     * representation with `stateEventTypeFromString("com.example.custom")`.
+     */
+open func subscribeToStateEvents(eventType: StateEventType, listener: RoomStateEventsListener) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_state_events(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeStateEventType_lower(eventType),
+        FfiConverterCallbackInterfaceRoomStateEventsListener_lower(listener),uniffiCallStatus
+    )
+})
 }
     
 open func subscribeToTypingNotifications(listener: TypingNotificationsListener) -> TaskHandle  {
@@ -21139,6 +21267,122 @@ public func FfiConverterTypeEmoteMessageContent_lower(_ value: EmoteMessageConte
 }
 
 
+/**
+ * The encryption data of an event that was sent encrypted (and which we
+ * managed to decrypt).
+ */
+public struct EventEncryptionInfo: Equatable, Hashable {
+    /**
+     * The user id this event is cryptographically attested to come from.
+     *
+     * For a to-device message this is what should be trusted, rather than the
+     * `sender` claimed in the event JSON.
+     */
+    public var senderId: String
+    /**
+     * The device the event was sent from, as claimed by the sender.
+     */
+    public var senderDeviceId: String?
+    /**
+     * The curve25519 key of the device that sent the event.
+     */
+    public var senderCurve25519Key: String?
+    /**
+     * The megolm session the event was sent in, if it was sent with megolm.
+     */
+    public var sessionId: String?
+    /**
+     * The shield to show for this event, lax interpretation.
+     */
+    public var shieldState: ShieldState
+    /**
+     * The shield to show for this event, strict interpretation.
+     */
+    public var shieldStateStrict: ShieldState
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The user id this event is cryptographically attested to come from.
+         *
+         * For a to-device message this is what should be trusted, rather than the
+         * `sender` claimed in the event JSON.
+         */senderId: String, 
+        /**
+         * The device the event was sent from, as claimed by the sender.
+         */senderDeviceId: String?, 
+        /**
+         * The curve25519 key of the device that sent the event.
+         */senderCurve25519Key: String?, 
+        /**
+         * The megolm session the event was sent in, if it was sent with megolm.
+         */sessionId: String?, 
+        /**
+         * The shield to show for this event, lax interpretation.
+         */shieldState: ShieldState, 
+        /**
+         * The shield to show for this event, strict interpretation.
+         */shieldStateStrict: ShieldState) {
+        self.senderId = senderId
+        self.senderDeviceId = senderDeviceId
+        self.senderCurve25519Key = senderCurve25519Key
+        self.sessionId = sessionId
+        self.shieldState = shieldState
+        self.shieldStateStrict = shieldStateStrict
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension EventEncryptionInfo: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeEventEncryptionInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EventEncryptionInfo {
+        return
+            try EventEncryptionInfo(
+                senderId: FfiConverterString.read(from: &buf), 
+                senderDeviceId: FfiConverterOptionString.read(from: &buf), 
+                senderCurve25519Key: FfiConverterOptionString.read(from: &buf), 
+                sessionId: FfiConverterOptionString.read(from: &buf), 
+                shieldState: FfiConverterTypeShieldState.read(from: &buf), 
+                shieldStateStrict: FfiConverterTypeShieldState.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: EventEncryptionInfo, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.senderId, into: &buf)
+        FfiConverterOptionString.write(value.senderDeviceId, into: &buf)
+        FfiConverterOptionString.write(value.senderCurve25519Key, into: &buf)
+        FfiConverterOptionString.write(value.sessionId, into: &buf)
+        FfiConverterTypeShieldState.write(value.shieldState, into: &buf)
+        FfiConverterTypeShieldState.write(value.shieldStateStrict, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEventEncryptionInfo_lift(_ buf: RustBuffer) throws -> EventEncryptionInfo {
+    return try FfiConverterTypeEventEncryptionInfo.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEventEncryptionInfo_lower(_ value: EventEncryptionInfo) -> RustBuffer {
+    return FfiConverterTypeEventEncryptionInfo.lower(value)
+}
+
+
 public struct EventTimelineItem {
     /**
      * Indicates that an event is remote.
@@ -26476,6 +26720,119 @@ public func FfiConverterTypeRoomPreviewInfo_lower(_ value: RoomPreviewInfo) -> R
 
 
 /**
+ * A room state event, as exposed over FFI.
+ */
+public struct RoomStateEvent: Equatable, Hashable {
+    /**
+     * The event type, e.g. `m.room.name`.
+     */
+    public var eventType: StateEventType
+    /**
+     * The state key this event is stored under.
+     */
+    public var stateKey: String
+    /**
+     * The event sender.
+     */
+    public var sender: String
+    /**
+     * The `content` of the event, as a JSON string.
+     */
+    public var contentJson: String
+    /**
+     * The event id, or `None` for the stripped state of a room we are only
+     * invited to.
+     */
+    public var eventId: String?
+    /**
+     * When the event was sent, in milliseconds since the Unix epoch, or `None`
+     * for the stripped state of a room we are only invited to.
+     */
+    public var timestamp: UInt64?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The event type, e.g. `m.room.name`.
+         */eventType: StateEventType, 
+        /**
+         * The state key this event is stored under.
+         */stateKey: String, 
+        /**
+         * The event sender.
+         */sender: String, 
+        /**
+         * The `content` of the event, as a JSON string.
+         */contentJson: String, 
+        /**
+         * The event id, or `None` for the stripped state of a room we are only
+         * invited to.
+         */eventId: String?, 
+        /**
+         * When the event was sent, in milliseconds since the Unix epoch, or `None`
+         * for the stripped state of a room we are only invited to.
+         */timestamp: UInt64?) {
+        self.eventType = eventType
+        self.stateKey = stateKey
+        self.sender = sender
+        self.contentJson = contentJson
+        self.eventId = eventId
+        self.timestamp = timestamp
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RoomStateEvent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRoomStateEvent: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomStateEvent {
+        return
+            try RoomStateEvent(
+                eventType: FfiConverterTypeStateEventType.read(from: &buf), 
+                stateKey: FfiConverterString.read(from: &buf), 
+                sender: FfiConverterString.read(from: &buf), 
+                contentJson: FfiConverterString.read(from: &buf), 
+                eventId: FfiConverterOptionString.read(from: &buf), 
+                timestamp: FfiConverterOptionUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RoomStateEvent, into buf: inout [UInt8]) {
+        FfiConverterTypeStateEventType.write(value.eventType, into: &buf)
+        FfiConverterString.write(value.stateKey, into: &buf)
+        FfiConverterString.write(value.sender, into: &buf)
+        FfiConverterString.write(value.contentJson, into: &buf)
+        FfiConverterOptionString.write(value.eventId, into: &buf)
+        FfiConverterOptionUInt64.write(value.timestamp, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomStateEvent_lift(_ buf: RustBuffer) throws -> RoomStateEvent {
+    return try FfiConverterTypeRoomStateEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomStateEvent_lower(_ value: RoomStateEvent) -> RustBuffer {
+    return FfiConverterTypeRoomStateEvent.lower(value)
+}
+
+
+/**
  * A push ruleset scopes a set of rules according to some criteria.
  */
 public struct Ruleset: Equatable, Hashable {
@@ -28550,6 +28907,105 @@ public func FfiConverterTypeTimelineUniqueId_lift(_ buf: RustBuffer) throws -> T
 #endif
 public func FfiConverterTypeTimelineUniqueId_lower(_ value: TimelineUniqueId) -> RustBuffer {
     return FfiConverterTypeTimelineUniqueId.lower(value)
+}
+
+
+/**
+ * A custom to-device message received by the client.
+ */
+public struct ToDeviceMessage: Equatable, Hashable {
+    /**
+     * The type of the message.
+     */
+    public var eventType: String
+    /**
+     * The user id that *claims* to have sent this message.
+     *
+     * This is unauthenticated. For an encrypted message, trust
+     * `encryption_info.sender_id` instead, which is cryptographically
+     * attested.
+     */
+    public var senderId: String
+    /**
+     * The message content, as a JSON string.
+     */
+    public var content: String
+    /**
+     * The encryption data of this message, or `None` if it arrived in the
+     * clear.
+     */
+    public var encryptionInfo: EventEncryptionInfo?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The type of the message.
+         */eventType: String, 
+        /**
+         * The user id that *claims* to have sent this message.
+         *
+         * This is unauthenticated. For an encrypted message, trust
+         * `encryption_info.sender_id` instead, which is cryptographically
+         * attested.
+         */senderId: String, 
+        /**
+         * The message content, as a JSON string.
+         */content: String, 
+        /**
+         * The encryption data of this message, or `None` if it arrived in the
+         * clear.
+         */encryptionInfo: EventEncryptionInfo?) {
+        self.eventType = eventType
+        self.senderId = senderId
+        self.content = content
+        self.encryptionInfo = encryptionInfo
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ToDeviceMessage: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeToDeviceMessage: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ToDeviceMessage {
+        return
+            try ToDeviceMessage(
+                eventType: FfiConverterString.read(from: &buf), 
+                senderId: FfiConverterString.read(from: &buf), 
+                content: FfiConverterString.read(from: &buf), 
+                encryptionInfo: FfiConverterOptionTypeEventEncryptionInfo.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ToDeviceMessage, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.eventType, into: &buf)
+        FfiConverterString.write(value.senderId, into: &buf)
+        FfiConverterString.write(value.content, into: &buf)
+        FfiConverterOptionTypeEventEncryptionInfo.write(value.encryptionInfo, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeToDeviceMessage_lift(_ buf: RustBuffer) throws -> ToDeviceMessage {
+    return try FfiConverterTypeToDeviceMessage.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeToDeviceMessage_lower(_ value: ToDeviceMessage) -> RustBuffer {
+    return FfiConverterTypeToDeviceMessage.lower(value)
 }
 
 
@@ -49404,6 +49860,145 @@ public func FfiConverterCallbackInterfaceRoomListServiceSyncIndicatorListener_lo
 
 
 
+/**
+ * A listener for the room state events of a single type, registered with
+ * [`Room::subscribe_to_state_events`].
+ */
+public protocol RoomStateEventsListener: AnyObject, Sendable {
+    
+    func onUpdate(events: [RoomStateEvent]) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceRoomStateEventsListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceRoomStateEventsListener = UniffiVTableCallbackInterfaceRoomStateEventsListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceRoomStateEventsListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface RoomStateEventsListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceRoomStateEventsListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface RoomStateEventsListener: handle missing in uniffiClone")
+            }
+        },
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            events: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceRoomStateEventsListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     events: try FfiConverterSequenceTypeRoomStateEvent.lift(events)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceRoomStateEventsListener> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceRoomStateEventsListener>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitRoomStateEventsListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_roomstateeventslistener(UniffiCallbackInterfaceRoomStateEventsListener.vtablePtr)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceRoomStateEventsListener {
+    fileprivate static let handleMap = UniffiHandleMap<RoomStateEventsListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceRoomStateEventsListener : FfiConverter {
+    typealias SwiftType = RoomStateEventsListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceRoomStateEventsListener_lift(_ handle: UInt64) throws -> RoomStateEventsListener {
+    return try FfiConverterCallbackInterfaceRoomStateEventsListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceRoomStateEventsListener_lower(_ v: RoomStateEventsListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceRoomStateEventsListener.lower(v)
+}
+
+
+
+
 public protocol SearchServicePaginationStateListener: AnyObject, Sendable {
     
     func onUpdate(paginationState: SearchServicePaginationState) 
@@ -51895,6 +52490,145 @@ public func FfiConverterCallbackInterfaceTimelineListener_lower(_ v: TimelineLis
 
 
 
+/**
+ * A listener for incoming to-device messages, registered with
+ * [`Client::subscribe_to_custom_to_device_messages`].
+ */
+public protocol ToDeviceMessageListener: AnyObject, Sendable {
+    
+    func onMessage(message: ToDeviceMessage) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceToDeviceMessageListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceToDeviceMessageListener = UniffiVTableCallbackInterfaceToDeviceMessageListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceToDeviceMessageListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface ToDeviceMessageListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceToDeviceMessageListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface ToDeviceMessageListener: handle missing in uniffiClone")
+            }
+        },
+        onMessage: { (
+            uniffiHandle: UInt64,
+            message: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceToDeviceMessageListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onMessage(
+                     message: try FfiConverterTypeToDeviceMessage_lift(message)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceToDeviceMessageListener> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceToDeviceMessageListener>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitToDeviceMessageListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_todevicemessagelistener(UniffiCallbackInterfaceToDeviceMessageListener.vtablePtr)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceToDeviceMessageListener {
+    fileprivate static let handleMap = UniffiHandleMap<ToDeviceMessageListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceToDeviceMessageListener : FfiConverter {
+    typealias SwiftType = ToDeviceMessageListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceToDeviceMessageListener_lift(_ handle: UInt64) throws -> ToDeviceMessageListener {
+    return try FfiConverterCallbackInterfaceToDeviceMessageListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceToDeviceMessageListener_lower(_ v: ToDeviceMessageListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceToDeviceMessageListener.lower(v)
+}
+
+
+
+
 public protocol TypingNotificationsListener: AnyObject, Sendable {
     
     func call(typingUserIds: [String]) 
@@ -53069,6 +53803,30 @@ fileprivate struct FfiConverterOptionTypeDuplicateOneTimeKeyErrorMessage: FfiCon
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeDuplicateOneTimeKeyErrorMessage.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeEventEncryptionInfo: FfiConverterRustBuffer {
+    typealias SwiftType = EventEncryptionInfo?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeEventEncryptionInfo.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeEventEncryptionInfo.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -55237,6 +55995,31 @@ fileprivate struct FfiConverterSequenceTypeRoomMember: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeRoomStateEvent: FfiConverterRustBuffer {
+    typealias SwiftType = [RoomStateEvent]
+
+    public static func write(_ value: [RoomStateEvent], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRoomStateEvent.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RoomStateEvent] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RoomStateEvent]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRoomStateEvent.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeSimplePushRule: FfiConverterRustBuffer {
     typealias SwiftType = [SimplePushRule]
 
@@ -57178,6 +57961,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_start_sso_login() != 26018) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_custom_to_device_messages() != 60226) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_duplicate_key_upload_errors() != 61081) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -57892,6 +58678,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_start_live_location_share() != 14892) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_state_events() != 9090) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_stop_live_location_share() != 49334) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -57908,6 +58697,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_send_queue_updates() != 14598) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_state_events() != 49220) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_typing_notifications() != 60113) {
@@ -58564,6 +59356,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_syncnotificationlistener_on_notification() != 2087) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_todevicemessagelistener_on_message() != 17223) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_backupstatelistener_on_update() != 3556) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -58610,6 +59405,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_roominfolistener_call() != 26634) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_roomstateeventslistener_on_update() != 57215) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sendqueuelistener_on_update() != 44694) {
@@ -58731,6 +59529,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitRoomListLoadingStateListener()
     uniffiCallbackInitRoomListServiceStateListener()
     uniffiCallbackInitRoomListServiceSyncIndicatorListener()
+    uniffiCallbackInitRoomStateEventsListener()
     uniffiCallbackInitSearchServicePaginationStateListener()
     uniffiCallbackInitSearchServiceResultsListener()
     uniffiCallbackInitSendQueueListener()
@@ -58748,6 +59547,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitThreadListEntriesListener()
     uniffiCallbackInitThreadListPaginationStateListener()
     uniffiCallbackInitTimelineListener()
+    uniffiCallbackInitToDeviceMessageListener()
     uniffiCallbackInitTypingNotificationsListener()
     uniffiCallbackInitUnableToDecryptDelegate()
     uniffiCallbackInitVerificationStateListener()
