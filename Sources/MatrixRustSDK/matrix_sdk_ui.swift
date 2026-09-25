@@ -826,8 +826,8 @@ public func FfiConverterTypeMembershipChangeFilter_lower(_ value: MembershipChan
  * different for this high-level UI API.
  *
  * This is implemented this way so that it's impossible to filter by “group”
- * and by “people” at the same time: these criteria are mutually
- * exclusive by design per filter.
+ * and by “people” at the same time: these criteria are mutually exclusive by
+ * design per filter.
  */
 
 public enum RoomListFilterCategory: Equatable, Hashable {
@@ -1323,8 +1323,8 @@ public enum TimelineEventCondition: Equatable, Hashable {
     case membershipChange(MembershipChangeFilter
     )
     /**
-     * The event is an `m.room.member` event that represents a profile
-     * change (displayname or avatar URL).
+     * The event is an `m.room.member` event that represents a profile change
+     * (displayname or avatar URL).
      */
     case profileChange
     /**
@@ -1502,8 +1502,8 @@ public func FfiConverterTypeTimelineEventFilter_lower(_ value: TimelineEventFilt
 
 
 /**
- * Options for controlling the behaviour of [`TimelineFocus::Event`]
- * for threaded events.
+ * Options for controlling the behaviour of [`TimelineFocus::Event`] for
+ * threaded events.
  */
 
 public enum TimelineEventFocusThreadMode: Equatable, Hashable {
@@ -1513,20 +1513,19 @@ public enum TimelineEventFocusThreadMode: Equatable, Hashable {
      *
      * When the focused event is part of a thread, the timeline will be focused
      * on that thread's root. Otherwise, the timeline will treat the target
-     * event itself as the thread root. Threaded events will never be
-     * hidden.
+     * event itself as the thread root. Threaded events will never be hidden.
      */
     case forceThread
     /**
      * Automatically determine if the target event is part of a thread or not.
      *
-     * If the event is part of a thread, the timeline
-     * will be filtered to on-thread events.
+     * If the event is part of a thread, the timeline will be filtered to
+     * on-thread events.
      */
     case automatic(
         /**
-         * When the target event is not part of a thread, whether to
-         * hide in-thread replies from the live timeline.
+         * When the target event is not part of a thread, whether to hide
+         * in-thread replies from the live timeline.
          *
          * Has no effect when the target event is part of a thread.
          *

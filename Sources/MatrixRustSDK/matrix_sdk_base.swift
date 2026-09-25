@@ -588,15 +588,14 @@ public struct MediaRetentionPolicy: Equatable, Hashable {
      *
      * If it is set, media content bigger than the maximum size will not be
      * cached. If the maximum size changed after media content that exceeds the
-     * new value was cached, the corresponding content will be removed
-     * during a cleanup.
+     * new value was cached, the corresponding content will be removed during a
+     * cleanup.
      *
      * Defaults to 20 MiB.
      */
     public var maxFileSize: UInt64?
     /**
-     * The duration after which unaccessed media content is considered
-     * expired.
+     * The duration after which unaccessed media content is considered expired.
      *
      * If this is set, media content whose last access is older than this
      * duration will be removed from the media cache during a cleanup.
@@ -607,8 +606,8 @@ public struct MediaRetentionPolicy: Equatable, Hashable {
     /**
      * The duration between two automatic media cache cleanups.
      *
-     * If this is set, a cleanup will be triggered after the given duration
-     * is elapsed, at the next call to the media cache API. If this is set to
+     * If this is set, a cleanup will be triggered after the given duration is
+     * elapsed, at the next call to the media cache API. If this is set to
      * zero, each call to the media cache API will trigger a cleanup. If this
      * is `None`, cleanups will only occur if they are triggered manually.
      *
@@ -647,14 +646,13 @@ public struct MediaRetentionPolicy: Equatable, Hashable {
          *
          * If it is set, media content bigger than the maximum size will not be
          * cached. If the maximum size changed after media content that exceeds the
-         * new value was cached, the corresponding content will be removed
-         * during a cleanup.
+         * new value was cached, the corresponding content will be removed during a
+         * cleanup.
          *
          * Defaults to 20 MiB.
          */maxFileSize: UInt64?, 
         /**
-         * The duration after which unaccessed media content is considered
-         * expired.
+         * The duration after which unaccessed media content is considered expired.
          *
          * If this is set, media content whose last access is older than this
          * duration will be removed from the media cache during a cleanup.
@@ -664,8 +662,8 @@ public struct MediaRetentionPolicy: Equatable, Hashable {
         /**
          * The duration between two automatic media cache cleanups.
          *
-         * If this is set, a cleanup will be triggered after the given duration
-         * is elapsed, at the next call to the media cache API. If this is set to
+         * If this is set, a cleanup will be triggered after the given duration is
+         * elapsed, at the next call to the media cache API. If this is set to
          * zero, each call to the media cache API will trigger a cleanup. If this
          * is `None`, cleanups will only occur if they are triggered manually.
          *
@@ -883,6 +881,92 @@ public func FfiConverterTypeEncryptionState_lift(_ buf: RustBuffer) throws -> En
 #endif
 public func FfiConverterTypeEncryptionState_lower(_ value: EncryptionState) -> RustBuffer {
     return FfiConverterTypeEncryptionState.lower(value)
+}
+
+
+
+/**
+ * Why a sticky event disappeared from the map of a room.
+ */
+
+public enum RemovalReason: Equatable, Hashable {
+    
+    /**
+     * The event stopped being sticky.
+     */
+    case expired
+    /**
+     * A newer event with the same key and an empty content (a removal, in
+     * MSC4354 terms) replaced it.
+     */
+    case replaced
+    /**
+     * We left the room.
+     */
+    case roomLeft
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension RemovalReason: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRemovalReason: FfiConverterRustBuffer {
+    typealias SwiftType = RemovalReason
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RemovalReason {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .expired
+        
+        case 2: return .replaced
+        
+        case 3: return .roomLeft
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RemovalReason, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .expired:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .replaced:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .roomLeft:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRemovalReason_lift(_ buf: RustBuffer) throws -> RemovalReason {
+    return try FfiConverterTypeRemovalReason.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRemovalReason_lower(_ value: RemovalReason) -> RustBuffer {
+    return FfiConverterTypeRemovalReason.lower(value)
 }
 
 
