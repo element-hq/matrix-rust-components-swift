@@ -1402,6 +1402,100 @@ public func FfiConverterTypeLoginQrCodeDecodeError_lower(_ value: LoginQrCodeDec
 
 
 /**
+ * Error type for the creation of a new [`QrCodeData`] struct.
+ */
+public 
+enum QrCodeCreationError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+    
+    
+    /**
+     * The base URL of the homeserver needs to be at most [`u8::MAX`] bytes
+     * long, otherwise it doesn't fit into the QR code.
+     */
+    case TooLongBaseUrl(message: String)
+    
+    /**
+     * The rendezvous ID of the channel needs to be at most [`u8::MAX`] bytes
+     * long, otherwise it doesn't fit into the QR code.
+     */
+    case TooLongRendezvousId(message: String)
+    
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
+}
+
+#if compiler(>=6)
+extension QrCodeCreationError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeQrCodeCreationError: FfiConverterRustBuffer {
+    typealias SwiftType = QrCodeCreationError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> QrCodeCreationError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .TooLongBaseUrl(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .TooLongRendezvousId(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: QrCodeCreationError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        case .TooLongBaseUrl(_ /* message is ignored*/):
+            writeInt(&buf, Int32(1))
+        case .TooLongRendezvousId(_ /* message is ignored*/):
+            writeInt(&buf, Int32(2))
+
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeQrCodeCreationError_lift(_ buf: RustBuffer) throws -> QrCodeCreationError {
+    return try FfiConverterTypeQrCodeCreationError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeQrCodeCreationError_lower(_ value: QrCodeCreationError) -> RustBuffer {
+    return FfiConverterTypeQrCodeCreationError.lower(value)
+}
+
+
+/**
  * The intent of the device that generated/displayed the QR code.
  *
  * The QR code login mechanism supports both, the new device, as well as the
