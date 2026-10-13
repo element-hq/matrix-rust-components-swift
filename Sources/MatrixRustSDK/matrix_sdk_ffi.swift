@@ -4551,10 +4551,10 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
      * `path` is the directory where the search index will be stored. It must
      * be unique per session.
      *
-     * `password` is an optional password to encrypt the search index at rest.
-     * If `None`, the search index will be stored unencrypted.
+     * `key` is an optional high-entropy key to encrypt the search index at
+     * rest. If `None`, the search index will be stored unencrypted.
      */
-    func withSearchIndexStore(path: String, password: String?)  -> ClientBuilder
+    func withSearchIndexStore(path: String, key: String?)  -> ClientBuilder
     
 }
 open class ClientBuilder: ClientBuilderProtocol, @unchecked Sendable {
@@ -5061,16 +5061,16 @@ open func userAgent(userAgent: String) -> ClientBuilder  {
      * `path` is the directory where the search index will be stored. It must
      * be unique per session.
      *
-     * `password` is an optional password to encrypt the search index at rest.
-     * If `None`, the search index will be stored unencrypted.
+     * `key` is an optional high-entropy key to encrypt the search index at
+     * rest. If `None`, the search index will be stored unencrypted.
      */
-open func withSearchIndexStore(path: String, password: String?) -> ClientBuilder  {
+open func withSearchIndexStore(path: String, key: String?) -> ClientBuilder  {
     return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_with_search_index_store(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(path),
-        FfiConverterOptionString.lower(password),uniffiCallStatus
+        FfiConverterOptionString.lower(key),uniffiCallStatus
     )
 })
 }
@@ -29231,6 +29231,10 @@ public struct StoreSizes: Equatable, Hashable {
      * The size of the MediaStore.
      */
     public var mediaStore: UInt64?
+    /**
+     * The size of the search index.
+     */
+    public var searchIndex: UInt64?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -29246,11 +29250,15 @@ public struct StoreSizes: Equatable, Hashable {
          */eventCacheStore: UInt64?, 
         /**
          * The size of the MediaStore.
-         */mediaStore: UInt64?) {
+         */mediaStore: UInt64?, 
+        /**
+         * The size of the search index.
+         */searchIndex: UInt64?) {
         self.cryptoStore = cryptoStore
         self.stateStore = stateStore
         self.eventCacheStore = eventCacheStore
         self.mediaStore = mediaStore
+        self.searchIndex = searchIndex
     }
 
     
@@ -29272,7 +29280,8 @@ public struct FfiConverterTypeStoreSizes: FfiConverterRustBuffer {
                 cryptoStore: FfiConverterOptionUInt64.read(from: &buf), 
                 stateStore: FfiConverterOptionUInt64.read(from: &buf), 
                 eventCacheStore: FfiConverterOptionUInt64.read(from: &buf), 
-                mediaStore: FfiConverterOptionUInt64.read(from: &buf)
+                mediaStore: FfiConverterOptionUInt64.read(from: &buf), 
+                searchIndex: FfiConverterOptionUInt64.read(from: &buf)
         )
     }
 
@@ -29281,6 +29290,7 @@ public struct FfiConverterTypeStoreSizes: FfiConverterRustBuffer {
         FfiConverterOptionUInt64.write(value.stateStore, into: &buf)
         FfiConverterOptionUInt64.write(value.eventCacheStore, into: &buf)
         FfiConverterOptionUInt64.write(value.mediaStore, into: &buf)
+        FfiConverterOptionUInt64.write(value.searchIndex, into: &buf)
     }
 }
 
@@ -36118,11 +36128,13 @@ public enum GrantGeneratedQrLoginProgress {
          * A URI to open in a (secure) system browser to verify the new login.
          */verificationUri: String, 
         /**
-         * A sender to confirm that the authorization using the verification
-         * URI has been started in the browser and that the application is
-         * ready to proceed. This allows applications that suspend or navigate
-         * away while the verification URI is open to resume the process
-         * explicitly.
+         * A sender to confirm that the verification URI has been opened in
+         * the browser and the application is ready to proceed, or to cancel.
+         *
+         * The new device has already been told to proceed when this state is
+         * emitted, so confirming only resumes this side of the process. This
+         * allows applications that suspend or navigate away while the
+         * verification URI is open to resume explicitly.
          */continuationSender: ContinuationMessageSender
     )
     /**
@@ -36259,11 +36271,13 @@ public enum GrantQrLoginProgress {
          * A URI to open in a (secure) system browser to verify the new login.
          */verificationUri: String, 
         /**
-         * A sender to confirm that the authorization using the verification
-         * URI has been started in the browser and that the application is
-         * ready to proceed. This allows applications that suspend or navigate
-         * away while the verification URI is open to resume the process
-         * explicitly.
+         * A sender to confirm that the verification URI has been opened in
+         * the browser and the application is ready to proceed, or to cancel.
+         *
+         * The new device has already been told to proceed when this state is
+         * emitted, so confirming only resumes this side of the process. This
+         * allows applications that suspend or navigate away while the
+         * verification URI is open to resume explicitly.
          */continuationSender: ContinuationMessageSender
     )
     /**
@@ -60357,7 +60371,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_user_agent() != 33630) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_with_search_index_store() != 61083) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_with_search_index_store() != 62704) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_contentscanner_scan() != 55879) {
