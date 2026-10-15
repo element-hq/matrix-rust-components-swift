@@ -1441,8 +1441,9 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * front-loaded by recency (the last week for all rooms first, then the
      * previous week, and so on), to populate the search index.
      *
-     * Requires `ClientBuilder::enable_automatic_back_pagination` to have been
-     * enabled, otherwise this no-ops.
+     * Requires `ClientBuilder::enable_automatic_back_pagination` and
+     * `ClientBuilder::enable_event_cache` to have been enabled, otherwise
+     * this no-ops.
      */
     func runSearchBackfill(strategy: SearchBackfillStrategy)  -> TaskHandle
     
@@ -3440,8 +3441,9 @@ open func rooms() -> [Room]  {
      * front-loaded by recency (the last week for all rooms first, then the
      * previous week, and so on), to populate the search index.
      *
-     * Requires `ClientBuilder::enable_automatic_back_pagination` to have been
-     * enabled, otherwise this no-ops.
+     * Requires `ClientBuilder::enable_automatic_back_pagination` and
+     * `ClientBuilder::enable_event_cache` to have been enabled, otherwise
+     * this no-ops.
      */
 open func runSearchBackfill(strategy: SearchBackfillStrategy) -> TaskHandle  {
     return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
@@ -4527,9 +4529,8 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
      * Tell the client that the system is memory constrained, like in a push
      * notification process for example.
      *
-     * So far, at the time of writing (2025-04-07), it changes the defaults of
-     * `matrix_sdk::SqliteStoreConfig` (if the `sqlite` feature is enabled).
-     * Please check `matrix_sdk::SqliteStoreConfig::with_low_memory_config`.
+     * It disables the Event Cache and the Latest Events, see
+     * [`matrix_sdk::ClientBuilder::with_event_cache`].
      */
     func systemIsMemoryConstrained()  -> ClientBuilder
     
@@ -5013,9 +5014,8 @@ open func sqliteStore(config: SqliteStoreBuilder) -> ClientBuilder  {
      * Tell the client that the system is memory constrained, like in a push
      * notification process for example.
      *
-     * So far, at the time of writing (2025-04-07), it changes the defaults of
-     * `matrix_sdk::SqliteStoreConfig` (if the `sqlite` feature is enabled).
-     * Please check `matrix_sdk::SqliteStoreConfig::with_low_memory_config`.
+     * It disables the Event Cache and the Latest Events, see
+     * [`matrix_sdk::ClientBuilder::with_event_cache`].
      */
 open func systemIsMemoryConstrained() -> ClientBuilder  {
     return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
@@ -10677,12 +10677,6 @@ public protocol RoomProtocol: AnyObject, Sendable {
     
     func resetPowerLevels() async throws  -> RoomPowerLevels
     
-    /**
-     * Return a debug representation for the internal room events data
-     * structure, one line per entry in the resulting vector.
-     */
-    func roomEventsDebugString() async throws  -> [String]
-    
     func roomInfo() async throws  -> RoomInfo
     
     /**
@@ -12268,26 +12262,6 @@ open func resetPowerLevels()async throws  -> RoomPowerLevels  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
             liftFunc: FfiConverterTypeRoomPowerLevels_lift,
-            errorHandler: FfiConverterTypeClientError_lift
-        )
-}
-    
-    /**
-     * Return a debug representation for the internal room events data
-     * structure, one line per entry in the resulting vector.
-     */
-open func roomEventsDebugString()async throws  -> [String]  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_room_room_events_debug_string(
-                        self.uniffiCloneHandle()
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterSequenceString.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -31620,6 +31594,16 @@ public struct WidgetCapabilities: Equatable, Hashable {
      * homeserver (MSC4515).
      */
     public var rtcTransports: Bool
+    /**
+     * This allows the widget to obtain a token to authenticate with a LiveKit
+     * SFU from the homeserver (MSC4533).
+     */
+    public var rtcLivekitGetToken: Bool
+    /**
+     * This allows the widget to hand the delayed leave event of a MatrixRTC
+     * session over to the homeserver (MSC4533).
+     */
+    public var rtcLivekitDelegateDelayedLeave: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -31649,7 +31633,15 @@ public struct WidgetCapabilities: Equatable, Hashable {
         /**
          * This allows the widget to discover the RTC transports advertised by the
          * homeserver (MSC4515).
-         */rtcTransports: Bool) {
+         */rtcTransports: Bool, 
+        /**
+         * This allows the widget to obtain a token to authenticate with a LiveKit
+         * SFU from the homeserver (MSC4533).
+         */rtcLivekitGetToken: Bool, 
+        /**
+         * This allows the widget to hand the delayed leave event of a MatrixRTC
+         * session over to the homeserver (MSC4533).
+         */rtcLivekitDelegateDelayedLeave: Bool) {
         self.read = read
         self.send = send
         self.requiresClient = requiresClient
@@ -31657,6 +31649,8 @@ public struct WidgetCapabilities: Equatable, Hashable {
         self.sendDelayedEvent = sendDelayedEvent
         self.downloadFiles = downloadFiles
         self.rtcTransports = rtcTransports
+        self.rtcLivekitGetToken = rtcLivekitGetToken
+        self.rtcLivekitDelegateDelayedLeave = rtcLivekitDelegateDelayedLeave
     }
 
     
@@ -31681,7 +31675,9 @@ public struct FfiConverterTypeWidgetCapabilities: FfiConverterRustBuffer {
                 updateDelayedEvent: FfiConverterBool.read(from: &buf), 
                 sendDelayedEvent: FfiConverterBool.read(from: &buf), 
                 downloadFiles: FfiConverterBool.read(from: &buf), 
-                rtcTransports: FfiConverterBool.read(from: &buf)
+                rtcTransports: FfiConverterBool.read(from: &buf), 
+                rtcLivekitGetToken: FfiConverterBool.read(from: &buf), 
+                rtcLivekitDelegateDelayedLeave: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -31693,6 +31689,8 @@ public struct FfiConverterTypeWidgetCapabilities: FfiConverterRustBuffer {
         FfiConverterBool.write(value.sendDelayedEvent, into: &buf)
         FfiConverterBool.write(value.downloadFiles, into: &buf)
         FfiConverterBool.write(value.rtcTransports, into: &buf)
+        FfiConverterBool.write(value.rtcLivekitGetToken, into: &buf)
+        FfiConverterBool.write(value.rtcLivekitDelegateDelayedLeave, into: &buf)
     }
 }
 
@@ -60119,7 +60117,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_rooms() != 64941) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_run_search_backfill() != 14130) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_run_search_backfill() != 15095) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_search_users() != 51156) {
@@ -60362,7 +60360,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_sqlite_store() != 59413) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_system_is_memory_constrained() != 59608) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_system_is_memory_constrained() != 25170) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_threads_enabled() != 10730) {
@@ -60867,9 +60865,6 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_reset_power_levels() != 61300) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_room_events_debug_string() != 47632) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_room_info() != 11004) {
