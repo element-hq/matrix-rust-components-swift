@@ -52675,6 +52675,9 @@ public protocol SessionVerificationControllerDelegate: AnyObject, Sendable {
     
     func didReceiveVerificationRequest(details: SessionVerificationRequestDetails) 
     
+    /**
+     * The other side accepted a verification request we sent.
+     */
     func didAcceptVerificationRequest() 
     
     func didStartSasVerification() 
@@ -61707,7 +61710,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_receive_verification_request() != 4653) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_accept_verification_request() != 61041) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_accept_verification_request() != 14352) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_sessionverificationcontrollerdelegate_did_start_sas_verification() != 12348) {
