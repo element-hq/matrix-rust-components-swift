@@ -1152,6 +1152,19 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func getUrlPreview(url: String, ts: UInt64?) async throws  -> String?
     
     /**
+     * Whether the user has joined at least one encrypted room, spaces
+     * excluded.
+     *
+     * The local cache is consulted first, falling back to asking the
+     * homeserver directly if no encrypted room is known. If the server
+     * does not answer in `timeout_ms` milliseconds, this returns an error.
+     *
+     * Clients should treat errors as "maybe encrypted", not as "not
+     * encrypted".
+     */
+    func hasEncryptedRooms(timeout: TimeInterval) async throws  -> Bool
+    
+    /**
      * The homeserver this client is configured to use.
      */
     func homeserver()  -> String
@@ -2635,6 +2648,33 @@ open func getUrlPreview(url: String, ts: UInt64?)async throws  -> String?  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterOptionString.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Whether the user has joined at least one encrypted room, spaces
+     * excluded.
+     *
+     * The local cache is consulted first, falling back to asking the
+     * homeserver directly if no encrypted room is known. If the server
+     * does not answer in `timeout_ms` milliseconds, this returns an error.
+     *
+     * Clients should treat errors as "maybe encrypted", not as "not
+     * encrypted".
+     */
+open func hasEncryptedRooms(timeout: TimeInterval)async throws  -> Bool  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_has_encrypted_rooms(
+                        self.uniffiCloneHandle(),FfiConverterDuration.lower(timeout)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_i8,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_i8,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
+            liftFunc: FfiConverterBool.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -10699,9 +10739,12 @@ public protocol RoomProtocol: AnyObject, Sendable {
      *
      * * `content` - The content of the event to send encoded as JSON string.
      *
+     * * `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
      * Returns the event ID of the newly sent event.
      */
-    func sendRaw(eventType: String, content: String) async throws  -> String
+    func sendRaw(eventType: String, content: String, requestConfigOverride: RequestConfigOverride?) async throws  -> String
     
     /**
      * Send a single receipt of the given type for the given event, optionally
@@ -10728,9 +10771,12 @@ public protocol RoomProtocol: AnyObject, Sendable {
      *
      * - `content` - The content of the state event encoded as a JSON string.
      *
+     * - `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
      * Returns the event ID of the newly created state event.
      */
-    func sendStateEventRaw(eventType: String, stateKey: String, content: String) async throws  -> String
+    func sendStateEventRaw(eventType: String, stateKey: String, content: String, requestConfigOverride: RequestConfigOverride?) async throws  -> String
     
     func setIsFavourite(isFavourite: Bool, tagOrder: Double?) async throws 
     
@@ -10974,6 +11020,8 @@ public protocol RoomProtocol: AnyObject, Sendable {
      * - `content` - The content of the event to send encoded as JSON string.
      * - `duration_ms` - How long the event stays sticky for, in milliseconds,
      * clamped to one hour.
+     * - `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
      *
      * # Returns
      *
@@ -10981,7 +11029,7 @@ public protocol RoomProtocol: AnyObject, Sendable {
      *
      * [`Client::is_sticky_events_supported`]: crate::client::Client::is_sticky_events_supported
      */
-    func sendStickyRaw(eventType: String, content: String, durationMs: UInt64) async throws  -> String
+    func sendStickyRaw(eventType: String, content: String, durationMs: UInt64, requestConfigOverride: RequestConfigOverride?) async throws  -> String
     
     /**
      * The sticky events that are currently live in this room.
@@ -12330,14 +12378,17 @@ open func sendLiveLocation(geoUri: String)async throws   {
      *
      * * `content` - The content of the event to send encoded as JSON string.
      *
+     * * `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
      * Returns the event ID of the newly sent event.
      */
-open func sendRaw(eventType: String, content: String)async throws  -> String  {
+open func sendRaw(eventType: String, content: String, requestConfigOverride: RequestConfigOverride? = nil)async throws  -> String  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_send_raw(
-                        self.uniffiCloneHandle(),FfiConverterString.lower(eventType),FfiConverterString.lower(content)
+                        self.uniffiCloneHandle(),FfiConverterString.lower(eventType),FfiConverterString.lower(content),FfiConverterOptionTypeRequestConfigOverride.lower(requestConfigOverride)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
@@ -12387,14 +12438,17 @@ open func sendSingleReceipt(receiptType: ReceiptType, thread: ReceiptThread, eve
      *
      * - `content` - The content of the state event encoded as a JSON string.
      *
+     * - `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
      * Returns the event ID of the newly created state event.
      */
-open func sendStateEventRaw(eventType: String, stateKey: String, content: String)async throws  -> String  {
+open func sendStateEventRaw(eventType: String, stateKey: String, content: String, requestConfigOverride: RequestConfigOverride? = nil)async throws  -> String  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_send_state_event_raw(
-                        self.uniffiCloneHandle(),FfiConverterString.lower(eventType),FfiConverterString.lower(stateKey),FfiConverterString.lower(content)
+                        self.uniffiCloneHandle(),FfiConverterString.lower(eventType),FfiConverterString.lower(stateKey),FfiConverterString.lower(content),FfiConverterOptionTypeRequestConfigOverride.lower(requestConfigOverride)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
@@ -13061,6 +13115,8 @@ open func subscribeToMessageLikeEvents(eventType: MessageLikeEventType, listener
      * - `content` - The content of the event to send encoded as JSON string.
      * - `duration_ms` - How long the event stays sticky for, in milliseconds,
      * clamped to one hour.
+     * - `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
      *
      * # Returns
      *
@@ -13068,12 +13124,12 @@ open func subscribeToMessageLikeEvents(eventType: MessageLikeEventType, listener
      *
      * [`Client::is_sticky_events_supported`]: crate::client::Client::is_sticky_events_supported
      */
-open func sendStickyRaw(eventType: String, content: String, durationMs: UInt64)async throws  -> String  {
+open func sendStickyRaw(eventType: String, content: String, durationMs: UInt64, requestConfigOverride: RequestConfigOverride? = nil)async throws  -> String  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_send_sticky_raw(
-                        self.uniffiCloneHandle(),FfiConverterString.lower(eventType),FfiConverterString.lower(content),FfiConverterUInt64.lower(durationMs)
+                        self.uniffiCloneHandle(),FfiConverterString.lower(eventType),FfiConverterString.lower(content),FfiConverterUInt64.lower(durationMs),FfiConverterOptionTypeRequestConfigOverride.lower(requestConfigOverride)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
@@ -26367,6 +26423,77 @@ public func FfiConverterTypeRequestConfig_lift(_ buf: RustBuffer) throws -> Requ
 #endif
 public func FfiConverterTypeRequestConfig_lower(_ value: RequestConfig) -> RustBuffer {
     return FfiConverterTypeRequestConfig.lower(value)
+}
+
+
+/**
+ * Overrides of the client's request config for a single request.
+ *
+ * Fields that are not set keep the values of the client's request config.
+ */
+public struct RequestConfigOverride: Equatable, Hashable {
+    /**
+     * Max number of retries. `0` disables retries.
+     */
+    public var retryLimit: UInt64?
+    /**
+     * Timeout for a single attempt of the request, in milliseconds.
+     */
+    public var timeout: UInt64?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Max number of retries. `0` disables retries.
+         */retryLimit: UInt64?, 
+        /**
+         * Timeout for a single attempt of the request, in milliseconds.
+         */timeout: UInt64?) {
+        self.retryLimit = retryLimit
+        self.timeout = timeout
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RequestConfigOverride: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRequestConfigOverride: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RequestConfigOverride {
+        return
+            try RequestConfigOverride(
+                retryLimit: FfiConverterOptionUInt64.read(from: &buf), 
+                timeout: FfiConverterOptionUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RequestConfigOverride, into buf: inout [UInt8]) {
+        FfiConverterOptionUInt64.write(value.retryLimit, into: &buf)
+        FfiConverterOptionUInt64.write(value.timeout, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRequestConfigOverride_lift(_ buf: RustBuffer) throws -> RequestConfigOverride {
+    return try FfiConverterTypeRequestConfigOverride.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRequestConfigOverride_lower(_ value: RequestConfigOverride) -> RustBuffer {
+    return FfiConverterTypeRequestConfigOverride.lower(value)
 }
 
 
@@ -56309,6 +56436,30 @@ fileprivate struct FfiConverterOptionTypePredecessorRoom: FfiConverterRustBuffer
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeRequestConfigOverride: FfiConverterRustBuffer {
+    typealias SwiftType = RequestConfigOverride?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRequestConfigOverride.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRequestConfigOverride.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeResolvedRoomAlias: FfiConverterRustBuffer {
     typealias SwiftType = ResolvedRoomAlias?
 
@@ -60000,6 +60151,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_url_preview() != 44378) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_has_encrypted_rooms() != 34305) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_homeserver() != 42423) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -60879,13 +61033,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_live_location() != 29293) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_raw() != 29137) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_raw() != 31612) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_single_receipt() != 44071) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_state_event_raw() != 54069) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_state_event_raw() != 50352) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_is_favourite() != 17735) {
@@ -60987,7 +61141,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_message_like_events() != 31308) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_sticky_raw() != 20102) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_sticky_raw() != 12025) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_sticky_events() != 3124) {
