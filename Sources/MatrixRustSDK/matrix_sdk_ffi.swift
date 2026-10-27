@@ -5534,11 +5534,11 @@ public protocol EncryptionProtocol: AnyObject, Sendable {
     func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, progressListener: EnableRecoveryProgressListener) async throws  -> String
     
     /**
-     * Does the user have other devices that the current device can verify
-     * against?
+     * Does the user have devices, other than the current one, that the
+     * current device can verify against?
      *
-     * The device must be signed by the user's cross-signing key, must have an
-     * identity, and must not be a dehydrated device.
+     * The device must be signed by the user's cross-signing key, must support
+     * Olm (have a Curve25519 key), and must not be a dehydrated device.
      */
     func hasDevicesToVerifyAgainst() async throws  -> Bool
     
@@ -5908,11 +5908,11 @@ open func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, prog
 }
     
     /**
-     * Does the user have other devices that the current device can verify
-     * against?
+     * Does the user have devices, other than the current one, that the
+     * current device can verify against?
      *
-     * The device must be signed by the user's cross-signing key, must have an
-     * identity, and must not be a dehydrated device.
+     * The device must be signed by the user's cross-signing key, must support
+     * Olm (have a Curve25519 key), and must not be a dehydrated device.
      */
 open func hasDevicesToVerifyAgainst()async throws  -> Bool  {
     return
@@ -60565,7 +60565,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_recovery() != 1090) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_has_devices_to_verify_against() != 53568) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_has_devices_to_verify_against() != 40096) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_import_secrets_bundle() != 51946) {
