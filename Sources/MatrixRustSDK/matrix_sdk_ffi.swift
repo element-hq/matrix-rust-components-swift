@@ -1341,6 +1341,19 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func observeRoomAccountDataEvent(roomId: String, eventType: RoomAccountDataEventType, listener: RoomAccountDataListener) throws  -> TaskHandle
     
     /**
+     * Subscribe to the total unread notification count of this [`Client`].
+     *
+     * The listener is called at most once every `min_interval` when new
+     * [`RoomInfoNotableUpdate`] are received. This interval mode is to avoid
+     * calculating hundreds of new values in a very small amount of time.
+     *
+     * An initial value will be reported as soon as the subscription starts.
+     *
+     * Use the returned [`TaskHandle`] to cancel the subscription.
+     */
+    func observeTotalUnreadNotifications(listener: TotalUnreadNotificationsListener, minInterval: TimeInterval)  -> TaskHandle
+    
+    /**
      * Perform database optimizations if any are available, i.e. vacuuming in
      * SQLite.
      */
@@ -3180,6 +3193,28 @@ open func observeRoomAccountDataEvent(roomId: String, eventType: RoomAccountData
         FfiConverterString.lower(roomId),
         FfiConverterTypeRoomAccountDataEventType_lower(eventType),
         FfiConverterCallbackInterfaceRoomAccountDataListener_lower(listener),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Subscribe to the total unread notification count of this [`Client`].
+     *
+     * The listener is called at most once every `min_interval` when new
+     * [`RoomInfoNotableUpdate`] are received. This interval mode is to avoid
+     * calculating hundreds of new values in a very small amount of time.
+     *
+     * An initial value will be reported as soon as the subscription starts.
+     *
+     * Use the returned [`TaskHandle`] to cancel the subscription.
+     */
+open func observeTotalUnreadNotifications(listener: TotalUnreadNotificationsListener, minInterval: TimeInterval) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_method_client_observe_total_unread_notifications(
+            self.uniffiCloneHandle(),
+        FfiConverterCallbackInterfaceTotalUnreadNotificationsListener_lower(listener),
+        FfiConverterDuration.lower(minInterval),uniffiCallStatus
     )
 })
 }
@@ -22285,6 +22320,11 @@ public struct EventTimelineItem {
      * Send state of our pending redaction of this event, if any.
      */
     public var redactionSendState: EventSendState?
+    /**
+     * The reason given with the redaction of this event, if any: from the
+     * server, or from our own redaction while it is still pending.
+     */
+    public var redactionReason: String?
     public var localCreatedAt: UInt64?
     public var readReceipts: [String: Receipt]
     public var origin: EventItemOrigin?
@@ -22306,7 +22346,11 @@ public struct EventTimelineItem {
          */editSendState: EventSendState?, 
         /**
          * Send state of our pending redaction of this event, if any.
-         */redactionSendState: EventSendState?, localCreatedAt: UInt64?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, lazyProvider: LazyTimelineItemProvider) {
+         */redactionSendState: EventSendState?, 
+        /**
+         * The reason given with the redaction of this event, if any: from the
+         * server, or from our own redaction while it is still pending.
+         */redactionReason: String?, localCreatedAt: UInt64?, readReceipts: [String: Receipt], origin: EventItemOrigin?, canBeRepliedTo: Bool, lazyProvider: LazyTimelineItemProvider) {
         self.isRemote = isRemote
         self.eventOrTransactionId = eventOrTransactionId
         self.sender = sender
@@ -22322,6 +22366,7 @@ public struct EventTimelineItem {
         self.localSendState = localSendState
         self.editSendState = editSendState
         self.redactionSendState = redactionSendState
+        self.redactionReason = redactionReason
         self.localCreatedAt = localCreatedAt
         self.readReceipts = readReceipts
         self.origin = origin
@@ -22360,6 +22405,7 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
                 localSendState: FfiConverterOptionTypeEventSendState.read(from: &buf), 
                 editSendState: FfiConverterOptionTypeEventSendState.read(from: &buf), 
                 redactionSendState: FfiConverterOptionTypeEventSendState.read(from: &buf), 
+                redactionReason: FfiConverterOptionString.read(from: &buf), 
                 localCreatedAt: FfiConverterOptionUInt64.read(from: &buf), 
                 readReceipts: FfiConverterDictionaryStringTypeReceipt.read(from: &buf), 
                 origin: FfiConverterOptionTypeEventItemOrigin.read(from: &buf), 
@@ -22384,6 +22430,7 @@ public struct FfiConverterTypeEventTimelineItem: FfiConverterRustBuffer {
         FfiConverterOptionTypeEventSendState.write(value.localSendState, into: &buf)
         FfiConverterOptionTypeEventSendState.write(value.editSendState, into: &buf)
         FfiConverterOptionTypeEventSendState.write(value.redactionSendState, into: &buf)
+        FfiConverterOptionString.write(value.redactionReason, into: &buf)
         FfiConverterOptionUInt64.write(value.localCreatedAt, into: &buf)
         FfiConverterDictionaryStringTypeReceipt.write(value.readReceipts, into: &buf)
         FfiConverterOptionTypeEventItemOrigin.write(value.origin, into: &buf)
@@ -44236,8 +44283,14 @@ public enum RtcTransport: Equatable, Hashable {
      */
     case liveKit(
         /**
-         * The URL of the LiveKit service.
-         */serviceUrl: String
+         * The WebSocket URL of the LiveKit SFU.
+         */url: String?, 
+        /**
+         * The URL of the LiveKit JWT service.
+         *
+         * Deprecated in favor of `url`. Should only be used when backwards
+         * compatibility with older versions of MSC4195 is required
+         */serviceUrl: String?
     )
     /**
      * A transport type the SDK doesn't know about, up for interpretation by
@@ -44273,7 +44326,7 @@ public struct FfiConverterTypeRtcTransport: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .liveKit(serviceUrl: try FfiConverterString.read(from: &buf)
+        case 1: return .liveKit(url: try FfiConverterOptionString.read(from: &buf), serviceUrl: try FfiConverterOptionString.read(from: &buf)
         )
         
         case 2: return .custom(transportType: try FfiConverterString.read(from: &buf), data: try FfiConverterString.read(from: &buf)
@@ -44287,9 +44340,10 @@ public struct FfiConverterTypeRtcTransport: FfiConverterRustBuffer {
         switch value {
         
         
-        case let .liveKit(serviceUrl):
+        case let .liveKit(url,serviceUrl):
             writeInt(&buf, Int32(1))
-            FfiConverterString.write(serviceUrl, into: &buf)
+            FfiConverterOptionString.write(url, into: &buf)
+            FfiConverterOptionString.write(serviceUrl, into: &buf)
             
         
         case let .custom(transportType,data):
@@ -54870,6 +54924,145 @@ public func FfiConverterCallbackInterfaceToDeviceMessageListener_lower(_ v: ToDe
 
 
 
+/**
+ * A callback interface for receiving updates of the total unread notification
+ * count.
+ */
+public protocol TotalUnreadNotificationsListener: AnyObject, Sendable {
+    
+    func onUpdate(count: UInt64) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceTotalUnreadNotificationsListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceTotalUnreadNotificationsListener = UniffiVTableCallbackInterfaceTotalUnreadNotificationsListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceTotalUnreadNotificationsListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface TotalUnreadNotificationsListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceTotalUnreadNotificationsListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface TotalUnreadNotificationsListener: handle missing in uniffiClone")
+            }
+        },
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            count: UInt64,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceTotalUnreadNotificationsListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     count: try FfiConverterUInt64.lift(count)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceTotalUnreadNotificationsListener> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceTotalUnreadNotificationsListener>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitTotalUnreadNotificationsListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_totalunreadnotificationslistener(UniffiCallbackInterfaceTotalUnreadNotificationsListener.vtablePtr)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceTotalUnreadNotificationsListener {
+    fileprivate static let handleMap = UniffiHandleMap<TotalUnreadNotificationsListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceTotalUnreadNotificationsListener : FfiConverter {
+    typealias SwiftType = TotalUnreadNotificationsListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceTotalUnreadNotificationsListener_lift(_ handle: UInt64) throws -> TotalUnreadNotificationsListener {
+    return try FfiConverterCallbackInterfaceTotalUnreadNotificationsListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceTotalUnreadNotificationsListener_lower(_ v: TotalUnreadNotificationsListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceTotalUnreadNotificationsListener.lower(v)
+}
+
+
+
+
 public protocol TypingNotificationsListener: AnyObject, Sendable {
     
     func call(typingUserIds: [String]) 
@@ -60232,6 +60425,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_observe_room_account_data_event() != 43975) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_observe_total_unread_notifications() != 58076) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_optimize_stores() != 24510) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -61777,6 +61973,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_todevicemessagelistener_on_message() != 17223) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_totalunreadnotificationslistener_on_update() != 47437) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_backupstatelistener_on_update() != 3556) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -61974,6 +62173,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitThreadListPaginationStateListener()
     uniffiCallbackInitTimelineListener()
     uniffiCallbackInitToDeviceMessageListener()
+    uniffiCallbackInitTotalUnreadNotificationsListener()
     uniffiCallbackInitTypingNotificationsListener()
     uniffiCallbackInitUnableToDecryptDelegate()
     uniffiCallbackInitVerificationStateListener()
