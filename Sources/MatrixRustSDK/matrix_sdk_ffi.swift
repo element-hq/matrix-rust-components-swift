@@ -938,11 +938,12 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * it via dropping the previous and re-creating it, restarting their
      * application, or any other similar means.
      *
-     * - This will get rid of the backing state store file, if provided.
      * - This will empty all the room's persisted event caches, so all rooms
      * will start as if they were empty.
-     * - This will empty the media cache according to the current media
-     * retention policy.
+     * - This will delete the search index.
+     * - This will close all the stores, then get rid of the backing state
+     * store, event cache store and media store files, if provided. The
+     * crypto store is kept.
      */
     func clearCaches(syncService: SyncService?) async throws 
     
@@ -1063,6 +1064,13 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * cache.
      */
     func getInviteAvatarsDisplayPolicy() async throws  -> InviteAvatars?
+    
+    /**
+     * Get the room invite permission stored in the cache.
+     *
+     * A missing configuration is treated as unrestricted.
+     */
+    func getInvitePermission() async throws  -> InvitePermissionState
     
     /**
      * Gets the `max_upload_size` value from the homeserver, which controls the
@@ -1551,6 +1559,11 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func setInviteAvatarsDisplayPolicy(policy: InviteAvatars) async throws 
     
     /**
+     * Set the room invite permission for this account.
+     */
+    func setInvitePermission(action: InvitePermissionAction) async throws 
+    
+    /**
      * Set the media previews timeline display policy
      */
     func setMediaPreviewDisplayPolicy(policy: MediaPreviews) async throws 
@@ -1623,6 +1636,11 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func subscribeToDuplicateKeyUploadErrors(listener: DuplicateKeyUploadErrorListener)  -> TaskHandle
     
     func subscribeToIgnoredUsers(listener: IgnoredUsersListener)  -> TaskHandle
+    
+    /**
+     * Subscribe to changes in the room invite permission configuration.
+     */
+    func subscribeToInvitePermission(listener: InvitePermissionListener) async throws  -> TaskHandle
     
     /**
      * Subscribe to changes in the media preview configuration.
@@ -2026,11 +2044,12 @@ open func canDeactivateAccount() -> Bool  {
      * it via dropping the previous and re-creating it, restarting their
      * application, or any other similar means.
      *
-     * - This will get rid of the backing state store file, if provided.
      * - This will empty all the room's persisted event caches, so all rooms
      * will start as if they were empty.
-     * - This will empty the media cache according to the current media
-     * retention policy.
+     * - This will delete the search index.
+     * - This will close all the stores, then get rid of the backing state
+     * store, event cache store and media store files, if provided. The
+     * crypto store is kept.
      */
 open func clearCaches(syncService: SyncService?)async throws   {
     return
@@ -2369,6 +2388,27 @@ open func getInviteAvatarsDisplayPolicy()async throws  -> InviteAvatars?  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterOptionTypeInviteAvatars.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Get the room invite permission stored in the cache.
+     *
+     * A missing configuration is treated as unrestricted.
+     */
+open func getInvitePermission()async throws  -> InvitePermissionState  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_get_invite_permission(
+                        self.uniffiCloneHandle()
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeInvitePermissionState_lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -3743,6 +3783,25 @@ open func setInviteAvatarsDisplayPolicy(policy: InviteAvatars)async throws   {
 }
     
     /**
+     * Set the room invite permission for this account.
+     */
+open func setInvitePermission(action: InvitePermissionAction)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_set_invite_permission(
+                        self.uniffiCloneHandle(),FfiConverterTypeInvitePermissionAction_lower(action)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
      * Set the media previews timeline display policy
      */
 open func setMediaPreviewDisplayPolicy(policy: MediaPreviews)async throws   {
@@ -3959,6 +4018,25 @@ open func subscribeToIgnoredUsers(listener: IgnoredUsersListener) -> TaskHandle 
         FfiConverterCallbackInterfaceIgnoredUsersListener_lower(listener),uniffiCallStatus
     )
 })
+}
+    
+    /**
+     * Subscribe to changes in the room invite permission configuration.
+     */
+open func subscribeToInvitePermission(listener: InvitePermissionListener)async throws  -> TaskHandle  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_subscribe_to_invite_permission(
+                        self.uniffiCloneHandle(),FfiConverterCallbackInterfaceInvitePermissionListener_lower(listener)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
+            liftFunc: FfiConverterTypeTaskHandle_lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
 }
     
     /**
@@ -5566,7 +5644,23 @@ public protocol EncryptionProtocol: AnyObject, Sendable {
     
     func enableBackups() async throws 
     
-    func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, progressListener: EnableRecoveryProgressListener) async throws  -> String
+    /**
+     * Enable recovery on the account.
+     *
+     * # Arguments
+     *
+     * - `wait_for_backups_to_upload` - Should the enabling of the recovery
+     * also wait for _all_ room keys to be uploaded to the server-side key
+     * backup?
+     * - `key` - The key to use to encrypt secret storage.  If `None`, a new
+     * key will be randomly generated.  A key can be generated from a
+     * passphrase by using [`SecretStorageKey::new_from_passphrase`].
+     * - `progress_listener` - A listener to track the progress of enabling
+     * recovery.
+     *
+     * Returns the base58-representation of the secret storage key.
+     */
+    func enableRecovery(waitForBackupsToUpload: Bool, key: SecretStorageKey?, progressListener: EnableRecoveryProgressListener) async throws  -> String
     
     /**
      * Does the user have devices, other than the current one, that the
@@ -5926,12 +6020,28 @@ open func enableBackups()async throws   {
         )
 }
     
-open func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, progressListener: EnableRecoveryProgressListener)async throws  -> String  {
+    /**
+     * Enable recovery on the account.
+     *
+     * # Arguments
+     *
+     * - `wait_for_backups_to_upload` - Should the enabling of the recovery
+     * also wait for _all_ room keys to be uploaded to the server-side key
+     * backup?
+     * - `key` - The key to use to encrypt secret storage.  If `None`, a new
+     * key will be randomly generated.  A key can be generated from a
+     * passphrase by using [`SecretStorageKey::new_from_passphrase`].
+     * - `progress_listener` - A listener to track the progress of enabling
+     * recovery.
+     *
+     * Returns the base58-representation of the secret storage key.
+     */
+open func enableRecovery(waitForBackupsToUpload: Bool, key: SecretStorageKey?, progressListener: EnableRecoveryProgressListener)async throws  -> String  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_encryption_enable_recovery(
-                        self.uniffiCloneHandle(),FfiConverterBool.lower(waitForBackupsToUpload),FfiConverterOptionString.lower(passphrase),FfiConverterCallbackInterfaceEnableRecoveryProgressListener_lower(progressListener)
+                        self.uniffiCloneHandle(),FfiConverterBool.lower(waitForBackupsToUpload),FfiConverterOptionTypeSecretStorageKey.lower(key),FfiConverterCallbackInterfaceEnableRecoveryProgressListener_lower(progressListener)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
@@ -10650,6 +10760,13 @@ public protocol RoomProtocol: AnyObject, Sendable {
     
     func members() async throws  -> RoomMembersIterator
     
+    /**
+     * Gets the members for this room, like [`Room::members`], but also fetches
+     * any missing global profiles for those members in the background (when
+     * supported by the server).
+     */
+    func membersFetchingGlobalProfiles() async throws  -> RoomMembersIterator
+    
     func membersNoSync() async throws  -> RoomMembersIterator
     
     /**
@@ -12082,6 +12199,27 @@ open func members()async throws  -> RoomMembersIterator  {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_room_members(
+                        self.uniffiCloneHandle()
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
+            liftFunc: FfiConverterTypeRoomMembersIterator_lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Gets the members for this room, like [`Room::members`], but also fetches
+     * any missing global profiles for those members in the background (when
+     * supported by the server).
+     */
+open func membersFetchingGlobalProfiles()async throws  -> RoomMembersIterator  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_members_fetching_global_profiles(
                         self.uniffiCloneHandle()
                 )
             },
@@ -15376,6 +15514,166 @@ public func FfiConverterTypeSearchService_lift(_ handle: UInt64) throws -> Searc
 #endif
 public func FfiConverterTypeSearchService_lower(_ value: SearchService) -> UInt64 {
     return FfiConverterTypeSearchService.lower(value)
+}
+
+
+
+
+
+
+/**
+ * A secret storage key.
+ */
+public protocol SecretStorageKeyProtocol: AnyObject, Sendable {
+    
+    /**
+     * The base-58 representation of the key to present to the user.
+     *
+     * _Note_: This returns a copy of the private key material of the
+     * [`SecretStorageKey`] as a string. The caller needs to ensure that this
+     * string is zeroized.
+     */
+    func toBase58()  -> String
+    
+}
+/**
+ * A secret storage key.
+ */
+open class SecretStorageKey: SecretStorageKeyProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_secretstoragekey(self.handle, $0) }
+    }
+    /**
+     * Create a new random secret storage key.
+     */
+public convenience init() {
+    let handle =
+        try! rustCall() {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_constructor_secretstoragekey_new(uniffiCallStatus
+    )
+}
+    self.init(unsafeFromHandle: handle)
+}
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_secretstoragekey(handle, $0) }
+    }
+
+    
+    /**
+     * Create a new secret storage key from a passphrase.
+     */
+public static func newFromPassphrase(passphrase: String) -> SecretStorageKey  {
+    return try!  FfiConverterTypeSecretStorageKey_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_constructor_secretstoragekey_new_from_passphrase(
+        FfiConverterString.lower(passphrase),uniffiCallStatus
+    )
+})
+}
+    
+
+    
+    /**
+     * The base-58 representation of the key to present to the user.
+     *
+     * _Note_: This returns a copy of the private key material of the
+     * [`SecretStorageKey`] as a string. The caller needs to ensure that this
+     * string is zeroized.
+     */
+open func toBase58() -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_method_secretstoragekey_to_base58(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSecretStorageKey: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = SecretStorageKey
+
+    public static func lift(_ handle: UInt64) throws -> SecretStorageKey {
+        return SecretStorageKey(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: SecretStorageKey) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SecretStorageKey {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: SecretStorageKey, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecretStorageKey_lift(_ handle: UInt64) throws -> SecretStorageKey {
+    return try FfiConverterTypeSecretStorageKey.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecretStorageKey_lower(_ value: SecretStorageKey) -> UInt64 {
+    return FfiConverterTypeSecretStorageKey.lower(value)
 }
 
 
@@ -31590,10 +31888,23 @@ public struct VideoInfo {
     public var thumbnailInfo: ThumbnailInfo?
     public var thumbnailSource: MediaSource?
     public var blurhash: String?
+    /**
+     * Whether this video should be displayed as a circle video
+     * ([MSC4546](https://github.com/matrix-org/matrix-spec-proposals/pull/4546)).
+     *
+     * Defaults to `false`.
+     */
+    public var circle: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(duration: TimeInterval?, height: UInt64?, width: UInt64?, mimetype: String?, size: UInt64?, thumbnailInfo: ThumbnailInfo?, thumbnailSource: MediaSource?, blurhash: String?) {
+    public init(duration: TimeInterval?, height: UInt64?, width: UInt64?, mimetype: String?, size: UInt64?, thumbnailInfo: ThumbnailInfo?, thumbnailSource: MediaSource?, blurhash: String?, 
+        /**
+         * Whether this video should be displayed as a circle video
+         * ([MSC4546](https://github.com/matrix-org/matrix-spec-proposals/pull/4546)).
+         *
+         * Defaults to `false`.
+         */circle: Bool = false) {
         self.duration = duration
         self.height = height
         self.width = width
@@ -31602,6 +31913,7 @@ public struct VideoInfo {
         self.thumbnailInfo = thumbnailInfo
         self.thumbnailSource = thumbnailSource
         self.blurhash = blurhash
+        self.circle = circle
     }
 
     
@@ -31627,7 +31939,8 @@ public struct FfiConverterTypeVideoInfo: FfiConverterRustBuffer {
                 size: FfiConverterOptionUInt64.read(from: &buf), 
                 thumbnailInfo: FfiConverterOptionTypeThumbnailInfo.read(from: &buf), 
                 thumbnailSource: FfiConverterOptionTypeMediaSource.read(from: &buf), 
-                blurhash: FfiConverterOptionString.read(from: &buf)
+                blurhash: FfiConverterOptionString.read(from: &buf), 
+                circle: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -31640,6 +31953,7 @@ public struct FfiConverterTypeVideoInfo: FfiConverterRustBuffer {
         FfiConverterOptionTypeThumbnailInfo.write(value.thumbnailInfo, into: &buf)
         FfiConverterOptionTypeMediaSource.write(value.thumbnailSource, into: &buf)
         FfiConverterOptionString.write(value.blurhash, into: &buf)
+        FfiConverterBool.write(value.circle, into: &buf)
     }
 }
 
@@ -31668,18 +31982,32 @@ public struct VideoMessageContent {
     public var formattedCaption: FormattedBody?
     public var source: MediaSource
     public var info: VideoInfo?
+    /**
+     * Whether this video should be displayed as a circle video
+     * ([MSC4546](https://github.com/matrix-org/matrix-spec-proposals/pull/4546)).
+     *
+     * Defaults to `false`.
+     */
+    public var circle: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         /**
          * The computed filename, for use in a client.
-         */filename: String, caption: String?, formattedCaption: FormattedBody?, source: MediaSource, info: VideoInfo?) {
+         */filename: String, caption: String?, formattedCaption: FormattedBody?, source: MediaSource, info: VideoInfo?, 
+        /**
+         * Whether this video should be displayed as a circle video
+         * ([MSC4546](https://github.com/matrix-org/matrix-spec-proposals/pull/4546)).
+         *
+         * Defaults to `false`.
+         */circle: Bool = false) {
         self.filename = filename
         self.caption = caption
         self.formattedCaption = formattedCaption
         self.source = source
         self.info = info
+        self.circle = circle
     }
 
     
@@ -31702,7 +32030,8 @@ public struct FfiConverterTypeVideoMessageContent: FfiConverterRustBuffer {
                 caption: FfiConverterOptionString.read(from: &buf), 
                 formattedCaption: FfiConverterOptionTypeFormattedBody.read(from: &buf), 
                 source: FfiConverterTypeMediaSource.read(from: &buf), 
-                info: FfiConverterOptionTypeVideoInfo.read(from: &buf)
+                info: FfiConverterOptionTypeVideoInfo.read(from: &buf), 
+                circle: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -31712,6 +32041,7 @@ public struct FfiConverterTypeVideoMessageContent: FfiConverterRustBuffer {
         FfiConverterOptionTypeFormattedBody.write(value.formattedCaption, into: &buf)
         FfiConverterTypeMediaSource.write(value.source, into: &buf)
         FfiConverterOptionTypeVideoInfo.write(value.info, into: &buf)
+        FfiConverterBool.write(value.circle, into: &buf)
     }
 }
 
@@ -37174,6 +37504,166 @@ public func FfiConverterTypeInviteAvatars_lift(_ buf: RustBuffer) throws -> Invi
 #endif
 public func FfiConverterTypeInviteAvatars_lower(_ value: InviteAvatars) -> RustBuffer {
     return FfiConverterTypeInviteAvatars.lower(value)
+}
+
+
+
+/**
+ * The room invite permissions that can be set.
+ */
+
+public enum InvitePermissionAction: Equatable, Hashable {
+    
+    /**
+     * Allow room invitations.
+     */
+    case allow
+    /**
+     * Block all room invitations.
+     */
+    case block
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension InvitePermissionAction: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeInvitePermissionAction: FfiConverterRustBuffer {
+    typealias SwiftType = InvitePermissionAction
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> InvitePermissionAction {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .allow
+        
+        case 2: return .block
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: InvitePermissionAction, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .allow:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .block:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeInvitePermissionAction_lift(_ buf: RustBuffer) throws -> InvitePermissionAction {
+    return try FfiConverterTypeInvitePermissionAction.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeInvitePermissionAction_lower(_ value: InvitePermissionAction) -> RustBuffer {
+    return FfiConverterTypeInvitePermissionAction.lower(value)
+}
+
+
+
+/**
+ * The current room invite permission state.
+ */
+
+public enum InvitePermissionState: Equatable, Hashable {
+    
+    /**
+     * No default restriction on room invitations.
+     */
+    case unrestricted
+    /**
+     * All room invitations are blocked.
+     */
+    case block
+    /**
+     * An invite permission not supported by the SDK.
+     */
+    case unsupported
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension InvitePermissionState: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeInvitePermissionState: FfiConverterRustBuffer {
+    typealias SwiftType = InvitePermissionState
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> InvitePermissionState {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .unrestricted
+        
+        case 2: return .block
+        
+        case 3: return .unsupported
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: InvitePermissionState, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .unrestricted:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .block:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .unsupported:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeInvitePermissionState_lift(_ buf: RustBuffer) throws -> InvitePermissionState {
+    return try FfiConverterTypeInvitePermissionState.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeInvitePermissionState_lower(_ value: InvitePermissionState) -> RustBuffer {
+    return FfiConverterTypeInvitePermissionState.lower(value)
 }
 
 
@@ -49690,6 +50180,141 @@ public func FfiConverterCallbackInterfaceIgnoredUsersListener_lower(_ v: Ignored
 
 
 
+public protocol InvitePermissionListener: AnyObject, Sendable {
+    
+    func onChange(invitePermission: InvitePermissionState) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceInvitePermissionListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceInvitePermissionListener = UniffiVTableCallbackInterfaceInvitePermissionListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceInvitePermissionListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface InvitePermissionListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceInvitePermissionListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface InvitePermissionListener: handle missing in uniffiClone")
+            }
+        },
+        onChange: { (
+            uniffiHandle: UInt64,
+            invitePermission: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceInvitePermissionListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onChange(
+                     invitePermission: try FfiConverterTypeInvitePermissionState_lift(invitePermission)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceInvitePermissionListener> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceInvitePermissionListener>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitInvitePermissionListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_invitepermissionlistener(UniffiCallbackInterfaceInvitePermissionListener.vtablePtr)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceInvitePermissionListener {
+    fileprivate static let handleMap = UniffiHandleMap<InvitePermissionListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceInvitePermissionListener : FfiConverter {
+    typealias SwiftType = InvitePermissionListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceInvitePermissionListener_lift(_ handle: UInt64) throws -> InvitePermissionListener {
+    return try FfiConverterCallbackInterfaceInvitePermissionListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceInvitePermissionListener_lower(_ v: InvitePermissionListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceInvitePermissionListener.lower(v)
+}
+
+
+
+
 /**
  * A listener for receiving new requests to a join a room.
  */
@@ -56029,6 +56654,30 @@ fileprivate struct FfiConverterOptionTypeRoomPowerLevels: FfiConverterRustBuffer
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeSecretStorageKey: FfiConverterRustBuffer {
+    typealias SwiftType = SecretStorageKey?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeSecretStorageKey.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeSecretStorageKey.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeSendHandle: FfiConverterRustBuffer {
     typealias SwiftType = SendHandle?
 
@@ -60242,7 +60891,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_can_deactivate_account() != 46985) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_clear_caches() != 12078) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_clear_caches() != 23784) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_clear_user_status() != 10577) {
@@ -60297,6 +60946,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_invite_avatars_display_policy() != 15140) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_invite_permission() != 51899) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_max_media_upload_size() != 31461) {
@@ -60506,6 +61158,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_invite_avatars_display_policy() != 45636) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_set_invite_permission() != 33188) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_set_media_preview_display_policy() != 58885) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -60540,6 +61195,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_ignored_users() != 43126) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_invite_permission() != 16523) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_subscribe_to_media_preview_config() != 2320) {
@@ -60758,7 +61416,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_backups() != 38908) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_recovery() != 1090) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_recovery() != 48489) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_has_devices_to_verify_against() != 40096) {
@@ -60825,6 +61483,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_identityresethandle_reset() != 30627) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_secretstoragekey_to_base58() != 26990) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_secretsbundlewithuserid_contains_backup_key() != 13305) {
@@ -61179,6 +61840,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_members() != 57063) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_members_fetching_global_profiles() != 13248) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_members_no_sync() != 18379) {
@@ -61889,6 +62553,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_constructor_contentscanner_new() != 51327) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_secretstoragekey_new() != 59636) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_secretstoragekey_new_from_passphrase() != 43240) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_secretsbundlewithuserid_from_database() != 44628) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -61947,6 +62617,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_ignoreduserslistener_call() != 45390) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_invitepermissionlistener_on_change() != 36582) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_mediapreviewconfiglistener_on_change() != 65101) {
@@ -62136,6 +62809,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitGrantQrLoginProgressListener()
     uniffiCallbackInitIdentityStatusChangeListener()
     uniffiCallbackInitIgnoredUsersListener()
+    uniffiCallbackInitInvitePermissionListener()
     uniffiCallbackInitKnockRequestsListener()
     uniffiCallbackInitLiveLocationsListener()
     uniffiCallbackInitMediaPreviewConfigListener()
