@@ -1197,6 +1197,9 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * a fallback, unless well-known discovery was disabled with
      * [`ClientBuilder::disable_well_known_lookup`] or
      * [`Client::disable_well_known_lookup`].
+     *
+     * Both the `m.livekit` and the legacy `livekit` transport types count as
+     * LiveKit support.
      */
     func isLivekitRtcSupported() async throws  -> Bool
     
@@ -1740,6 +1743,26 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func trackRecentlyVisitedRoom(room: String) async throws 
     
     func unignoreUser(userId: String) async throws 
+    
+    /**
+     * Cancel, restart or immediately send a previously scheduled delayed
+     * event ([MSC4140]).
+     *
+     * # Arguments
+     *
+     * * `delay_id` - The identifier returned by [`Room::send_delayed_event`]
+     * or [`Room::send_delayed_state_event`].
+     *
+     * * `action` - What should happen to the delayed event.
+     *
+     * * `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
+     * [MSC4140]: https://github.com/matrix-org/matrix-spec-proposals/pull/4140
+     * [`Room::send_delayed_event`]: crate::room::Room::send_delayed_event
+     * [`Room::send_delayed_state_event`]: crate::room::Room::send_delayed_state_event
+     */
+    func updateDelayedEvent(delayId: String, action: DelayedEventUpdateAction, requestConfigOverride: RequestConfigOverride?) async throws 
     
     func uploadAvatar(mimeType: String, data: Data) async throws 
     
@@ -2814,6 +2837,9 @@ open func ignoredUsers()async throws  -> [String]  {
      * a fallback, unless well-known discovery was disabled with
      * [`ClientBuilder::disable_well_known_lookup`] or
      * [`Client::disable_well_known_lookup`].
+     *
+     * Both the `m.livekit` and the legacy `livekit` transport types count as
+     * LiveKit support.
      */
 open func isLivekitRtcSupported()async throws  -> Bool  {
     return
@@ -4274,6 +4300,40 @@ open func unignoreUser(userId: String)async throws   {
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_unignore_user(
                         self.uniffiCloneHandle(),FfiConverterString.lower(userId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Cancel, restart or immediately send a previously scheduled delayed
+     * event ([MSC4140]).
+     *
+     * # Arguments
+     *
+     * * `delay_id` - The identifier returned by [`Room::send_delayed_event`]
+     * or [`Room::send_delayed_state_event`].
+     *
+     * * `action` - What should happen to the delayed event.
+     *
+     * * `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
+     * [MSC4140]: https://github.com/matrix-org/matrix-spec-proposals/pull/4140
+     * [`Room::send_delayed_event`]: crate::room::Room::send_delayed_event
+     * [`Room::send_delayed_state_event`]: crate::room::Room::send_delayed_state_event
+     */
+open func updateDelayedEvent(delayId: String, action: DelayedEventUpdateAction, requestConfigOverride: RequestConfigOverride? = nil)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_update_delayed_event(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(delayId),FfiConverterTypeDelayedEventUpdateAction_lower(action),FfiConverterOptionTypeRequestConfigOverride.lower(requestConfigOverride)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -11140,6 +11200,96 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandle) async throws 
     
     /**
+     * Send a delayed message-like event to the room ([MSC4140]).
+     *
+     * The homeserver holds on to the event and only distributes it to the room
+     * once `delay_ms` has elapsed, unless the delayed event is updated
+     * beforehand with [`Client::update_delayed_event`].
+     *
+     * If the room is encrypted, the content is encrypted when the event is
+     * scheduled, like [`Room::send_raw`] does. A member joining the room
+     * before the delay elapses won't be able to decrypt it.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the event to send.
+     *
+     * * `content` - The content of the event to send encoded as a JSON string.
+     *
+     * * `delay_ms` - How long, in milliseconds, the homeserver should hold on
+     * to the event.
+     *
+     * * `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
+     * Returns the `delay_id` identifying the scheduled event.
+     *
+     * [MSC4140]: https://github.com/matrix-org/matrix-spec-proposals/pull/4140
+     * [`Client::update_delayed_event`]: crate::client::Client::update_delayed_event
+     */
+    func sendDelayedEvent(eventType: String, content: String, delayMs: UInt64, requestConfigOverride: RequestConfigOverride?) async throws  -> String
+    
+    /**
+     * Send a delayed state event to the room ([MSC4140]).
+     *
+     * See [`Room::send_delayed_event`] for the semantics of delayed events.
+     * Unlike message-like events, state events can't be sticky.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the state event to send.
+     *
+     * * `state_key` - A unique key which defines the overwriting semantics for
+     * this piece of room state. This is often an empty string.
+     *
+     * * `content` - The content of the event to send encoded as a JSON string.
+     *
+     * * `delay_ms` - How long, in milliseconds, the homeserver should hold on
+     * to the event.
+     *
+     * * `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
+     * Returns the `delay_id` identifying the scheduled event.
+     *
+     * [MSC4140]: https://github.com/matrix-org/matrix-spec-proposals/pull/4140
+     */
+    func sendDelayedStateEvent(eventType: String, stateKey: String, content: String, delayMs: UInt64, requestConfigOverride: RequestConfigOverride?) async throws  -> String
+    
+    /**
+     * Send a delayed message-like event to the room ([MSC4140]) that becomes
+     * sticky ([MSC4354]) once the homeserver sends it.
+     *
+     * See [`Room::send_delayed_event`] for the semantics of delayed events.
+     *
+     * Note that if the homeserver doesn't support sticky events, it will
+     * ignore the duration and send the event unsticky. Server support can be
+     * checked with [`Client::is_sticky_events_supported`].
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the event to send.
+     *
+     * * `content` - The content of the event to send encoded as a JSON string.
+     *
+     * * `delay_ms` - How long, in milliseconds, the homeserver should hold on
+     * to the event.
+     *
+     * * `sticky_duration_ms` - How long the event stays sticky for once it is
+     * sent, in milliseconds, clamped to one hour.
+     *
+     * * `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
+     * Returns the `delay_id` identifying the scheduled event.
+     *
+     * [MSC4140]: https://github.com/matrix-org/matrix-spec-proposals/pull/4140
+     * [MSC4354]: https://github.com/matrix-org/matrix-spec-proposals/pull/4354
+     * [`Client::is_sticky_events_supported`]: crate::client::Client::is_sticky_events_supported
+     */
+    func sendStickyDelayedEvent(eventType: String, content: String, delayMs: UInt64, stickyDurationMs: UInt64, requestConfigOverride: RequestConfigOverride?) async throws  -> String
+    
+    /**
      * Subscribe to the message-like events of the given type in this room.
      *
      * The listener is called with every event of that type that a sync brings
@@ -13242,6 +13392,138 @@ open func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandl
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Send a delayed message-like event to the room ([MSC4140]).
+     *
+     * The homeserver holds on to the event and only distributes it to the room
+     * once `delay_ms` has elapsed, unless the delayed event is updated
+     * beforehand with [`Client::update_delayed_event`].
+     *
+     * If the room is encrypted, the content is encrypted when the event is
+     * scheduled, like [`Room::send_raw`] does. A member joining the room
+     * before the delay elapses won't be able to decrypt it.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the event to send.
+     *
+     * * `content` - The content of the event to send encoded as a JSON string.
+     *
+     * * `delay_ms` - How long, in milliseconds, the homeserver should hold on
+     * to the event.
+     *
+     * * `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
+     * Returns the `delay_id` identifying the scheduled event.
+     *
+     * [MSC4140]: https://github.com/matrix-org/matrix-spec-proposals/pull/4140
+     * [`Client::update_delayed_event`]: crate::client::Client::update_delayed_event
+     */
+open func sendDelayedEvent(eventType: String, content: String, delayMs: UInt64, requestConfigOverride: RequestConfigOverride? = nil)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_delayed_event(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(eventType),FfiConverterString.lower(content),FfiConverterUInt64.lower(delayMs),FfiConverterOptionTypeRequestConfigOverride.lower(requestConfigOverride)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Send a delayed state event to the room ([MSC4140]).
+     *
+     * See [`Room::send_delayed_event`] for the semantics of delayed events.
+     * Unlike message-like events, state events can't be sticky.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the state event to send.
+     *
+     * * `state_key` - A unique key which defines the overwriting semantics for
+     * this piece of room state. This is often an empty string.
+     *
+     * * `content` - The content of the event to send encoded as a JSON string.
+     *
+     * * `delay_ms` - How long, in milliseconds, the homeserver should hold on
+     * to the event.
+     *
+     * * `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
+     * Returns the `delay_id` identifying the scheduled event.
+     *
+     * [MSC4140]: https://github.com/matrix-org/matrix-spec-proposals/pull/4140
+     */
+open func sendDelayedStateEvent(eventType: String, stateKey: String, content: String, delayMs: UInt64, requestConfigOverride: RequestConfigOverride? = nil)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_delayed_state_event(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(eventType),FfiConverterString.lower(stateKey),FfiConverterString.lower(content),FfiConverterUInt64.lower(delayMs),FfiConverterOptionTypeRequestConfigOverride.lower(requestConfigOverride)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Send a delayed message-like event to the room ([MSC4140]) that becomes
+     * sticky ([MSC4354]) once the homeserver sends it.
+     *
+     * See [`Room::send_delayed_event`] for the semantics of delayed events.
+     *
+     * Note that if the homeserver doesn't support sticky events, it will
+     * ignore the duration and send the event unsticky. Server support can be
+     * checked with [`Client::is_sticky_events_supported`].
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the event to send.
+     *
+     * * `content` - The content of the event to send encoded as a JSON string.
+     *
+     * * `delay_ms` - How long, in milliseconds, the homeserver should hold on
+     * to the event.
+     *
+     * * `sticky_duration_ms` - How long the event stays sticky for once it is
+     * sent, in milliseconds, clamped to one hour.
+     *
+     * * `request_config_override` - Overrides the client's request config for
+     * this request. Fields that are not set keep the client's values.
+     *
+     * Returns the `delay_id` identifying the scheduled event.
+     *
+     * [MSC4140]: https://github.com/matrix-org/matrix-spec-proposals/pull/4140
+     * [MSC4354]: https://github.com/matrix-org/matrix-spec-proposals/pull/4354
+     * [`Client::is_sticky_events_supported`]: crate::client::Client::is_sticky_events_supported
+     */
+open func sendStickyDelayedEvent(eventType: String, content: String, delayMs: UInt64, stickyDurationMs: UInt64, requestConfigOverride: RequestConfigOverride? = nil)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_sticky_delayed_event(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(eventType),FfiConverterString.lower(content),FfiConverterUInt64.lower(delayMs),FfiConverterUInt64.lower(stickyDurationMs),FfiConverterOptionTypeRequestConfigOverride.lower(requestConfigOverride)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -34552,6 +34834,94 @@ public func FfiConverterTypeDehydratedDeviceEvent_lower(_ value: DehydratedDevic
 
 
 /**
+ * What to do with a delayed event that hasn't been distributed to the room
+ * yet ([MSC4140]).
+ *
+ * [MSC4140]: https://github.com/matrix-org/matrix-spec-proposals/pull/4140
+ */
+
+public enum DelayedEventUpdateAction: Equatable, Hashable {
+    
+    /**
+     * Cancel the delayed event: it will never be sent to the room.
+     */
+    case cancel
+    /**
+     * Restart the delay timeout, keeping the event scheduled.
+     */
+    case restart
+    /**
+     * Send the event to the room right away.
+     */
+    case send
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension DelayedEventUpdateAction: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDelayedEventUpdateAction: FfiConverterRustBuffer {
+    typealias SwiftType = DelayedEventUpdateAction
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DelayedEventUpdateAction {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .cancel
+        
+        case 2: return .restart
+        
+        case 3: return .send
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: DelayedEventUpdateAction, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .cancel:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .restart:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .send:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDelayedEventUpdateAction_lift(_ buf: RustBuffer) throws -> DelayedEventUpdateAction {
+    return try FfiConverterTypeDelayedEventUpdateAction.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDelayedEventUpdateAction_lower(_ value: DelayedEventUpdateAction) -> RustBuffer {
+    return FfiConverterTypeDelayedEventUpdateAction.lower(value)
+}
+
+
+
+/**
  * Result for the check if a store has a valid secrets bundle.
  */
 
@@ -44770,6 +45140,9 @@ public enum RtcTransport: Equatable, Hashable {
     
     /**
      * A LiveKit RTC transport.
+     *
+     * This covers both the `m.livekit` transport type and the legacy `livekit`
+     * type used by implementations of earlier versions of MSC4195.
      */
     case liveKit(
         /**
@@ -61014,7 +61387,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_ignored_users() != 60744) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_livekit_rtc_supported() != 21068) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_livekit_rtc_supported() != 60417) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_is_login_with_qr_code_supported() != 48668) {
@@ -61237,6 +61610,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_unignore_user() != 28367) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_update_delayed_event() != 23725) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_upload_avatar() != 20638) {
@@ -61996,6 +62372,15 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_withdraw_verification_and_resend() != 56581) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_delayed_event() != 7176) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_delayed_state_event() != 26141) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_sticky_delayed_event() != 20506) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_message_like_events() != 31308) {
