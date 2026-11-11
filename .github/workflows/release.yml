@@ -1,6 +1,10 @@
 name: Release
 
 on:
+  schedule:
+    # Tuesday at 01:00 UTC, before the other macOS jobs in the organisation,
+    # which run from 02:00 to 05:00 UTC.
+    - cron: "0 1 * * 2"
   workflow_dispatch:
     inputs:
       rust-ref:
@@ -37,7 +41,7 @@ jobs:
     steps:
       - id: params
         env:
-          RUST_REF: ${{ inputs.rust-ref }}
+          RUST_REF: ${{ inputs.rust-ref || 'main' }}
           VERSION: ${{ inputs.version }}
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
         run: |
@@ -117,7 +121,7 @@ jobs:
     env:
       TARGETS: aarch64-apple-ios aarch64-apple-ios-sim
       VERSION: ${{ needs.prepare.outputs.version }}
-      RUST_REF: ${{ inputs.rust-ref }}
+      RUST_REF: ${{ inputs.rust-ref || 'main' }}
     steps:
       # Tools/Release expects the SDK to be checked out next to this repo.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
