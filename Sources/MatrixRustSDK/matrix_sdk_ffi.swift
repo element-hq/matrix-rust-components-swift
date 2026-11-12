@@ -1472,6 +1472,46 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func rooms()  -> [Room]
     
     /**
+     * Hand the delayed leave event of a MatrixRTC session over to the
+     * homeserver, through its `/rtc/livekit/delegate_delayed_leave` endpoint
+     * (MSC4195).
+     *
+     * # Arguments
+     *
+     * * `url` - The WebSocket URL of the LiveKit SFU that the user has
+     * connected to.
+     * * `room_id` - The room where the `m.rtc.member` event is present.
+     * * `slot_id` - The slot ID from the `m.rtc.member` event.
+     * * `member_id` - The `member.id` property of the `m.rtc.member` event.
+     * * `delay_id` - The ID of the delayed `m.rtc.member` leave event to
+     * delegate.
+     *
+     * Homeservers that don't implement the endpoint respond with an
+     * `M_UNRECOGNIZED` error.
+     */
+    func rtcLivekitDelegateDelayedLeave(url: String, roomId: String, slotId: String, memberId: String, delayId: String) async throws 
+    
+    /**
+     * Obtain a JWT to authenticate with a LiveKit SFU, through the
+     * homeserver's `/rtc/livekit/get_token` endpoint (MSC4195).
+     *
+     * # Arguments
+     *
+     * * `url` - The WebSocket URL of the LiveKit SFU to obtain a token for.
+     * * `room_id` - The room where the `m.rtc.member` event is present.
+     * * `slot_id` - The slot ID from the `m.rtc.member` event.
+     * * `member_id` - The `member.id` property of the user's own
+     * `m.rtc.member` event.
+     * * `server_name` - The server name of the sender of the `m.rtc.member`
+     * event that advertised the SFU. If `None`, the homeserver uses its own
+     * server name.
+     *
+     * Homeservers that don't implement the endpoint respond with an
+     * `M_UNRECOGNIZED` error.
+     */
+    func rtcLivekitGetToken(url: String, roomId: String, slotId: String, memberId: String, serverName: String?) async throws  -> String
+    
+    /**
      * Start a search backfill sweep in the background.
      *
      * Back-paginates message history for every room, down to a ~3-month floor,
@@ -3573,6 +3613,74 @@ open func rooms() -> [Room]  {
             self.uniffiCloneHandle(),uniffiCallStatus
     )
 })
+}
+    
+    /**
+     * Hand the delayed leave event of a MatrixRTC session over to the
+     * homeserver, through its `/rtc/livekit/delegate_delayed_leave` endpoint
+     * (MSC4195).
+     *
+     * # Arguments
+     *
+     * * `url` - The WebSocket URL of the LiveKit SFU that the user has
+     * connected to.
+     * * `room_id` - The room where the `m.rtc.member` event is present.
+     * * `slot_id` - The slot ID from the `m.rtc.member` event.
+     * * `member_id` - The `member.id` property of the `m.rtc.member` event.
+     * * `delay_id` - The ID of the delayed `m.rtc.member` leave event to
+     * delegate.
+     *
+     * Homeservers that don't implement the endpoint respond with an
+     * `M_UNRECOGNIZED` error.
+     */
+open func rtcLivekitDelegateDelayedLeave(url: String, roomId: String, slotId: String, memberId: String, delayId: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_rtc_livekit_delegate_delayed_leave(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(url),FfiConverterString.lower(roomId),FfiConverterString.lower(slotId),FfiConverterString.lower(memberId),FfiConverterString.lower(delayId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Obtain a JWT to authenticate with a LiveKit SFU, through the
+     * homeserver's `/rtc/livekit/get_token` endpoint (MSC4195).
+     *
+     * # Arguments
+     *
+     * * `url` - The WebSocket URL of the LiveKit SFU to obtain a token for.
+     * * `room_id` - The room where the `m.rtc.member` event is present.
+     * * `slot_id` - The slot ID from the `m.rtc.member` event.
+     * * `member_id` - The `member.id` property of the user's own
+     * `m.rtc.member` event.
+     * * `server_name` - The server name of the sender of the `m.rtc.member`
+     * event that advertised the SFU. If `None`, the homeserver uses its own
+     * server name.
+     *
+     * Homeservers that don't implement the endpoint respond with an
+     * `M_UNRECOGNIZED` error.
+     */
+open func rtcLivekitGetToken(url: String, roomId: String, slotId: String, memberId: String, serverName: String?)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_rtc_livekit_get_token(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(url),FfiConverterString.lower(roomId),FfiConverterString.lower(slotId),FfiConverterString.lower(memberId),FfiConverterOptionString.lower(serverName)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
 }
     
     /**
@@ -61493,6 +61601,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_rooms() != 64941) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_rtc_livekit_delegate_delayed_leave() != 64232) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_rtc_livekit_get_token() != 18096) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_run_search_backfill() != 15095) {
