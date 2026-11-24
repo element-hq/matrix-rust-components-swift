@@ -2266,6 +2266,132 @@ public func FfiConverterTypeQRCodeLoginError_lower(_ value: QrCodeLoginError) ->
 
 
 /**
+ * Error for the room key importing functionality.
+ */
+public 
+enum RoomKeyImportError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+    
+    
+    /**
+     * An error de/serializing type for the `StateStore`
+     */
+    case SerdeJson(message: String)
+    
+    /**
+     * The crypto store isn't yet open. Logging in is required to open the
+     * crypto store.
+     */
+    case StoreClosed(message: String)
+    
+    /**
+     * An IO error happened.
+     */
+    case Io(message: String)
+    
+    /**
+     * An error occurred in the crypto store.
+     */
+    case CryptoStore(message: String)
+    
+    /**
+     * An error occurred while importing the key export.
+     */
+    case Export(message: String)
+    
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
+}
+
+#if compiler(>=6)
+extension RoomKeyImportError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRoomKeyImportError: FfiConverterRustBuffer {
+    typealias SwiftType = RoomKeyImportError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomKeyImportError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .SerdeJson(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .StoreClosed(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .Io(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 4: return .CryptoStore(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 5: return .Export(
+            message: try FfiConverterString.read(from: &buf)
+        )
+        
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RoomKeyImportError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        case .SerdeJson(_ /* message is ignored*/):
+            writeInt(&buf, Int32(1))
+        case .StoreClosed(_ /* message is ignored*/):
+            writeInt(&buf, Int32(2))
+        case .Io(_ /* message is ignored*/):
+            writeInt(&buf, Int32(3))
+        case .CryptoStore(_ /* message is ignored*/):
+            writeInt(&buf, Int32(4))
+        case .Export(_ /* message is ignored*/):
+            writeInt(&buf, Int32(5))
+
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomKeyImportError_lift(_ buf: RustBuffer) throws -> RoomKeyImportError {
+    return try FfiConverterTypeRoomKeyImportError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomKeyImportError_lower(_ value: RoomKeyImportError) -> RustBuffer {
+    return FfiConverterTypeRoomKeyImportError.lower(value)
+}
+
+
+/**
  * The role of a member in a room.
  */
 

@@ -1093,7 +1093,7 @@ public protocol ClientProtocol: AnyObject, Sendable {
      */
     func getMediaPreviewDisplayPolicy() async throws  -> MediaPreviews?
     
-    func getMediaThumbnail(mediaSource: MediaSource, width: UInt64, height: UInt64) async throws  -> Data
+    func getMediaThumbnail(mediaSource: MediaSource, width: UInt64, height: UInt64, animated: Bool) async throws  -> Data
     
     func getNotificationSettings() async  -> NotificationSettings
     
@@ -1135,18 +1135,6 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * Returns the sizes of the existing stores, if known.
      */
     func getStoreSizes() async throws  -> StoreSizes
-    
-    /**
-     * Allows generic GET requests to be made through the SDK's internal HTTP
-     * client. This is useful when the caller's native HTTP client wouldn't
-     * have the same configuration (such as certificates, proxies, etc.) This
-     * method returns the raw bytes of the response, so that any kind of
-     * resource can be fetched including images, files, etc.
-     *
-     * Note: When an HTTP error occurs, the error response can be found in the
-     * `ClientError::Generic`'s `details` field.
-     */
-    func getUrl(url: String) async throws  -> Data
     
     /**
      * Get the homeserver-generated preview for a URL, as OpenGraph JSON.
@@ -2553,12 +2541,12 @@ open func getMediaPreviewDisplayPolicy()async throws  -> MediaPreviews?  {
         )
 }
     
-open func getMediaThumbnail(mediaSource: MediaSource, width: UInt64, height: UInt64)async throws  -> Data  {
+open func getMediaThumbnail(mediaSource: MediaSource, width: UInt64, height: UInt64, animated: Bool = false)async throws  -> Data  {
     return
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_client_get_media_thumbnail(
-                        self.uniffiCloneHandle(),FfiConverterTypeMediaSource_lower(mediaSource),FfiConverterUInt64.lower(width),FfiConverterUInt64.lower(height)
+                        self.uniffiCloneHandle(),FfiConverterTypeMediaSource_lower(mediaSource),FfiConverterUInt64.lower(width),FfiConverterUInt64.lower(height),FfiConverterBool.lower(animated)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
@@ -2713,32 +2701,6 @@ open func getStoreSizes()async throws  -> StoreSizes  {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterTypeStoreSizes_lift,
-            errorHandler: FfiConverterTypeClientError_lift
-        )
-}
-    
-    /**
-     * Allows generic GET requests to be made through the SDK's internal HTTP
-     * client. This is useful when the caller's native HTTP client wouldn't
-     * have the same configuration (such as certificates, proxies, etc.) This
-     * method returns the raw bytes of the response, so that any kind of
-     * resource can be fetched including images, files, etc.
-     *
-     * Note: When an HTTP error occurs, the error response can be found in the
-     * `ClientError::Generic`'s `details` field.
-     */
-open func getUrl(url: String)async throws  -> Data  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_matrix_sdk_ffi_fn_method_client_get_url(
-                        self.uniffiCloneHandle(),FfiConverterString.lower(url)
-                )
-            },
-            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
-            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
-            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
-            liftFunc: FfiConverterData.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -4666,8 +4628,6 @@ public func FfiConverterTypeClient_lower(_ value: Client) -> UInt64 {
 
 public protocol ClientBuilderProtocol: AnyObject, Sendable {
     
-    func addRootCertificates(certificates: [Data])  -> ClientBuilder
-    
     /**
      * Automatically create a backup version if no backup exists.
      */
@@ -4693,15 +4653,6 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
     func decryptionSettings(decryptionSettings: DecryptionSettings)  -> ClientBuilder
     
     func disableAutomaticTokenRefresh()  -> ClientBuilder
-    
-    /**
-     * Don't trust any system root certificates, only trust the certificates
-     * provided through
-     * [`add_root_certificates`][ClientBuilder::add_root_certificates].
-     */
-    func disableBuiltInRootCertificates()  -> ClientBuilder
-    
-    func disableSslVerification()  -> ClientBuilder
     
     /**
      * Disable all the `.well-known/matrix/client` lookups, both the one
@@ -4757,11 +4708,16 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
     func homeserverUrl(url: String)  -> ClientBuilder
     
     /**
+     * Configure the HTTP client: proxy, user agent, TLS settings and extra
+     * root certificates. Timeouts are set with
+     * [`ClientBuilder::request_config`].
+     */
+    func httpSettings(settings: HttpSettings)  -> ClientBuilder
+    
+    /**
      * Use in-memory session storage.
      */
     func inMemoryStore()  -> ClientBuilder
-    
-    func proxy(url: String)  -> ClientBuilder
     
     /**
      * Add a default request config to this client.
@@ -4861,8 +4817,6 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
      */
     func threadsEnabled(enabled: Bool, threadSubscriptions: Bool)  -> ClientBuilder
     
-    func userAgent(userAgent: String)  -> ClientBuilder
-    
     /**
      * Set up the search index store for this client, which is used to store
      * the message search index locally.
@@ -4939,16 +4893,6 @@ public convenience init() {
 
     
 
-    
-open func addRootCertificates(certificates: [Data]) -> ClientBuilder  {
-    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
-        uniffiCallStatus in
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_add_root_certificates(
-            self.uniffiCloneHandle(),
-        FfiConverterSequenceData.lower(certificates),uniffiCallStatus
-    )
-})
-}
     
     /**
      * Automatically create a backup version if no backup exists.
@@ -5032,29 +4976,6 @@ open func disableAutomaticTokenRefresh() -> ClientBuilder  {
     return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_disable_automatic_token_refresh(
-            self.uniffiCloneHandle(),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Don't trust any system root certificates, only trust the certificates
-     * provided through
-     * [`add_root_certificates`][ClientBuilder::add_root_certificates].
-     */
-open func disableBuiltInRootCertificates() -> ClientBuilder  {
-    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
-        uniffiCallStatus in
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_disable_built_in_root_certificates(
-            self.uniffiCloneHandle(),uniffiCallStatus
-    )
-})
-}
-    
-open func disableSslVerification() -> ClientBuilder  {
-    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
-        uniffiCallStatus in
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_disable_ssl_verification(
             self.uniffiCloneHandle(),uniffiCallStatus
     )
 })
@@ -5154,6 +5075,21 @@ open func homeserverUrl(url: String) -> ClientBuilder  {
 }
     
     /**
+     * Configure the HTTP client: proxy, user agent, TLS settings and extra
+     * root certificates. Timeouts are set with
+     * [`ClientBuilder::request_config`].
+     */
+open func httpSettings(settings: HttpSettings) -> ClientBuilder  {
+    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_http_settings(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeHttpSettings_lower(settings),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * Use in-memory session storage.
      */
 open func inMemoryStore() -> ClientBuilder  {
@@ -5161,16 +5097,6 @@ open func inMemoryStore() -> ClientBuilder  {
         uniffiCallStatus in
     uniffi_matrix_sdk_ffi_fn_method_clientbuilder_in_memory_store(
             self.uniffiCloneHandle(),uniffiCallStatus
-    )
-})
-}
-    
-open func proxy(url: String) -> ClientBuilder  {
-    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
-        uniffiCallStatus in
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_proxy(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(url),uniffiCallStatus
     )
 })
 }
@@ -5358,16 +5284,6 @@ open func threadsEnabled(enabled: Bool, threadSubscriptions: Bool) -> ClientBuil
             self.uniffiCloneHandle(),
         FfiConverterBool.lower(enabled),
         FfiConverterBool.lower(threadSubscriptions),uniffiCallStatus
-    )
-})
-}
-    
-open func userAgent(userAgent: String) -> ClientBuilder  {
-    return try!  FfiConverterTypeClientBuilder_lift(try! rustCall() {
-        uniffiCallStatus in
-    uniffi_matrix_sdk_ffi_fn_method_clientbuilder_user_agent(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(userAgent),uniffiCallStatus
     )
 })
 }
@@ -5830,6 +5746,8 @@ public protocol EncryptionProtocol: AnyObject, Sendable {
      */
     func enableRecovery(waitForBackupsToUpload: Bool, key: SecretStorageKey?, progressListener: EnableRecoveryProgressListener) async throws  -> String
     
+    func exportRoomKeys(path: String, passphrase: String) async throws 
+    
     /**
      * Does the user have devices, other than the current one, that the
      * current device can verify against?
@@ -5838,6 +5756,8 @@ public protocol EncryptionProtocol: AnyObject, Sendable {
      * Olm (have a Curve25519 key), and must not be a dehydrated device.
      */
     func hasDevicesToVerifyAgainst() async throws  -> Bool
+    
+    func importRoomKeys(path: String, passphrase: String) async throws  -> RoomKeyImportSummary
     
     /**
      * This method will import all the private cross-signing keys and the
@@ -6220,6 +6140,22 @@ open func enableRecovery(waitForBackupsToUpload: Bool, key: SecretStorageKey?, p
         )
 }
     
+open func exportRoomKeys(path: String, passphrase: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_export_room_keys(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path),FfiConverterString.lower(passphrase)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
     /**
      * Does the user have devices, other than the current one, that the
      * current device can verify against?
@@ -6240,6 +6176,22 @@ open func hasDevicesToVerifyAgainst()async throws  -> Bool  {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_i8,
             liftFunc: FfiConverterBool.lift,
             errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+open func importRoomKeys(path: String, passphrase: String)async throws  -> RoomKeyImportSummary  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_import_room_keys(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(path),FfiConverterString.lower(passphrase)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeRoomKeyImportSummary_lift,
+            errorHandler: FfiConverterTypeRoomKeyImportError_lift
         )
 }
     
@@ -7500,6 +7452,279 @@ public func FfiConverterTypeHomeserverLoginDetails_lift(_ handle: UInt64) throws
 #endif
 public func FfiConverterTypeHomeserverLoginDetails_lower(_ value: HomeserverLoginDetails) -> UInt64 {
     return FfiConverterTypeHomeserverLoginDetails.lower(value)
+}
+
+
+
+
+
+
+public protocol HttpCertificateProtocol: AnyObject, Sendable {
+    
+}
+open class HttpCertificate: HttpCertificateProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_httpcertificate(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_httpcertificate(handle, $0) }
+    }
+
+    
+public static func fromBytes(bytes: Data)throws  -> HttpCertificate  {
+    return try  FfiConverterTypeHttpCertificate_lift(try rustCallWithError(FfiConverterTypeHttpClientError_lift) {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_constructor_httpcertificate_from_bytes(
+        FfiConverterData.lower(bytes),uniffiCallStatus
+    )
+})
+}
+    
+
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeHttpCertificate: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = HttpCertificate
+
+    public static func lift(_ handle: UInt64) throws -> HttpCertificate {
+        return HttpCertificate(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: HttpCertificate) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HttpCertificate {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: HttpCertificate, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHttpCertificate_lift(_ handle: UInt64) throws -> HttpCertificate {
+    return try FfiConverterTypeHttpCertificate.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHttpCertificate_lower(_ value: HttpCertificate) -> UInt64 {
+    return FfiConverterTypeHttpCertificate.lower(value)
+}
+
+
+
+
+
+
+/**
+ * A standalone HTTP client, configured with the same [`HttpSettings`] and
+ * [`RequestConfig`] as the ones used by a `Client`, including its retry
+ * behaviour, certificates, user-agent, etc.
+ */
+public protocol HttpClientProtocol: AnyObject, Sendable {
+    
+    /**
+     * Send a `GET` request to `url` and return the raw bytes of the
+     * response.
+     *
+     * Note: When an HTTP error occurs, the error response can be found in the
+     * `HttpClientError::GetUrl`'s `details` field.
+     */
+    func getUrl(url: String) async throws  -> Data
+    
+}
+/**
+ * A standalone HTTP client, configured with the same [`HttpSettings`] and
+ * [`RequestConfig`] as the ones used by a `Client`, including its retry
+ * behaviour, certificates, user-agent, etc.
+ */
+open class HttpClient: HttpClientProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_matrix_sdk_ffi_fn_clone_httpclient(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_matrix_sdk_ffi_fn_free_httpclient(handle, $0) }
+    }
+
+    
+public static func fromSettings(httpSettings: HttpSettings, requestConfig: RequestConfig)throws  -> HttpClient  {
+    return try  FfiConverterTypeHttpClient_lift(try rustCallWithError(FfiConverterTypeHttpClientError_lift) {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_constructor_httpclient_from_settings(
+        FfiConverterTypeHttpSettings_lower(httpSettings),
+        FfiConverterTypeRequestConfig_lower(requestConfig),uniffiCallStatus
+    )
+})
+}
+    
+
+    
+    /**
+     * Send a `GET` request to `url` and return the raw bytes of the
+     * response.
+     *
+     * Note: When an HTTP error occurs, the error response can be found in the
+     * `HttpClientError::GetUrl`'s `details` field.
+     */
+open func getUrl(url: String)async throws  -> Data  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_httpclient_get_url(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(url)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterData.lift,
+            errorHandler: FfiConverterTypeHttpClientError_lift
+        )
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeHttpClient: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = HttpClient
+
+    public static func lift(_ handle: UInt64) throws -> HttpClient {
+        return HttpClient(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: HttpClient) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HttpClient {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: HttpClient, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHttpClient_lift(_ handle: UInt64) throws -> HttpClient {
+    return try FfiConverterTypeHttpClient.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHttpClient_lower(_ value: HttpClient) -> UInt64 {
+    return FfiConverterTypeHttpClient.lower(value)
 }
 
 
@@ -11169,6 +11394,20 @@ public protocol RoomProtocol: AnyObject, Sendable {
      */
     func subscribeToCallDeclineEvents(rtcNotificationEventId: String, listener: CallDeclineListener) throws  -> TaskHandle
     
+    /**
+     * Subscribe to changes of the effective message retention policy of this
+     * room ([MSC1763](https://github.com/matrix-org/matrix-spec-proposals/pull/1763)).
+     *
+     * The listener is first called with the current effective retention
+     * policy, then whenever it changes, either because the cached homeserver
+     * retention configuration was updated or because the room's
+     * `m.room.retention` state event changed.
+     *
+     * This never makes a request to the homeserver. The policy is `None` while
+     * the homeserver's retention configuration was never fetched.
+     */
+    func subscribeToEffectiveRetention(listener: EffectiveRetentionListener)  -> TaskHandle
+    
     func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener) async throws  -> TaskHandle
     
     /**
@@ -11396,6 +11635,14 @@ public protocol RoomProtocol: AnyObject, Sendable {
      * [`Client::is_sticky_events_supported`]: crate::client::Client::is_sticky_events_supported
      */
     func sendStickyDelayedEvent(eventType: String, content: String, delayMs: UInt64, stickyDurationMs: UInt64, requestConfigOverride: RequestConfigOverride?) async throws  -> String
+    
+    /**
+     * Get the image packs that can be used in this room.
+     *
+     * The packs the user enabled globally come first, then the packs defined
+     * in this room, then the packs of the joined spaces it belongs to.
+     */
+    func imagePacks(spaceService: SpaceService) async throws  -> [ImagePack]
     
     /**
      * Subscribe to the message-like events of the given type in this room.
@@ -13110,6 +13357,28 @@ open func subscribeToCallDeclineEvents(rtcNotificationEventId: String, listener:
 })
 }
     
+    /**
+     * Subscribe to changes of the effective message retention policy of this
+     * room ([MSC1763](https://github.com/matrix-org/matrix-spec-proposals/pull/1763)).
+     *
+     * The listener is first called with the current effective retention
+     * policy, then whenever it changes, either because the cached homeserver
+     * retention configuration was updated or because the room's
+     * `m.room.retention` state event changed.
+     *
+     * This never makes a request to the homeserver. The policy is `None` while
+     * the homeserver's retention configuration was never fetched.
+     */
+open func subscribeToEffectiveRetention(listener: EffectiveRetentionListener) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_effective_retention(
+            self.uniffiCloneHandle(),
+        FfiConverterCallbackInterfaceEffectiveRetentionListener_lower(listener),uniffiCallStatus
+    )
+})
+}
+    
 open func subscribeToIdentityStatusChanges(listener: IdentityStatusChangeListener)async throws  -> TaskHandle  {
     return
         try  await uniffiRustCallAsync(
@@ -13632,6 +13901,28 @@ open func sendStickyDelayedEvent(eventType: String, content: String, delayMs: UI
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Get the image packs that can be used in this room.
+     *
+     * The packs the user enabled globally come first, then the packs defined
+     * in this room, then the packs of the joined spaces it belongs to.
+     */
+open func imagePacks(spaceService: SpaceService)async throws  -> [ImagePack]  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_image_packs(
+                        self.uniffiCloneHandle(),FfiConverterTypeSpaceService_lower(spaceService)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeImagePack.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -23733,6 +24024,72 @@ public func FfiConverterTypeHttpPusherData_lower(_ value: HttpPusherData) -> Rus
 }
 
 
+public struct HttpSettings {
+    public var disableSslVerification: Bool
+    public var proxy: String?
+    public var userAgent: String?
+    public var additionalRootCertificates: [HttpCertificate]?
+    public var disableBuiltInRootCertificates: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(disableSslVerification: Bool = false, proxy: String? = nil, userAgent: String? = nil, additionalRootCertificates: [HttpCertificate]? = nil, disableBuiltInRootCertificates: Bool = false) {
+        self.disableSslVerification = disableSslVerification
+        self.proxy = proxy
+        self.userAgent = userAgent
+        self.additionalRootCertificates = additionalRootCertificates
+        self.disableBuiltInRootCertificates = disableBuiltInRootCertificates
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension HttpSettings: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeHttpSettings: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HttpSettings {
+        return
+            try HttpSettings(
+                disableSslVerification: FfiConverterBool.read(from: &buf), 
+                proxy: FfiConverterOptionString.read(from: &buf), 
+                userAgent: FfiConverterOptionString.read(from: &buf), 
+                additionalRootCertificates: FfiConverterOptionSequenceTypeHttpCertificate.read(from: &buf), 
+                disableBuiltInRootCertificates: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: HttpSettings, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.disableSslVerification, into: &buf)
+        FfiConverterOptionString.write(value.proxy, into: &buf)
+        FfiConverterOptionString.write(value.userAgent, into: &buf)
+        FfiConverterOptionSequenceTypeHttpCertificate.write(value.additionalRootCertificates, into: &buf)
+        FfiConverterBool.write(value.disableBuiltInRootCertificates, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHttpSettings_lift(_ buf: RustBuffer) throws -> HttpSettings {
+    return try FfiConverterTypeHttpSettings.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHttpSettings_lower(_ value: HttpSettings) -> RustBuffer {
+    return FfiConverterTypeHttpSettings.lower(value)
+}
+
+
 public struct IdentityStatusChange: Equatable, Hashable {
     /**
      * The user ID of the user whose identity status changed
@@ -23996,6 +24353,240 @@ public func FfiConverterTypeImageMessageContent_lift(_ buf: RustBuffer) throws -
 #endif
 public func FfiConverterTypeImageMessageContent_lower(_ value: ImageMessageContent) -> RustBuffer {
     return FfiConverterTypeImageMessageContent.lower(value)
+}
+
+
+/**
+ * An image pack, holding custom emoticons and/or stickers.
+ */
+public struct ImagePack {
+    /**
+     * The room the pack is defined in.
+     */
+    public var roomId: String
+    /**
+     * The state key of the pack's state event, identifying it within its
+     * room.
+     */
+    public var stateKey: String
+    /**
+     * The name to display for the pack: its own display name if it has one,
+     * otherwise the name of its room. `None` only if neither has a name.
+     */
+    public var displayName: String?
+    /**
+     * The `mxc://` URL of the avatar to display for the pack: its own avatar
+     * if it has one, otherwise the avatar of its room. `None` only if neither
+     * has an avatar.
+     */
+    public var avatarUrl: String?
+    /**
+     * Whether the pack's images can be used as inline emoticons.
+     */
+    public var isEmoticonPack: Bool
+    /**
+     * Whether the pack's images can be sent as stickers.
+     */
+    public var isStickerPack: Bool
+    /**
+     * An attribution for the pack, crediting its original author or source
+     * for example.
+     */
+    public var attribution: String?
+    /**
+     * The pack's images.
+     */
+    public var images: [ImagePackImage]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The room the pack is defined in.
+         */roomId: String, 
+        /**
+         * The state key of the pack's state event, identifying it within its
+         * room.
+         */stateKey: String, 
+        /**
+         * The name to display for the pack: its own display name if it has one,
+         * otherwise the name of its room. `None` only if neither has a name.
+         */displayName: String?, 
+        /**
+         * The `mxc://` URL of the avatar to display for the pack: its own avatar
+         * if it has one, otherwise the avatar of its room. `None` only if neither
+         * has an avatar.
+         */avatarUrl: String?, 
+        /**
+         * Whether the pack's images can be used as inline emoticons.
+         */isEmoticonPack: Bool, 
+        /**
+         * Whether the pack's images can be sent as stickers.
+         */isStickerPack: Bool, 
+        /**
+         * An attribution for the pack, crediting its original author or source
+         * for example.
+         */attribution: String?, 
+        /**
+         * The pack's images.
+         */images: [ImagePackImage]) {
+        self.roomId = roomId
+        self.stateKey = stateKey
+        self.displayName = displayName
+        self.avatarUrl = avatarUrl
+        self.isEmoticonPack = isEmoticonPack
+        self.isStickerPack = isStickerPack
+        self.attribution = attribution
+        self.images = images
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ImagePack: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeImagePack: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ImagePack {
+        return
+            try ImagePack(
+                roomId: FfiConverterString.read(from: &buf), 
+                stateKey: FfiConverterString.read(from: &buf), 
+                displayName: FfiConverterOptionString.read(from: &buf), 
+                avatarUrl: FfiConverterOptionString.read(from: &buf), 
+                isEmoticonPack: FfiConverterBool.read(from: &buf), 
+                isStickerPack: FfiConverterBool.read(from: &buf), 
+                attribution: FfiConverterOptionString.read(from: &buf), 
+                images: FfiConverterSequenceTypeImagePackImage.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ImagePack, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.roomId, into: &buf)
+        FfiConverterString.write(value.stateKey, into: &buf)
+        FfiConverterOptionString.write(value.displayName, into: &buf)
+        FfiConverterOptionString.write(value.avatarUrl, into: &buf)
+        FfiConverterBool.write(value.isEmoticonPack, into: &buf)
+        FfiConverterBool.write(value.isStickerPack, into: &buf)
+        FfiConverterOptionString.write(value.attribution, into: &buf)
+        FfiConverterSequenceTypeImagePackImage.write(value.images, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeImagePack_lift(_ buf: RustBuffer) throws -> ImagePack {
+    return try FfiConverterTypeImagePack.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeImagePack_lower(_ value: ImagePack) -> RustBuffer {
+    return FfiConverterTypeImagePack.lower(value)
+}
+
+
+/**
+ * An image of an [`ImagePack`].
+ */
+public struct ImagePackImage {
+    /**
+     * The shortcode of the image, unique within its pack.
+     */
+    public var shortcode: String
+    /**
+     * The `mxc://` URL of the image.
+     */
+    public var url: String
+    /**
+     * A textual description of the image, falling back to its shortcode as
+     * the spec recommends. To be used as the `alt` of emoticons and the
+     * `body` of stickers.
+     */
+    public var body: String
+    /**
+     * Metadata about the image, to be used as the `info` of the `m.sticker`
+     * events it's sent as.
+     */
+    public var info: ImageInfo?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The shortcode of the image, unique within its pack.
+         */shortcode: String, 
+        /**
+         * The `mxc://` URL of the image.
+         */url: String, 
+        /**
+         * A textual description of the image, falling back to its shortcode as
+         * the spec recommends. To be used as the `alt` of emoticons and the
+         * `body` of stickers.
+         */body: String, 
+        /**
+         * Metadata about the image, to be used as the `info` of the `m.sticker`
+         * events it's sent as.
+         */info: ImageInfo?) {
+        self.shortcode = shortcode
+        self.url = url
+        self.body = body
+        self.info = info
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ImagePackImage: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeImagePackImage: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ImagePackImage {
+        return
+            try ImagePackImage(
+                shortcode: FfiConverterString.read(from: &buf), 
+                url: FfiConverterString.read(from: &buf), 
+                body: FfiConverterString.read(from: &buf), 
+                info: FfiConverterOptionTypeImageInfo.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ImagePackImage, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.shortcode, into: &buf)
+        FfiConverterString.write(value.url, into: &buf)
+        FfiConverterString.write(value.body, into: &buf)
+        FfiConverterOptionTypeImageInfo.write(value.info, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeImagePackImage_lift(_ buf: RustBuffer) throws -> ImagePackImage {
+    return try FfiConverterTypeImagePackImage.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeImagePackImage_lower(_ value: ImagePackImage) -> RustBuffer {
+    return FfiConverterTypeImagePackImage.lower(value)
 }
 
 
@@ -27092,6 +27683,11 @@ public struct RequestConfig: Equatable, Hashable {
      * Base delay between retries.
      */
     public var maxRetryTime: UInt64?
+    /**
+     * Timeout for each read operation in milliseconds, which resets after a
+     * successful read. Defaults to 60 seconds.
+     */
+    public var readTimeout: UInt64?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -27107,11 +27703,16 @@ public struct RequestConfig: Equatable, Hashable {
          */maxConcurrentRequests: UInt64?, 
         /**
          * Base delay between retries.
-         */maxRetryTime: UInt64?) {
+         */maxRetryTime: UInt64?, 
+        /**
+         * Timeout for each read operation in milliseconds, which resets after a
+         * successful read. Defaults to 60 seconds.
+         */readTimeout: UInt64? = nil) {
         self.retryLimit = retryLimit
         self.timeout = timeout
         self.maxConcurrentRequests = maxConcurrentRequests
         self.maxRetryTime = maxRetryTime
+        self.readTimeout = readTimeout
     }
 
     
@@ -27133,7 +27734,8 @@ public struct FfiConverterTypeRequestConfig: FfiConverterRustBuffer {
                 retryLimit: FfiConverterOptionUInt64.read(from: &buf), 
                 timeout: FfiConverterOptionUInt64.read(from: &buf), 
                 maxConcurrentRequests: FfiConverterOptionUInt64.read(from: &buf), 
-                maxRetryTime: FfiConverterOptionUInt64.read(from: &buf)
+                maxRetryTime: FfiConverterOptionUInt64.read(from: &buf), 
+                readTimeout: FfiConverterOptionUInt64.read(from: &buf)
         )
     }
 
@@ -27142,6 +27744,7 @@ public struct FfiConverterTypeRequestConfig: FfiConverterRustBuffer {
         FfiConverterOptionUInt64.write(value.timeout, into: &buf)
         FfiConverterOptionUInt64.write(value.maxConcurrentRequests, into: &buf)
         FfiConverterOptionUInt64.write(value.maxRetryTime, into: &buf)
+        FfiConverterOptionUInt64.write(value.readTimeout, into: &buf)
     }
 }
 
@@ -27809,6 +28412,60 @@ public func FfiConverterTypeRoomInfo_lift(_ buf: RustBuffer) throws -> RoomInfo 
 #endif
 public func FfiConverterTypeRoomInfo_lower(_ value: RoomInfo) -> RustBuffer {
     return FfiConverterTypeRoomInfo.lower(value)
+}
+
+
+public struct RoomKeyImportSummary: Equatable, Hashable {
+    public var importedCount: UInt64
+    public var totalCount: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(importedCount: UInt64, totalCount: UInt64) {
+        self.importedCount = importedCount
+        self.totalCount = totalCount
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RoomKeyImportSummary: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRoomKeyImportSummary: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomKeyImportSummary {
+        return
+            try RoomKeyImportSummary(
+                importedCount: FfiConverterUInt64.read(from: &buf), 
+                totalCount: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RoomKeyImportSummary, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.importedCount, into: &buf)
+        FfiConverterUInt64.write(value.totalCount, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomKeyImportSummary_lift(_ buf: RustBuffer) throws -> RoomKeyImportSummary {
+    return try FfiConverterTypeRoomKeyImportSummary.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomKeyImportSummary_lower(_ value: RoomKeyImportSummary) -> RustBuffer {
+    return FfiConverterTypeRoomKeyImportSummary.lower(value)
 }
 
 
@@ -28568,6 +29225,76 @@ public func FfiConverterTypeRoomPreviewInfo_lift(_ buf: RustBuffer) throws -> Ro
 #endif
 public func FfiConverterTypeRoomPreviewInfo_lower(_ value: RoomPreviewInfo) -> RustBuffer {
     return FfiConverterTypeRoomPreviewInfo.lower(value)
+}
+
+
+/**
+ * A message retention policy
+ * ([MSC1763](https://github.com/matrix-org/matrix-spec-proposals/pull/1763)).
+ */
+public struct RoomRetentionPolicy: Equatable, Hashable {
+    /**
+     * The minimum amount of time messages should be kept, if any.
+     */
+    public var minLifetime: TimeInterval?
+    /**
+     * The maximum amount of time messages should be kept, if any.
+     */
+    public var maxLifetime: TimeInterval?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The minimum amount of time messages should be kept, if any.
+         */minLifetime: TimeInterval?, 
+        /**
+         * The maximum amount of time messages should be kept, if any.
+         */maxLifetime: TimeInterval?) {
+        self.minLifetime = minLifetime
+        self.maxLifetime = maxLifetime
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RoomRetentionPolicy: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRoomRetentionPolicy: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomRetentionPolicy {
+        return
+            try RoomRetentionPolicy(
+                minLifetime: FfiConverterOptionDuration.read(from: &buf), 
+                maxLifetime: FfiConverterOptionDuration.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RoomRetentionPolicy, into buf: inout [UInt8]) {
+        FfiConverterOptionDuration.write(value.minLifetime, into: &buf)
+        FfiConverterOptionDuration.write(value.maxLifetime, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomRetentionPolicy_lift(_ buf: RustBuffer) throws -> RoomRetentionPolicy {
+    return try FfiConverterTypeRoomRetentionPolicy.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomRetentionPolicy_lower(_ value: RoomRetentionPolicy) -> RustBuffer {
+    return FfiConverterTypeRoomRetentionPolicy.lower(value)
 }
 
 
@@ -32498,6 +33225,17 @@ public struct WidgetCapabilities: Equatable, Hashable {
      * session over to the homeserver (MSC4533).
      */
     public var rtcLivekitDelegateDelayedLeave: Bool
+    /**
+     * This allows the widget to send sticky events (MSC4354) of the types it
+     * may send, as per MSC4407.
+     */
+    public var sendStickyEvent: Bool
+    /**
+     * This allows the widget to receive the live sticky events (MSC4354) of
+     * the types it may read when its capabilities are negotiated, as per
+     * MSC4407.
+     */
+    public var receiveStickyEvent: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -32535,7 +33273,16 @@ public struct WidgetCapabilities: Equatable, Hashable {
         /**
          * This allows the widget to hand the delayed leave event of a MatrixRTC
          * session over to the homeserver (MSC4533).
-         */rtcLivekitDelegateDelayedLeave: Bool) {
+         */rtcLivekitDelegateDelayedLeave: Bool, 
+        /**
+         * This allows the widget to send sticky events (MSC4354) of the types it
+         * may send, as per MSC4407.
+         */sendStickyEvent: Bool, 
+        /**
+         * This allows the widget to receive the live sticky events (MSC4354) of
+         * the types it may read when its capabilities are negotiated, as per
+         * MSC4407.
+         */receiveStickyEvent: Bool) {
         self.read = read
         self.send = send
         self.requiresClient = requiresClient
@@ -32545,6 +33292,8 @@ public struct WidgetCapabilities: Equatable, Hashable {
         self.rtcTransports = rtcTransports
         self.rtcLivekitGetToken = rtcLivekitGetToken
         self.rtcLivekitDelegateDelayedLeave = rtcLivekitDelegateDelayedLeave
+        self.sendStickyEvent = sendStickyEvent
+        self.receiveStickyEvent = receiveStickyEvent
     }
 
     
@@ -32571,7 +33320,9 @@ public struct FfiConverterTypeWidgetCapabilities: FfiConverterRustBuffer {
                 downloadFiles: FfiConverterBool.read(from: &buf), 
                 rtcTransports: FfiConverterBool.read(from: &buf), 
                 rtcLivekitGetToken: FfiConverterBool.read(from: &buf), 
-                rtcLivekitDelegateDelayedLeave: FfiConverterBool.read(from: &buf)
+                rtcLivekitDelegateDelayedLeave: FfiConverterBool.read(from: &buf), 
+                sendStickyEvent: FfiConverterBool.read(from: &buf), 
+                receiveStickyEvent: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -32585,6 +33336,8 @@ public struct FfiConverterTypeWidgetCapabilities: FfiConverterRustBuffer {
         FfiConverterBool.write(value.rtcTransports, into: &buf)
         FfiConverterBool.write(value.rtcLivekitGetToken, into: &buf)
         FfiConverterBool.write(value.rtcLivekitDelegateDelayedLeave, into: &buf)
+        FfiConverterBool.write(value.sendStickyEvent, into: &buf)
+        FfiConverterBool.write(value.receiveStickyEvent, into: &buf)
     }
 }
 
@@ -37470,6 +38223,126 @@ public func FfiConverterTypeHistoryVisibility_lower(_ value: HistoryVisibility) 
     return FfiConverterTypeHistoryVisibility.lower(value)
 }
 
+
+
+public 
+enum HttpClientError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+    
+    
+    case FailedToFormatCertificate(derError: String, pemError: String
+    )
+    case HttpClientCreation(error: String
+    )
+    case GetUrl(msg: String, 
+        /**
+         * The HTTP status code of the response, if the server responded with
+         * an error. `None` if the request failed before getting a response.
+         */statusCode: UInt16?, 
+        /**
+         * The body of the response, if the server responded with an error.
+         */details: String?
+    )
+    case FailedToFormatUrl(url: String, msg: String
+    )
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
+}
+
+#if compiler(>=6)
+extension HttpClientError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeHttpClientError: FfiConverterRustBuffer {
+    typealias SwiftType = HttpClientError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HttpClientError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .FailedToFormatCertificate(
+            derError: try FfiConverterString.read(from: &buf), 
+            pemError: try FfiConverterString.read(from: &buf)
+            )
+        case 2: return .HttpClientCreation(
+            error: try FfiConverterString.read(from: &buf)
+            )
+        case 3: return .GetUrl(
+            msg: try FfiConverterString.read(from: &buf), 
+            statusCode: try FfiConverterOptionUInt16.read(from: &buf), 
+            details: try FfiConverterOptionString.read(from: &buf)
+            )
+        case 4: return .FailedToFormatUrl(
+            url: try FfiConverterString.read(from: &buf), 
+            msg: try FfiConverterString.read(from: &buf)
+            )
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: HttpClientError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        
+        case let .FailedToFormatCertificate(derError,pemError):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(derError, into: &buf)
+            FfiConverterString.write(pemError, into: &buf)
+            
+        
+        case let .HttpClientCreation(error):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(error, into: &buf)
+            
+        
+        case let .GetUrl(msg,statusCode,details):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(msg, into: &buf)
+            FfiConverterOptionUInt16.write(statusCode, into: &buf)
+            FfiConverterOptionString.write(details, into: &buf)
+            
+        
+        case let .FailedToFormatUrl(url,msg):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(url, into: &buf)
+            FfiConverterString.write(msg, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHttpClientError_lift(_ buf: RustBuffer) throws -> HttpClientError {
+    return try FfiConverterTypeHttpClientError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHttpClientError_lower(_ value: HttpClientError) -> RustBuffer {
+    return FfiConverterTypeHttpClientError.lower(value)
+}
 
 
 public 
@@ -45247,20 +46120,30 @@ public func FfiConverterTypeRtcNotificationType_lower(_ value: RtcNotificationTy
 public enum RtcTransport: Equatable, Hashable {
     
     /**
-     * A LiveKit RTC transport.
-     *
-     * This covers both the `m.livekit` transport type and the legacy `livekit`
-     * type used by implementations of earlier versions of MSC4195.
+     * A LiveKit RTC transport with the `m.livekit` type, as defined in the
+     * merged state of MSC4195.
      */
     case liveKit(
+        /**
+         * The WebSocket URL of the LiveKit SFU.
+         */url: String, 
+        /**
+         * The URL of the LiveKit JWT service.
+         *
+         * Deprecated in favor of `url`. Should only be used when backwards
+         * compatibility with older versions of MSC4195 is required.
+         */serviceUrl: String?
+    )
+    /**
+     * A LiveKit RTC transport with the legacy `livekit` type, used by
+     * implementations of earlier versions of MSC4195.
+     */
+    case legacyLiveKit(
         /**
          * The WebSocket URL of the LiveKit SFU.
          */url: String?, 
         /**
          * The URL of the LiveKit JWT service.
-         *
-         * Deprecated in favor of `url`. Should only be used when backwards
-         * compatibility with older versions of MSC4195 is required
          */serviceUrl: String?
     )
     /**
@@ -45297,10 +46180,13 @@ public struct FfiConverterTypeRtcTransport: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .liveKit(url: try FfiConverterOptionString.read(from: &buf), serviceUrl: try FfiConverterOptionString.read(from: &buf)
+        case 1: return .liveKit(url: try FfiConverterString.read(from: &buf), serviceUrl: try FfiConverterOptionString.read(from: &buf)
         )
         
-        case 2: return .custom(transportType: try FfiConverterString.read(from: &buf), data: try FfiConverterString.read(from: &buf)
+        case 2: return .legacyLiveKit(url: try FfiConverterOptionString.read(from: &buf), serviceUrl: try FfiConverterOptionString.read(from: &buf)
+        )
+        
+        case 3: return .custom(transportType: try FfiConverterString.read(from: &buf), data: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -45313,12 +46199,18 @@ public struct FfiConverterTypeRtcTransport: FfiConverterRustBuffer {
         
         case let .liveKit(url,serviceUrl):
             writeInt(&buf, Int32(1))
+            FfiConverterString.write(url, into: &buf)
+            FfiConverterOptionString.write(serviceUrl, into: &buf)
+            
+        
+        case let .legacyLiveKit(url,serviceUrl):
+            writeInt(&buf, Int32(2))
             FfiConverterOptionString.write(url, into: &buf)
             FfiConverterOptionString.write(serviceUrl, into: &buf)
             
         
         case let .custom(transportType,data):
-            writeInt(&buf, Int32(2))
+            writeInt(&buf, Int32(3))
             FfiConverterString.write(transportType, into: &buf)
             FfiConverterString.write(data, into: &buf)
             
@@ -46023,7 +46915,8 @@ public func FfiConverterTypeShieldState_lower(_ value: ShieldState) -> RustBuffe
 public enum SlidingSyncVersion: Equatable, Hashable {
     
     case none
-    case native
+    case unstable
+    case stable
 
 
 
@@ -46047,7 +46940,9 @@ public struct FfiConverterTypeSlidingSyncVersion: FfiConverterRustBuffer {
         
         case 1: return .none
         
-        case 2: return .native
+        case 2: return .unstable
+        
+        case 3: return .stable
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -46061,8 +46956,12 @@ public struct FfiConverterTypeSlidingSyncVersion: FfiConverterRustBuffer {
             writeInt(&buf, Int32(1))
         
         
-        case .native:
+        case .unstable:
             writeInt(&buf, Int32(2))
+        
+        
+        case .stable:
+            writeInt(&buf, Int32(3))
         
         }
     }
@@ -46089,8 +46988,11 @@ public func FfiConverterTypeSlidingSyncVersion_lower(_ value: SlidingSyncVersion
 public enum SlidingSyncVersionBuilder: Equatable, Hashable {
     
     case none
-    case native
-    case discoverNative
+    case unstable
+    case stable
+    case discoverUnstable
+    case discoverStable
+    case discover
 
 
 
@@ -46114,9 +47016,15 @@ public struct FfiConverterTypeSlidingSyncVersionBuilder: FfiConverterRustBuffer 
         
         case 1: return .none
         
-        case 2: return .native
+        case 2: return .unstable
         
-        case 3: return .discoverNative
+        case 3: return .stable
+        
+        case 4: return .discoverUnstable
+        
+        case 5: return .discoverStable
+        
+        case 6: return .discover
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -46130,12 +47038,24 @@ public struct FfiConverterTypeSlidingSyncVersionBuilder: FfiConverterRustBuffer 
             writeInt(&buf, Int32(1))
         
         
-        case .native:
+        case .unstable:
             writeInt(&buf, Int32(2))
         
         
-        case .discoverNative:
+        case .stable:
             writeInt(&buf, Int32(3))
+        
+        
+        case .discoverUnstable:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .discoverStable:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .discover:
+            writeInt(&buf, Int32(6))
         
         }
     }
@@ -49846,6 +50766,141 @@ public func FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener_lift(_ 
 #endif
 public func FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener_lower(_ v: DuplicateKeyUploadErrorListener) -> UInt64 {
     return FfiConverterCallbackInterfaceDuplicateKeyUploadErrorListener.lower(v)
+}
+
+
+
+
+public protocol EffectiveRetentionListener: AnyObject, Sendable {
+    
+    func call(retention: RoomRetentionPolicy?) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceEffectiveRetentionListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceEffectiveRetentionListener = UniffiVTableCallbackInterfaceEffectiveRetentionListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceEffectiveRetentionListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface EffectiveRetentionListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceEffectiveRetentionListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface EffectiveRetentionListener: handle missing in uniffiClone")
+            }
+        },
+        call: { (
+            uniffiHandle: UInt64,
+            retention: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceEffectiveRetentionListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.call(
+                     retention: try FfiConverterOptionTypeRoomRetentionPolicy.lift(retention)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceEffectiveRetentionListener> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceEffectiveRetentionListener>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitEffectiveRetentionListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_effectiveretentionlistener(UniffiCallbackInterfaceEffectiveRetentionListener.vtablePtr)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceEffectiveRetentionListener {
+    fileprivate static let handleMap = UniffiHandleMap<EffectiveRetentionListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceEffectiveRetentionListener : FfiConverter {
+    typealias SwiftType = EffectiveRetentionListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceEffectiveRetentionListener_lift(_ handle: UInt64) throws -> EffectiveRetentionListener {
+    return try FfiConverterCallbackInterfaceEffectiveRetentionListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceEffectiveRetentionListener_lower(_ v: EffectiveRetentionListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceEffectiveRetentionListener.lower(v)
 }
 
 
@@ -57855,6 +58910,30 @@ fileprivate struct FfiConverterOptionTypeRoomMemberWithSenderInfo: FfiConverterR
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeRoomRetentionPolicy: FfiConverterRustBuffer {
+    typealias SwiftType = RoomRetentionPolicy?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRoomRetentionPolicy.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRoomRetentionPolicy.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeSentryConfig: FfiConverterRustBuffer {
     typealias SwiftType = SentryConfig?
 
@@ -58815,6 +59894,30 @@ fileprivate struct FfiConverterOptionSequenceString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionSequenceTypeHttpCertificate: FfiConverterRustBuffer {
+    typealias SwiftType = [HttpCertificate]?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterSequenceTypeHttpCertificate.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterSequenceTypeHttpCertificate.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionSequenceTypeRoomHero: FfiConverterRustBuffer {
     typealias SwiftType = [RoomHero]?
 
@@ -59082,23 +60185,23 @@ fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterSequenceData: FfiConverterRustBuffer {
-    typealias SwiftType = [Data]
+fileprivate struct FfiConverterSequenceTypeHttpCertificate: FfiConverterRustBuffer {
+    typealias SwiftType = [HttpCertificate]
 
-    public static func write(_ value: [Data], into buf: inout [UInt8]) {
+    public static func write(_ value: [HttpCertificate], into buf: inout [UInt8]) {
         let len = Int32(value.count)
         writeInt(&buf, len)
         for item in value {
-            FfiConverterData.write(item, into: &buf)
+            FfiConverterTypeHttpCertificate.write(item, into: &buf)
         }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Data] {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [HttpCertificate] {
         let len: Int32 = try readInt(&buf)
-        var seq = [Data]()
+        var seq = [HttpCertificate]()
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
-            seq.append(try FfiConverterData.read(from: &buf))
+            seq.append(try FfiConverterTypeHttpCertificate.read(from: &buf))
         }
         return seq
     }
@@ -59299,6 +60402,56 @@ fileprivate struct FfiConverterSequenceTypeIdentityStatusChange: FfiConverterRus
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeIdentityStatusChange.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeImagePack: FfiConverterRustBuffer {
+    typealias SwiftType = [ImagePack]
+
+    public static func write(_ value: [ImagePack], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeImagePack.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ImagePack] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ImagePack]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeImagePack.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeImagePackImage: FfiConverterRustBuffer {
+    typealias SwiftType = [ImagePackImage]
+
+    public static func write(_ value: [ImagePackImage], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeImagePackImage.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ImagePackImage] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ImagePackImage]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeImagePackImage.read(from: &buf))
         }
         return seq
     }
@@ -61444,7 +62597,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_preview_display_policy() != 54801) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_thumbnail() != 29416) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_media_thumbnail() != 39373) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_notification_settings() != 23861) {
@@ -61469,9 +62622,6 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_store_sizes() != 7663) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_url() != 18890) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_url_preview() != 44378) {
@@ -61783,9 +62933,6 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_mediafilehandle_persist() != 65270) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_add_root_certificates() != 41491) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_auto_enable_backups() != 3029) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -61807,12 +62954,6 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_automatic_token_refresh() != 24815) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_built_in_root_certificates() != 23450) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_ssl_verification() != 59151) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_disable_well_known_lookup() != 23377) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -61828,10 +62969,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_homeserver_url() != 12248) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_in_memory_store() != 16792) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_http_settings() != 20257) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_proxy() != 37144) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_in_memory_store() != 16792) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_request_config() != 42730) {
@@ -61865,9 +63006,6 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_threads_enabled() != 10730) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_user_agent() != 33630) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_with_search_index_store() != 62704) {
@@ -61909,7 +63047,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_recovery() != 48489) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_export_room_keys() != 16968) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_has_devices_to_verify_against() != 40096) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_import_room_keys() != 56192) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_import_secrets_bundle() != 51946) {
@@ -62012,6 +63156,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timelineevent_timestamp() != 4201) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_httpclient_get_url() != 52748) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_livelocationsobserver_subscribe() != 22247) {
@@ -62425,6 +63572,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_call_decline_events() != 41573) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_effective_retention() != 1581) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_identity_status_changes() != 7209) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -62495,6 +63645,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_sticky_delayed_event() != 20506) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_image_packs() != 24997) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_message_like_events() != 31308) {
@@ -63064,6 +64217,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_constructor_secretsbundlewithuserid_from_str() != 25880) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_httpcertificate_from_bytes() != 20595) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_constructor_httpclient_from_settings() != 47939) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_constructor_passwordstrengthestimator_new() != 13036) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -63187,6 +64346,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_calldeclinelistener_call() != 13036) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_effectiveretentionlistener_call() != 44051) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_identitystatuschangelistener_call() != 45143) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -63302,6 +64464,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitClientSessionDelegate()
     uniffiCallbackInitDehydratedDeviceEventListener()
     uniffiCallbackInitDuplicateKeyUploadErrorListener()
+    uniffiCallbackInitEffectiveRetentionListener()
     uniffiCallbackInitEnableRecoveryProgressListener()
     uniffiCallbackInitGeneratedQrLoginProgressListener()
     uniffiCallbackInitGrantGeneratedQrLoginProgressListener()
