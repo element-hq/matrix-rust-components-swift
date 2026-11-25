@@ -1050,6 +1050,24 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func fetchMediaPreviewConfig() async throws  -> MediaPreviewConfig?
     
     /**
+     * Fetch the server's message retention policy configuration.
+     *
+     * Returns the server-level retention policy limits and any per-room
+     * overrides defined by the server, or `None` if the homeserver doesn't
+     * implement the endpoint.
+     *
+     * This always makes a request to the homeserver. On success, the
+     * response is stored in the client's cache and persisted in the state
+     * store, so it can be read with [`Client::retention_configuration`],
+     * even after a restart without connectivity.
+     *
+     * See
+     * [MSC1763](https://github.com/matrix-org/matrix-spec-proposals/pull/1763)
+     * for more info.
+     */
+    func fetchRetentionConfiguration() async throws  -> RetentionConfiguration?
+    
+    /**
      * Get the first existing DM room with the given user, if any.
      */
     func getDmRoom(userId: String) throws  -> Room?
@@ -1171,6 +1189,12 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * Information about login options for the client's homeserver.
      */
     func homeserverLoginDetails() async  -> HomeserverLoginDetails
+    
+    /**
+     * The [`HttpClient`] used by this client, sharing its HTTP settings,
+     * request config and concurrency limits.
+     */
+    func httpClient()  -> HttpClient
     
     func ignoreUser(userId: String) async throws 
     
@@ -1449,6 +1473,23 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * lifecycle.
      */
     func resume() async throws 
+    
+    /**
+     * Get the server's message retention policy configuration, from the cache
+     * if possible.
+     *
+     * If the cached value is missing or older than 6 hours, it is re-fetched
+     * from the homeserver with [`Client::fetch_retention_configuration`]. If
+     * that request fails (e.g. because there is no connectivity) and a stale
+     * value is cached, the stale value is returned instead. The only
+     * exception is when the homeserver doesn't implement the endpoint, in
+     * which case `None` is always returned.
+     *
+     * See
+     * [MSC1763](https://github.com/matrix-org/matrix-spec-proposals/pull/1763)
+     * for more info.
+     */
+    func retentionConfiguration() async throws  -> RetentionConfiguration?
     
     /**
      * Checks if a room alias exists in the current homeserver.
@@ -2398,6 +2439,38 @@ open func fetchMediaPreviewConfig()async throws  -> MediaPreviewConfig?  {
 }
     
     /**
+     * Fetch the server's message retention policy configuration.
+     *
+     * Returns the server-level retention policy limits and any per-room
+     * overrides defined by the server, or `None` if the homeserver doesn't
+     * implement the endpoint.
+     *
+     * This always makes a request to the homeserver. On success, the
+     * response is stored in the client's cache and persisted in the state
+     * store, so it can be read with [`Client::retention_configuration`],
+     * even after a restart without connectivity.
+     *
+     * See
+     * [MSC1763](https://github.com/matrix-org/matrix-spec-proposals/pull/1763)
+     * for more info.
+     */
+open func fetchRetentionConfiguration()async throws  -> RetentionConfiguration?  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_fetch_retention_configuration(
+                        self.uniffiCloneHandle()
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeRetentionConfiguration.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
      * Get the first existing DM room with the given user, if any.
      */
 open func getDmRoom(userId: String)throws  -> Room?  {
@@ -2796,6 +2869,19 @@ open func homeserverLoginDetails()async  -> HomeserverLoginDetails  {
             errorHandler: nil
             
         )
+}
+    
+    /**
+     * The [`HttpClient`] used by this client, sharing its HTTP settings,
+     * request config and concurrency limits.
+     */
+open func httpClient() -> HttpClient  {
+    return try!  FfiConverterTypeHttpClient_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_method_client_http_client(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
 }
     
 open func ignoreUser(userId: String)async throws   {
@@ -3536,6 +3622,37 @@ open func resume()async throws   {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Get the server's message retention policy configuration, from the cache
+     * if possible.
+     *
+     * If the cached value is missing or older than 6 hours, it is re-fetched
+     * from the homeserver with [`Client::fetch_retention_configuration`]. If
+     * that request fails (e.g. because there is no connectivity) and a stale
+     * value is cached, the stale value is returned instead. The only
+     * exception is when the homeserver doesn't implement the endpoint, in
+     * which case `None` is always returned.
+     *
+     * See
+     * [MSC1763](https://github.com/matrix-org/matrix-spec-proposals/pull/1763)
+     * for more info.
+     */
+open func retentionConfiguration()async throws  -> RetentionConfiguration?  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_retention_configuration(
+                        self.uniffiCloneHandle()
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeRetentionConfiguration.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -20222,6 +20339,20 @@ public protocol TimelineProtocol: AnyObject, Sendable {
     func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String) async throws  -> SendHandle
     
     /**
+     * Sends an already uploaded image as a sticker, such as one of the images
+     * of an image pack.
+     *
+     * In a threaded timeline, the sticker is sent in the thread.
+     *
+     * # Arguments
+     *
+     * - `body` - A textual description of the sticker.
+     * - `url` - The `mxc://` URL of the image.
+     * - `info` - Metadata about the image, if known.
+     */
+    func sendSticker(body: String, url: String, info: ImageInfo?) async throws  -> SendHandle
+    
+    /**
      * Deprecated: use [`Self::send_attachment`] with `AttachmentKind::Video`.
      */
     func sendVideo(params: UploadParameters, thumbnailSource: UploadSource?, videoInfo: VideoInfo) throws  -> SendAttachmentJoinHandle
@@ -20886,6 +21017,34 @@ open func sendReply(msg: RoomMessageEventContentWithoutRelation, eventId: String
             rustFutureFunc: {
                 uniffi_matrix_sdk_ffi_fn_method_timeline_send_reply(
                         self.uniffiCloneHandle(),FfiConverterTypeRoomMessageEventContentWithoutRelation_lower(msg),FfiConverterString.lower(eventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_u64,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_u64,
+            liftFunc: FfiConverterTypeSendHandle_lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Sends an already uploaded image as a sticker, such as one of the images
+     * of an image pack.
+     *
+     * In a threaded timeline, the sticker is sent in the thread.
+     *
+     * # Arguments
+     *
+     * - `body` - A textual description of the sticker.
+     * - `url` - The `mxc://` URL of the image.
+     * - `info` - Metadata about the image, if known.
+     */
+open func sendSticker(body: String, url: String, info: ImageInfo?)async throws  -> SendHandle  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_timeline_send_sticker(
+                        self.uniffiCloneHandle(),FfiConverterString.lower(body),FfiConverterString.lower(url),FfiConverterOptionTypeImageInfo.lower(info)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_u64,
@@ -26151,10 +26310,19 @@ public struct NotificationRoomInfo: Equatable, Hashable {
     public var isDirect: Bool
     public var isSpace: Bool
     public var isDm: Bool
+    /**
+     * Whether the current user is allowed to send an `m.room.message` event
+     * in the room, according to the room's power levels.
+     */
+    public var canSendMessage: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, topic: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, activeServiceMembersCount: UInt64, serviceMembers: [String], isEncrypted: Bool?, isDirect: Bool, isSpace: Bool, isDm: Bool) {
+    public init(displayName: String, avatarUrl: String?, canonicalAlias: String?, topic: String?, joinRule: JoinRule?, joinedMembersCount: UInt64, activeServiceMembersCount: UInt64, serviceMembers: [String], isEncrypted: Bool?, isDirect: Bool, isSpace: Bool, isDm: Bool, 
+        /**
+         * Whether the current user is allowed to send an `m.room.message` event
+         * in the room, according to the room's power levels.
+         */canSendMessage: Bool) {
         self.displayName = displayName
         self.avatarUrl = avatarUrl
         self.canonicalAlias = canonicalAlias
@@ -26167,6 +26335,7 @@ public struct NotificationRoomInfo: Equatable, Hashable {
         self.isDirect = isDirect
         self.isSpace = isSpace
         self.isDm = isDm
+        self.canSendMessage = canSendMessage
     }
 
     
@@ -26196,7 +26365,8 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
                 isEncrypted: FfiConverterOptionBool.read(from: &buf), 
                 isDirect: FfiConverterBool.read(from: &buf), 
                 isSpace: FfiConverterBool.read(from: &buf), 
-                isDm: FfiConverterBool.read(from: &buf)
+                isDm: FfiConverterBool.read(from: &buf), 
+                canSendMessage: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -26213,6 +26383,7 @@ public struct FfiConverterTypeNotificationRoomInfo: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isDirect, into: &buf)
         FfiConverterBool.write(value.isSpace, into: &buf)
         FfiConverterBool.write(value.isDm, into: &buf)
+        FfiConverterBool.write(value.canSendMessage, into: &buf)
     }
 }
 
@@ -27901,6 +28072,229 @@ public func FfiConverterTypeResolvedRoomAlias_lift(_ buf: RustBuffer) throws -> 
 #endif
 public func FfiConverterTypeResolvedRoomAlias_lower(_ value: ResolvedRoomAlias) -> RustBuffer {
     return FfiConverterTypeResolvedRoomAlias.lower(value)
+}
+
+
+/**
+ * The server's message retention policy configuration.
+ *
+ * See
+ * [MSC1763](https://github.com/matrix-org/matrix-spec-proposals/pull/1763)
+ * for more info.
+ */
+public struct RetentionConfiguration: Equatable, Hashable {
+    /**
+     * The server's default retention policy (`"*"`), if any.
+     */
+    public var defaultPolicy: RoomRetentionPolicy?
+    /**
+     * Map between a room ID and the per-room override the server defines for
+     * that room.
+     */
+    public var roomPolicies: [String: RoomRetentionPolicy]
+    /**
+     * Limits to apply to policies defined by `m.room.retention` state events.
+     */
+    public var limits: RetentionLimits
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The server's default retention policy (`"*"`), if any.
+         */defaultPolicy: RoomRetentionPolicy?, 
+        /**
+         * Map between a room ID and the per-room override the server defines for
+         * that room.
+         */roomPolicies: [String: RoomRetentionPolicy], 
+        /**
+         * Limits to apply to policies defined by `m.room.retention` state events.
+         */limits: RetentionLimits) {
+        self.defaultPolicy = defaultPolicy
+        self.roomPolicies = roomPolicies
+        self.limits = limits
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RetentionConfiguration: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRetentionConfiguration: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RetentionConfiguration {
+        return
+            try RetentionConfiguration(
+                defaultPolicy: FfiConverterOptionTypeRoomRetentionPolicy.read(from: &buf), 
+                roomPolicies: FfiConverterDictionaryStringTypeRoomRetentionPolicy.read(from: &buf), 
+                limits: FfiConverterTypeRetentionLimits.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RetentionConfiguration, into buf: inout [UInt8]) {
+        FfiConverterOptionTypeRoomRetentionPolicy.write(value.defaultPolicy, into: &buf)
+        FfiConverterDictionaryStringTypeRoomRetentionPolicy.write(value.roomPolicies, into: &buf)
+        FfiConverterTypeRetentionLimits.write(value.limits, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRetentionConfiguration_lift(_ buf: RustBuffer) throws -> RetentionConfiguration {
+    return try FfiConverterTypeRetentionConfiguration.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRetentionConfiguration_lower(_ value: RetentionConfiguration) -> RustBuffer {
+    return FfiConverterTypeRetentionConfiguration.lower(value)
+}
+
+
+/**
+ * Global limits for the per-room retention policy lifetimes.
+ */
+public struct RetentionLifetimeLimits: Equatable, Hashable {
+    /**
+     * The minimum accepted value for this limit.
+     */
+    public var min: TimeInterval?
+    /**
+     * The maximum accepted value for this limit.
+     */
+    public var max: TimeInterval?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The minimum accepted value for this limit.
+         */min: TimeInterval?, 
+        /**
+         * The maximum accepted value for this limit.
+         */max: TimeInterval?) {
+        self.min = min
+        self.max = max
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RetentionLifetimeLimits: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRetentionLifetimeLimits: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RetentionLifetimeLimits {
+        return
+            try RetentionLifetimeLimits(
+                min: FfiConverterOptionDuration.read(from: &buf), 
+                max: FfiConverterOptionDuration.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RetentionLifetimeLimits, into buf: inout [UInt8]) {
+        FfiConverterOptionDuration.write(value.min, into: &buf)
+        FfiConverterOptionDuration.write(value.max, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRetentionLifetimeLimits_lift(_ buf: RustBuffer) throws -> RetentionLifetimeLimits {
+    return try FfiConverterTypeRetentionLifetimeLimits.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRetentionLifetimeLimits_lower(_ value: RetentionLifetimeLimits) -> RustBuffer {
+    return FfiConverterTypeRetentionLifetimeLimits.lower(value)
+}
+
+
+/**
+ * Limits to apply to policies defined by `m.room.retention` state events.
+ */
+public struct RetentionLimits: Equatable, Hashable {
+    /**
+     * Limits to apply to the minimum lifetime of `m.room.retention` policies.
+     */
+    public var minLifetime: RetentionLifetimeLimits?
+    /**
+     * Limits to apply to the maximum lifetime of `m.room.retention` policies.
+     */
+    public var maxLifetime: RetentionLifetimeLimits?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Limits to apply to the minimum lifetime of `m.room.retention` policies.
+         */minLifetime: RetentionLifetimeLimits?, 
+        /**
+         * Limits to apply to the maximum lifetime of `m.room.retention` policies.
+         */maxLifetime: RetentionLifetimeLimits?) {
+        self.minLifetime = minLifetime
+        self.maxLifetime = maxLifetime
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RetentionLimits: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRetentionLimits: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RetentionLimits {
+        return
+            try RetentionLimits(
+                minLifetime: FfiConverterOptionTypeRetentionLifetimeLimits.read(from: &buf), 
+                maxLifetime: FfiConverterOptionTypeRetentionLifetimeLimits.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RetentionLimits, into buf: inout [UInt8]) {
+        FfiConverterOptionTypeRetentionLifetimeLimits.write(value.minLifetime, into: &buf)
+        FfiConverterOptionTypeRetentionLifetimeLimits.write(value.maxLifetime, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRetentionLimits_lift(_ buf: RustBuffer) throws -> RetentionLimits {
+    return try FfiConverterTypeRetentionLimits.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRetentionLimits_lower(_ value: RetentionLimits) -> RustBuffer {
+    return FfiConverterTypeRetentionLimits.lower(value)
 }
 
 
@@ -58862,6 +59256,54 @@ fileprivate struct FfiConverterOptionTypeResolvedRoomAlias: FfiConverterRustBuff
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeRetentionConfiguration: FfiConverterRustBuffer {
+    typealias SwiftType = RetentionConfiguration?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRetentionConfiguration.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRetentionConfiguration.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeRetentionLifetimeLimits: FfiConverterRustBuffer {
+    typealias SwiftType = RetentionLifetimeLimits?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRetentionLifetimeLimits.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRetentionLifetimeLimits.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeRoomMember: FfiConverterRustBuffer {
     typealias SwiftType = RoomMember?
 
@@ -61740,6 +62182,32 @@ fileprivate struct FfiConverterDictionaryStringTypeReceipt: FfiConverterRustBuff
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterDictionaryStringTypeRoomRetentionPolicy: FfiConverterRustBuffer {
+    public static func write(_ value: [String: RoomRetentionPolicy], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for (key, value) in value {
+            FfiConverterString.write(key, into: &buf)
+            FfiConverterTypeRoomRetentionPolicy.write(value, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [String: RoomRetentionPolicy] {
+        let len: Int32 = try readInt(&buf)
+        var dict = [String: RoomRetentionPolicy]()
+        dict.reserveCapacity(Int(len))
+        for _ in 0..<len {
+            let key = try FfiConverterString.read(from: &buf)
+            let value = try FfiConverterTypeRoomRetentionPolicy.read(from: &buf)
+            dict[key] = value
+        }
+        return dict
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterDictionaryStringTypeBatchNotificationResult: FfiConverterRustBuffer {
     public static func write(_ value: [String: BatchNotificationResult], into buf: inout [UInt8]) {
         let len = Int32(value.count)
@@ -62573,6 +63041,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_fetch_media_preview_config() != 4594) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_fetch_retention_configuration() != 33686) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_dm_room() != 35770) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -62637,6 +63108,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_homeserver_login_details() != 50528) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_http_client() != 55331) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_ignore_user() != 35445) {
@@ -62742,6 +63216,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_resume() != 61108) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_retention_configuration() != 44504) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_room_alias_exists() != 35828) {
@@ -64116,6 +64593,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_reply() != 37856) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_sticker() != 48023) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_send_video() != 46403) {
