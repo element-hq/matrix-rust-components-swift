@@ -20201,6 +20201,15 @@ public protocol TimelineProtocol: AnyObject, Sendable {
     func fetchMembers() async 
     
     /**
+     * Get the ID of the closest visible event at or before the user's
+     * `m.fully_read` marker, or the marker's own event ID if neither is
+     * loaded.
+     *
+     * See [`matrix_sdk_ui::timeline::Timeline::fully_read_event_id`].
+     */
+    func fullyReadEventId()  -> String?
+    
+    /**
      * Get the current timeline item for the given event ID, if any.
      *
      * Will return a remote event, _or_ a local echo that has been sent but not
@@ -20369,6 +20378,14 @@ public protocol TimelineProtocol: AnyObject, Sendable {
     func sendWithExtraContent(msg: RoomMessageEventContentWithoutRelation, extraContentJson: String?) async throws  -> SendHandle
     
     func subscribeToBackPaginationStatus(listener: PaginationStatusListener) async throws  -> TaskHandle
+    
+    /**
+     * Subscribe to changes of [`Self::fully_read_event_id`]. The listener is
+     * called with the current value right away.
+     *
+     * See [`matrix_sdk_ui::timeline::Timeline::subscribe_fully_read_event_id`].
+     */
+    func subscribeToFullyReadEventId(listener: FullyReadEventIdListener)  -> TaskHandle
     
     /**
      * Toggle a reaction on an event.
@@ -20646,6 +20663,22 @@ open func fetchMembers()async   {
             errorHandler: nil
             
         )
+}
+    
+    /**
+     * Get the ID of the closest visible event at or before the user's
+     * `m.fully_read` marker, or the marker's own event ID if neither is
+     * loaded.
+     *
+     * See [`matrix_sdk_ui::timeline::Timeline::fully_read_event_id`].
+     */
+open func fullyReadEventId() -> String?  {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_method_timeline_fully_read_event_id(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
 }
     
     /**
@@ -21119,6 +21152,22 @@ open func subscribeToBackPaginationStatus(listener: PaginationStatusListener)asy
             liftFunc: FfiConverterTypeTaskHandle_lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
+}
+    
+    /**
+     * Subscribe to changes of [`Self::fully_read_event_id`]. The listener is
+     * called with the current value right away.
+     *
+     * See [`matrix_sdk_ui::timeline::Timeline::subscribe_fully_read_event_id`].
+     */
+open func subscribeToFullyReadEventId(listener: FullyReadEventIdListener) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_matrix_sdk_ffi_fn_method_timeline_subscribe_to_fully_read_event_id(
+            self.uniffiCloneHandle(),
+        FfiConverterCallbackInterfaceFullyReadEventIdListener_lower(listener),uniffiCallStatus
+    )
+})
 }
     
     /**
@@ -24548,6 +24597,11 @@ public struct ImagePack {
      */
     public var isStickerPack: Bool
     /**
+     * Whether the user enabled the pack globally, making it usable in all
+     * the rooms.
+     */
+    public var isEnabledGlobally: Bool
+    /**
      * An attribution for the pack, crediting its original author or source
      * for example.
      */
@@ -24583,6 +24637,10 @@ public struct ImagePack {
          * Whether the pack's images can be sent as stickers.
          */isStickerPack: Bool, 
         /**
+         * Whether the user enabled the pack globally, making it usable in all
+         * the rooms.
+         */isEnabledGlobally: Bool, 
+        /**
          * An attribution for the pack, crediting its original author or source
          * for example.
          */attribution: String?, 
@@ -24595,6 +24653,7 @@ public struct ImagePack {
         self.avatarUrl = avatarUrl
         self.isEmoticonPack = isEmoticonPack
         self.isStickerPack = isStickerPack
+        self.isEnabledGlobally = isEnabledGlobally
         self.attribution = attribution
         self.images = images
     }
@@ -24621,6 +24680,7 @@ public struct FfiConverterTypeImagePack: FfiConverterRustBuffer {
                 avatarUrl: FfiConverterOptionString.read(from: &buf), 
                 isEmoticonPack: FfiConverterBool.read(from: &buf), 
                 isStickerPack: FfiConverterBool.read(from: &buf), 
+                isEnabledGlobally: FfiConverterBool.read(from: &buf), 
                 attribution: FfiConverterOptionString.read(from: &buf), 
                 images: FfiConverterSequenceTypeImagePackImage.read(from: &buf)
         )
@@ -24633,6 +24693,7 @@ public struct FfiConverterTypeImagePack: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.avatarUrl, into: &buf)
         FfiConverterBool.write(value.isEmoticonPack, into: &buf)
         FfiConverterBool.write(value.isStickerPack, into: &buf)
+        FfiConverterBool.write(value.isEnabledGlobally, into: &buf)
         FfiConverterOptionString.write(value.attribution, into: &buf)
         FfiConverterSequenceTypeImagePackImage.write(value.images, into: &buf)
     }
@@ -28549,10 +28610,6 @@ public struct RoomInfo {
      */
     public var numUnreadMentions: UInt64
     /**
-     * Event ID of the user's `m.fully_read` marker for this room, if any.
-     */
-    public var fullyReadEventId: String?
-    /**
      * The currently pinned event ids.
      */
     public var pinnedEventIds: [String]
@@ -28622,9 +28679,6 @@ public struct RoomInfo {
          * notification settings.
          */numUnreadMentions: UInt64, 
         /**
-         * Event ID of the user's `m.fully_read` marker for this room, if any.
-         */fullyReadEventId: String?, 
-        /**
          * The currently pinned event ids.
          */pinnedEventIds: [String], 
         /**
@@ -28679,7 +28733,6 @@ public struct RoomInfo {
         self.numUnreadMessages = numUnreadMessages
         self.numUnreadNotifications = numUnreadNotifications
         self.numUnreadMentions = numUnreadMentions
-        self.fullyReadEventId = fullyReadEventId
         self.pinnedEventIds = pinnedEventIds
         self.joinRule = joinRule
         self.historyVisibility = historyVisibility
@@ -28738,7 +28791,6 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
                 numUnreadMessages: FfiConverterUInt64.read(from: &buf), 
                 numUnreadNotifications: FfiConverterUInt64.read(from: &buf), 
                 numUnreadMentions: FfiConverterUInt64.read(from: &buf), 
-                fullyReadEventId: FfiConverterOptionString.read(from: &buf), 
                 pinnedEventIds: FfiConverterSequenceString.read(from: &buf), 
                 joinRule: FfiConverterOptionTypeJoinRule.read(from: &buf), 
                 historyVisibility: FfiConverterTypeRoomHistoryVisibility.read(from: &buf), 
@@ -28783,7 +28835,6 @@ public struct FfiConverterTypeRoomInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.numUnreadMessages, into: &buf)
         FfiConverterUInt64.write(value.numUnreadNotifications, into: &buf)
         FfiConverterUInt64.write(value.numUnreadMentions, into: &buf)
-        FfiConverterOptionString.write(value.fullyReadEventId, into: &buf)
         FfiConverterSequenceString.write(value.pinnedEventIds, into: &buf)
         FfiConverterOptionTypeJoinRule.write(value.joinRule, into: &buf)
         FfiConverterTypeRoomHistoryVisibility.write(value.historyVisibility, into: &buf)
@@ -51435,6 +51486,141 @@ public func FfiConverterCallbackInterfaceEnableRecoveryProgressListener_lower(_ 
 
 
 
+public protocol FullyReadEventIdListener: AnyObject, Sendable {
+    
+    func onUpdate(eventId: String?) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceFullyReadEventIdListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceFullyReadEventIdListener = UniffiVTableCallbackInterfaceFullyReadEventIdListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceFullyReadEventIdListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface FullyReadEventIdListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceFullyReadEventIdListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface FullyReadEventIdListener: handle missing in uniffiClone")
+            }
+        },
+        onUpdate: { (
+            uniffiHandle: UInt64,
+            eventId: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceFullyReadEventIdListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onUpdate(
+                     eventId: try FfiConverterOptionString.lift(eventId)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceFullyReadEventIdListener> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceFullyReadEventIdListener>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitFullyReadEventIdListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_fullyreadeventidlistener(UniffiCallbackInterfaceFullyReadEventIdListener.vtablePtr)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceFullyReadEventIdListener {
+    fileprivate static let handleMap = UniffiHandleMap<FullyReadEventIdListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceFullyReadEventIdListener : FfiConverter {
+    typealias SwiftType = FullyReadEventIdListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceFullyReadEventIdListener_lift(_ handle: UInt64) throws -> FullyReadEventIdListener {
+    return try FfiConverterCallbackInterfaceFullyReadEventIdListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceFullyReadEventIdListener_lower(_ v: FullyReadEventIdListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceFullyReadEventIdListener.lower(v)
+}
+
+
+
+
 public protocol GeneratedQrLoginProgressListener: AnyObject, Sendable {
     
     func onUpdate(state: GeneratedQrLoginProgress) 
@@ -64538,6 +64724,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_fetch_members() != 39770) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_fully_read_event_id() != 508) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_get_event_timeline_item_by_event_id() != 43047) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -64608,6 +64797,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_back_pagination_status() != 61171) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_timeline_subscribe_to_fully_read_event_id() != 62580) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_timeline_toggle_reaction() != 3610) {
@@ -64916,6 +65108,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_synclistenerv2_on_update() != 8562) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_fullyreadeventidlistener_on_update() != 2105) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_paginationstatuslistener_on_update() != 28733) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -64946,6 +65141,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitDuplicateKeyUploadErrorListener()
     uniffiCallbackInitEffectiveRetentionListener()
     uniffiCallbackInitEnableRecoveryProgressListener()
+    uniffiCallbackInitFullyReadEventIdListener()
     uniffiCallbackInitGeneratedQrLoginProgressListener()
     uniffiCallbackInitGrantGeneratedQrLoginProgressListener()
     uniffiCallbackInitGrantQrLoginProgressListener()
