@@ -965,9 +965,9 @@ public protocol ClientProtocol: AnyObject, Sendable {
     
     /**
      * Login using JWT This is an implementation of the custom_login
-     * https://docs.rs/matrix-sdk/latest/matrix_sdk/matrix_auth/struct.MatrixAuth.html#method.login_custom
+     * <https://docs.rs/matrix-sdk/latest/matrix_sdk/matrix_auth/struct.MatrixAuth.html#method.login_custom>
      * For more information on logging in with JWT:
-     * https://element-hq.github.io/synapse/latest/jwt.html
+     * <https://element-hq.github.io/synapse/latest/jwt.html>
      */
     func customLoginWithJwt(jwt: String, initialDeviceName: String?, deviceId: String?) async throws 
     
@@ -995,9 +995,10 @@ public protocol ClientProtocol: AnyObject, Sendable {
      *
      * Some deployments must not emit any request to the well-known URI of
      * their domain. When disabled, [`Client::tile_server`] returns `None`,
-     * [`Client::well_known_rtc_transports`] returns an empty list, and
-     * [`Client::discover_rtc_transports`] doesn't fall back to the well-known
-     * `m.rtc_foci`, relying only on the MSC4143 discovery endpoint.
+     * [`matrix_sdk::Client::well_known_rtc_transports`] returns an empty list,
+     * and [`matrix_sdk::Client::discover_rtc_transports`] doesn't fall
+     * back to the well-known `m.rtc_foci`, relying only on the MSC4143
+     * discovery endpoint.
      */
     func disableWellKnownLookup(disable: Bool) 
     
@@ -1008,8 +1009,8 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * `GET /_matrix/client/v1/rtc/transports` endpoint (MSC4143). If the
      * homeserver doesn't implement that endpoint, this falls back to the
      * `m.rtc_foci` field of the well-known, unless well-known discovery was
-     * disabled with [`ClientBuilder::disable_well_known_lookup`] or
-     * [`Client::disable_well_known_lookup`].
+     * disabled with [`crate::ClientBuilder::disable_well_known_lookup`] or
+     * [`crate::Client::disable_well_known_lookup`].
      *
      * Returns `None` if neither source could provide transports, which is kept
      * distinct from an empty list, i.e. a homeserver that advertises no
@@ -1066,6 +1067,22 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * for more info.
      */
     func fetchRetentionConfiguration() async throws  -> RetentionConfiguration?
+    
+    /**
+     * Get a media file's content from the cache only, without fetching it from
+     * the network.
+     *
+     * Returns `None` if it isn't cached.
+     */
+    func getCachedMediaContent(mediaSource: MediaSource) async throws  -> Data?
+    
+    /**
+     * Get a media thumbnail from the cache only, without fetching it from the
+     * network.
+     *
+     * Returns `None` if it isn't cached.
+     */
+    func getCachedMediaThumbnail(mediaSource: MediaSource, width: UInt64, height: UInt64, animated: Bool) async throws  -> Data?
     
     /**
      * Get the first existing DM room with the given user, if any.
@@ -1207,7 +1224,7 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * `GET /_matrix/client/v1/rtc/transports` endpoint (MSC4143). If the
      * homeserver doesn't implement it, the well-known `m.rtc_foci` are used as
      * a fallback, unless well-known discovery was disabled with
-     * [`ClientBuilder::disable_well_known_lookup`] or
+     * [`crate::ClientBuilder::disable_well_known_lookup`] or
      * [`Client::disable_well_known_lookup`].
      *
      * Both the `m.livekit` and the legacy `livekit` transport types count as
@@ -1308,7 +1325,7 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * all events in a room including those inside threads.
      *
      * This is useful to mitigate backend led wrong iOS app badges and work
-     * around https://github.com/element-hq/element-x-ios/issues/3151
+     * around <https://github.com/element-hq/element-x-ios/issues/3151>
      */
     func markAllRoomsAsRead() async throws 
     
@@ -1858,8 +1875,7 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * by the spec as external providers all have their own way to handle the
      * hint. However, it should be noted that when providing a user ID as a
      * hint for MAS (with no upstream provider), then the format to use is
-     * defined by [MSC4198]:
-     * https://github.com/matrix-org/matrix-spec-proposals/pull/4198
+     * defined by [MSC4198].
      *
      * - `device_id` - The unique ID that will be associated with the session.
      * If not set, a random one will be generated. It can be an existing
@@ -1872,6 +1888,8 @@ public protocol ClientProtocol: AnyObject, Sendable {
      * and the device ID according to the
      * [specification](https://spec.matrix.org/v1.15/client-server-api/#allocated-scope-tokens)
      * are always requested.
+     *
+     * [MSC4198]: https://github.com/matrix-org/matrix-spec-proposals/pull/4198
      */
     func urlForOauth(oauthConfiguration: OAuthConfiguration, prompt: OAuthPrompt?, loginHint: String?, deviceId: String?, additionalScopes: [String]?) async throws  -> OAuthAuthorizationData
     
@@ -1899,8 +1917,9 @@ public protocol ClientProtocol: AnyObject, Sendable {
      *
      * The search service aggregates results of different kinds (currently only
      * messages) into a single reactive, paginated list of typed
-     * [`SearchResult`]s. Call [`SearchService::set_query`] to start or update
-     * the search, then [`SearchService::paginate`] to load more results.
+     * [`SearchServiceResult`]s. Call [`SearchService::set_query`] to start or
+     * update the search, then [`SearchService::paginate`] to load more
+     * results.
      */
     func searchService()  -> SearchService
     
@@ -2220,9 +2239,9 @@ open func createRoom(request: CreateRoomParameters)async throws  -> String  {
     
     /**
      * Login using JWT This is an implementation of the custom_login
-     * https://docs.rs/matrix-sdk/latest/matrix_sdk/matrix_auth/struct.MatrixAuth.html#method.login_custom
+     * <https://docs.rs/matrix-sdk/latest/matrix_sdk/matrix_auth/struct.MatrixAuth.html#method.login_custom>
      * For more information on logging in with JWT:
-     * https://element-hq.github.io/synapse/latest/jwt.html
+     * <https://element-hq.github.io/synapse/latest/jwt.html>
      */
 open func customLoginWithJwt(jwt: String, initialDeviceName: String?, deviceId: String?)async throws   {
     return
@@ -2299,9 +2318,10 @@ open func deviceId()throws  -> String  {
      *
      * Some deployments must not emit any request to the well-known URI of
      * their domain. When disabled, [`Client::tile_server`] returns `None`,
-     * [`Client::well_known_rtc_transports`] returns an empty list, and
-     * [`Client::discover_rtc_transports`] doesn't fall back to the well-known
-     * `m.rtc_foci`, relying only on the MSC4143 discovery endpoint.
+     * [`matrix_sdk::Client::well_known_rtc_transports`] returns an empty list,
+     * and [`matrix_sdk::Client::discover_rtc_transports`] doesn't fall
+     * back to the well-known `m.rtc_foci`, relying only on the MSC4143
+     * discovery endpoint.
      */
 open func disableWellKnownLookup(disable: Bool)  {try! rustCall() {
         uniffiCallStatus in
@@ -2319,8 +2339,8 @@ open func disableWellKnownLookup(disable: Bool)  {try! rustCall() {
      * `GET /_matrix/client/v1/rtc/transports` endpoint (MSC4143). If the
      * homeserver doesn't implement that endpoint, this falls back to the
      * `m.rtc_foci` field of the well-known, unless well-known discovery was
-     * disabled with [`ClientBuilder::disable_well_known_lookup`] or
-     * [`Client::disable_well_known_lookup`].
+     * disabled with [`crate::ClientBuilder::disable_well_known_lookup`] or
+     * [`crate::Client::disable_well_known_lookup`].
      *
      * Returns `None` if neither source could provide transports, which is kept
      * distinct from an empty list, i.e. a homeserver that advertises no
@@ -2466,6 +2486,50 @@ open func fetchRetentionConfiguration()async throws  -> RetentionConfiguration? 
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterOptionTypeRetentionConfiguration.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Get a media file's content from the cache only, without fetching it from
+     * the network.
+     *
+     * Returns `None` if it isn't cached.
+     */
+open func getCachedMediaContent(mediaSource: MediaSource)async throws  -> Data?  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_get_cached_media_content(
+                        self.uniffiCloneHandle(),FfiConverterTypeMediaSource_lower(mediaSource)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionData.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Get a media thumbnail from the cache only, without fetching it from the
+     * network.
+     *
+     * Returns `None` if it isn't cached.
+     */
+open func getCachedMediaThumbnail(mediaSource: MediaSource, width: UInt64, height: UInt64, animated: Bool = false)async throws  -> Data?  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_get_cached_media_thumbnail(
+                        self.uniffiCloneHandle(),FfiConverterTypeMediaSource_lower(mediaSource),FfiConverterUInt64.lower(width),FfiConverterUInt64.lower(height),FfiConverterBool.lower(animated)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionData.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -2923,7 +2987,7 @@ open func ignoredUsers()async throws  -> [String]  {
      * `GET /_matrix/client/v1/rtc/transports` endpoint (MSC4143). If the
      * homeserver doesn't implement it, the well-known `m.rtc_foci` are used as
      * a fallback, unless well-known discovery was disabled with
-     * [`ClientBuilder::disable_well_known_lookup`] or
+     * [`crate::ClientBuilder::disable_well_known_lookup`] or
      * [`Client::disable_well_known_lookup`].
      *
      * Both the `m.livekit` and the legacy `livekit` transport types count as
@@ -3220,7 +3284,7 @@ open func logout()async throws   {
      * all events in a room including those inside threads.
      *
      * This is useful to mitigate backend led wrong iOS app badges and work
-     * around https://github.com/element-hq/element-x-ios/issues/3151
+     * around <https://github.com/element-hq/element-x-ios/issues/3151>
      */
 open func markAllRoomsAsRead()async throws   {
     return
@@ -4584,8 +4648,7 @@ open func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWat
      * by the spec as external providers all have their own way to handle the
      * hint. However, it should be noted that when providing a user ID as a
      * hint for MAS (with no upstream provider), then the format to use is
-     * defined by [MSC4198]:
-     * https://github.com/matrix-org/matrix-spec-proposals/pull/4198
+     * defined by [MSC4198].
      *
      * - `device_id` - The unique ID that will be associated with the session.
      * If not set, a random one will be generated. It can be an existing
@@ -4598,6 +4661,8 @@ open func uploadMedia(mimeType: String, data: Data, progressWatcher: ProgressWat
      * and the device ID according to the
      * [specification](https://spec.matrix.org/v1.15/client-server-api/#allocated-scope-tokens)
      * are always requested.
+     *
+     * [MSC4198]: https://github.com/matrix-org/matrix-spec-proposals/pull/4198
      */
 open func urlForOauth(oauthConfiguration: OAuthConfiguration, prompt: OAuthPrompt?, loginHint: String?, deviceId: String?, additionalScopes: [String]?)async throws  -> OAuthAuthorizationData  {
     return
@@ -4681,8 +4746,9 @@ open func getRecentEmojis()async throws  -> [RecentEmoji]  {
      *
      * The search service aggregates results of different kinds (currently only
      * messages) into a single reactive, paginated list of typed
-     * [`SearchResult`]s. Call [`SearchService::set_query`] to start or update
-     * the search, then [`SearchService::paginate`] to load more results.
+     * [`SearchServiceResult`]s. Call [`SearchService::set_query`] to start or
+     * update the search, then [`SearchService::paginate`] to load more
+     * results.
      */
 open func searchService() -> SearchService  {
     return try!  FfiConverterTypeSearchService_lift(try! rustCall() {
@@ -4867,7 +4933,7 @@ public protocol ClientBuilderProtocol: AnyObject, Sendable {
      *
      * When building a client for restoration, prefer to use
      * [`Self::homeserver_url`] as the restoration will pick up the user ID
-     * from the [`Session`], and using this will result in a needless request
+     * from the session, and using this will result in a needless request
      * to re-discover the homeserver.
      *
      * The following methods are mutually exclusive: [`Self::homeserver_url`],
@@ -5273,7 +5339,7 @@ open func serverName(serverName: String) -> ClientBuilder  {
      *
      * When building a client for restoration, prefer to use
      * [`Self::homeserver_url`] as the restoration will pick up the user ID
-     * from the [`Session`], and using this will result in a needless request
+     * from the session, and using this will result in a needless request
      * to re-discover the homeserver.
      *
      * The following methods are mutually exclusive: [`Self::homeserver_url`],
@@ -11416,7 +11482,8 @@ public protocol RoomProtocol: AnyObject, Sendable {
      * [`Timeline`] they belong to, e.g. marking a thread as read from its root
      * and latest event ids. Note that this won't check whether sending the
      * receipt is necessary or valid (i.e. it can move a receipt backwards);
-     * prefer [`Timeline::send_single_receipt`] when a timeline is available.
+     * prefer [`crate::Timeline::send_read_receipt`] when a timeline is
+     * available.
      */
     func sendSingleReceipt(receiptType: ReceiptType, thread: ReceiptThread, eventId: String) async throws 
     
@@ -13202,7 +13269,8 @@ open func sendRaw(eventType: String, content: String, requestConfigOverride: Req
      * [`Timeline`] they belong to, e.g. marking a thread as read from its root
      * and latest event ids. Note that this won't check whether sending the
      * receipt is necessary or valid (i.e. it can move a receipt backwards);
-     * prefer [`Timeline::send_single_receipt`] when a timeline is available.
+     * prefer [`crate::Timeline::send_read_receipt`] when a timeline is
+     * available.
      */
 open func sendSingleReceipt(receiptType: ReceiptType, thread: ReceiptThread, eventId: String)async throws   {
     return
@@ -19754,7 +19822,7 @@ public func FfiConverterTypeTaskHandle_lower(_ value: TaskHandle) -> UInt64 {
  * state publisher, making it straightforward to build reactive UIs on top of
  * the thread list.
  *
- * Obtain an instance via [`Room::thread_list_service`].
+ * Obtain an instance via [`crate::Room::thread_list_service`].
  */
 public protocol ThreadListServiceProtocol: AnyObject, Sendable {
     
@@ -19812,7 +19880,7 @@ public protocol ThreadListServiceProtocol: AnyObject, Sendable {
  * state publisher, making it straightforward to build reactive UIs on top of
  * the thread list.
  *
- * Obtain an instance via [`Room::thread_list_service`].
+ * Obtain an instance via [`crate::Room::thread_list_service`].
  */
 open class ThreadListService: ThreadListServiceProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
@@ -43982,7 +44050,7 @@ public func FfiConverterTypeReceiptThread_lower(_ value: ReceiptThread) -> RustB
 
 
 /**
- * A [`TimelineItem`](super::TimelineItem) that doesn't correspond to an event.
+ * A [`TimelineItem`] that doesn't correspond to an event.
  */
 
 public enum ReceiptType: Equatable, Hashable {
@@ -63191,7 +63259,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_create_room() != 3492) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_custom_login_with_jwt() != 58183) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_custom_login_with_jwt() != 49997) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_deactivate_account() != 65060) {
@@ -63203,10 +63271,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_device_id() != 2605) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_disable_well_known_lookup() != 38090) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_disable_well_known_lookup() != 60091) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_discover_rtc_transports() != 38965) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_discover_rtc_transports() != 10355) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_display_name() != 13626) {
@@ -63228,6 +63296,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_fetch_retention_configuration() != 33686) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_cached_media_content() != 14083) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_get_cached_media_thumbnail() != 4797) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_dm_room() != 35770) {
@@ -63305,7 +63379,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_ignored_users() != 60744) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_livekit_rtc_supported() != 60417) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_is_livekit_rtc_supported() != 40384) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_is_login_with_qr_code_supported() != 48668) {
@@ -63347,7 +63421,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_logout() != 12942) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_mark_all_rooms_as_read() != 2022) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_mark_all_rooms_as_read() != 58552) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_new_grant_login_with_qr_code_handler() != 23786) {
@@ -63548,7 +63622,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_upload_media() != 27840) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oauth() != 57377) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_url_for_oauth() != 36282) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_user_id() != 42220) {
@@ -63563,7 +63637,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_get_recent_emojis() != 3907) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_client_search_service() != 4417) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_search_service() != 53836) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_homeservercapabilities_can_change_avatar() != 36643) {
@@ -63647,7 +63721,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name() != 50140) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name_from_user_id() != 2715) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name_from_user_id() != 13243) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_clientbuilder_server_name_or_homeserver_url() != 27197) {
@@ -64196,7 +64270,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_raw() != 31612) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_single_receipt() != 44071) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_single_receipt() != 58972) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_state_event_raw() != 50352) {
